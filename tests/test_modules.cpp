@@ -345,7 +345,7 @@ TestImpl(test_modules)
         AssertThat(rpp::Compare::lt(1, 2), true);
         AssertThat(int(rpp::TestVerbosity::Summary), 1);
 
-        rpp::test_info info { rpp::strview{"probe"}, nullptr, {} };
+        rpp::test_info info { rpp::strview{"probe"}, nullptr };
         AssertThat(info.test_enabled, true);
         AssertThat(info.auto_run, true);
         rpp::test_factory factory = info.factory;

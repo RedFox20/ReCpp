@@ -13,42 +13,23 @@ A template which a module exports instantiates in the importer. GCC then looks t
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
 no longer apply. So a suppression which holds for a header consumer reaches no importer.
 
-`delegate.h` hit this. `init_function` cast `&dummy::func_proxy` to `dummy_type`, which named a
-different parameter list on G++, and a pragma pair suppressed `-Wcast-function-type`. The header
-build stayed quiet. Every importer which built an `rpp::delegate` from a function pointer warned:
+`delegate.h` hit this first, and `9c23b1b` closed that half. `init_function` cast
+`&dummy::func_proxy` to a `dummy_type` which named a different parameter list on G++, under a
+pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
+`run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
 
-```
-delegate.h:328: warning: cast between incompatible pointer to member types from
-'int (rpp::delegate<int()>::dummy::*)()' to 'int (rpp::delegate<int()>::dummy::*)(void*)'
-```
+Three regions remain, and each one sits in a template a module exports:
 
-| Build | gcc-15 | What the pragma does |
+| Where | Suppresses | An importer at `-Wall -Wextra` |
 |---|---|---|
-| headers, `-Wall -Wextra` | quiet | suppresses the cast |
-| an importer of `rpp.core` | warns | nothing |
-
-**The fix removes the cast instead of the warning.** `dummy_type` now names the same parameter
-list as `dummy::func_proxy` on every compiler, so `init_function` assigns with no cast and needs
-no pragma. The union still puns the member pointer into `memb_type`, which is how the call
-works, and the clang branch already used this spelling.
-
-`run_test.py --warn-free` pins it. It imports `rpp.core`, builds a delegate from a function
-pointer, and compiles with `-Werror=cast-function-type`. That probe fails against the old header
-and passes against the new one.
-
-The rule is general, so treat every `#pragma GCC diagnostic` around a template as dead for an
-importer. Three regions remain, and each one sits in a template a module exports:
-
-| Where | Suppresses |
-|---|---|
-| `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` |
-| `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` |
-| `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` |
+| `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` | warns at `delegate.h:433` |
+| `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` | warns at `tests.h:413` |
+| `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` | no probe has run |
 
 Each one wraps the GNU pmf-conversion extension, which has no standard spelling, so the cast
-cannot go. `-Wall -Wextra` leaves `-Wpedantic` off, so the ReCpp build stays quiet. An importer
-of `rpp.testing` which adds `-Wpedantic` gets an error at `tests.h:413`, measured on gcc-15. The
-other two share the shape and no probe has run against them.
+cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
+flag set. The ReCpp build stays quiet because every consumer includes the header before the
+import. Measured on gcc-15.
 
 ### B29. `udp_load_balancer` misses its throughput floor under full-suite load
 `test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
