@@ -1274,6 +1274,23 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── the drain notices a count which drops after the last event ─────
+    // A worker posts its resume, then drops the count when it returns. A drain which waits
+    // on the queue alone sits out its whole timeout, because no event follows that drop.
+    TestCase(stop_and_wait_all_ready_returns_when_the_last_task_returns)
+    {
+        rpp::event_loop_test::run_background(*loop, [this]
+        {
+            loop->post_resume({}); // what every awaiter does last
+            rpp::sleep_us(200); // the drain reaches its wait before the count drops
+        });
+        rpp::Timer wall;
+        AssertThat(loop->stop_and_wait_all_ready(rpp::seconds(1)), true);
+        double drain_ms = wall.elapsed_millis();
+        print_info("stop_and_wait_all_ready: %.1fms\n", drain_ms);
+        AssertLess(drain_ms, 100.0); // a drain which waits on the queue alone burns the timeout
+    }
+
     // ─── a delay() whose clock a swap replaces mid-wait ─────────
     // A deadline belongs to the clock which built it. A waiter which takes the offset of the
     // new clock measures that deadline on a timeline it never saw. See BUGS.md B26.

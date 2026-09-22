@@ -127,10 +127,18 @@ namespace rpp
         {
             process_event(event);
         }
-        while ((has_background_tasks() || pending_waiters() > 0) && wait_next_event(event, end, frame))
+        while (has_background_tasks() || pending_waiters() > 0)
         {
-            process_event(event);
-            invoke_loop_hook();
+            // the count drops with no event behind it, so the wait re-checks it on each slice
+            const rpp::TimePoint now = current_time(frame);
+            if (now >= end)
+                break;
+            const rpp::TimePoint slice = now + POLL_SLICE;
+            if (wait_next_event(event, slice < end ? slice : end, frame))
+            {
+                process_event(event);
+                invoke_loop_hook();
+            }
         }
         return resume_queue.empty() && !has_background_tasks() && pending_waiters() == 0;
     }
