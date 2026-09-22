@@ -459,20 +459,20 @@ TestImpl(test_timer)
         AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
     }
 
-    TestCase(timepoint_to_utc)
+    TestCase(timepoint_to_calendar)
     {
-        rpp::CalendarTime utc = rpp::TimePoint(2024, 3, 4, 9, 8, 7, 123'456'789LL).to_utc();
-        AssertTrue(utc.is_valid());
-        AssertEqual(utc.year, 2024);
-        AssertEqual(utc.month, 3);
-        AssertEqual(utc.day, 4);
-        AssertEqual(utc.hour, 9);
-        AssertEqual(utc.minute, 8);
-        AssertEqual(utc.second, 7);
-        AssertEqual(utc.nanos, 123'456'789LL);
+        rpp::CalendarTime cal = rpp::TimePoint(2024, 3, 4, 9, 8, 7, 123'456'789LL).to_calendar();
+        AssertTrue(cal.is_valid());
+        AssertEqual(cal.year, 2024);
+        AssertEqual(cal.month, 3);
+        AssertEqual(cal.day, 4);
+        AssertEqual(cal.hour, 9);
+        AssertEqual(cal.minute, 8);
+        AssertEqual(cal.second, 7);
+        AssertEqual(cal.nanos, 123'456'789LL);
 
         // a pre-epoch timepoint is negative, so a truncated division would report the next second
-        rpp::CalendarTime moon = rpp::TimePoint(1969, 7, 20, 20, 17, 40, 500'000'000LL).to_utc();
+        rpp::CalendarTime moon = rpp::TimePoint(1969, 7, 20, 20, 17, 40, 500'000'000LL).to_calendar();
         AssertTrue(moon.is_valid());
         AssertEqual(moon.year, 1969);
         AssertEqual(moon.month, 7);
@@ -483,12 +483,29 @@ TestImpl(test_timer)
         AssertEqual(moon.nanos, 500'000'000LL);
     }
 
-    TestCase(timepoint_to_utc_matches_to_string)
+    TestCase(timepoint_to_calendar_rejects_narrow_time_t)
+    {
+        // a narrow time_t cannot hold this year, so the split reports invalid instead of a wrapped date
+        constexpr rpp::int64 YEAR_2200_SECONDS = 7'272'378'123LL;
+        rpp::TimePoint far { rpp::Duration::from_seconds(YEAR_2200_SECONDS) };
+        rpp::CalendarTime cal = far.to_calendar();
+        if (cal.is_valid())
+        {
+            AssertEqual(cal.year, 2200);
+            AssertEqual(cal.month, 6);
+            AssertEqual(cal.day, 15);
+            AssertEqual(cal.hour, 1);
+            AssertEqual(cal.minute, 2);
+            AssertEqual(cal.second, 3);
+        }
+    }
+
+    TestCase(timepoint_to_calendar_matches_to_string)
     {
         rpp::TimePoint now = rpp::TimePoint::now();
-        rpp::CalendarTime utc = now.to_utc();
-        AssertTrue(utc.is_valid());
-        rpp::TimePoint rebuilt { utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second, utc.nanos };
+        rpp::CalendarTime cal = now.to_calendar();
+        AssertTrue(bool(cal));
+        rpp::TimePoint rebuilt { cal.year, cal.month, cal.day, cal.hour, cal.minute, cal.second, cal.nanos };
         AssertEqual(rebuilt.to_string(9), now.to_string(9));
     }
 

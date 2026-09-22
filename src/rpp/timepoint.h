@@ -299,6 +299,7 @@ namespace rpp
 
         /** @returns true if the OS converted the TimePoint into calendar parts */
         constexpr bool is_valid() const noexcept { return year != 0; }
+        constexpr explicit operator bool() const noexcept { return year != 0; }
 
         constexpr bool operator==(const CalendarTime& c) const noexcept
         {
@@ -382,12 +383,13 @@ namespace rpp
         static int64 timezone_offset_seconds() noexcept;
 
         /**
-         * @brief Splits this timepoint into UTC calendar parts, which is the inverse
-         *        of the TimePoint(year, month, day, ...) constructor.
-         * @note Use utc_to_local().to_utc() to get the parts in local time.
+         * @brief Splits this timepoint into calendar parts, which is the inverse of
+         *        the TimePoint(year, month, day, ...) constructor. Both use the UTC
+         *        calendar, because a TimePoint carries no timezone.
+         * @note Use utc_to_local().to_calendar() to get the parts in local time.
          * @returns The calendar parts, or an invalid CalendarTime if the OS rejected this timepoint.
          */
-        CalendarTime to_utc() const noexcept;
+        CalendarTime to_calendar() const noexcept;
 
         /** @returns only the HH:MM:SS.NANOS part of the Duration */
         constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }

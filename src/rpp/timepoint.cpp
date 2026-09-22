@@ -630,7 +630,7 @@ namespace rpp
         return time_tm;
     }
 
-    CalendarTime TimePoint::to_utc() const noexcept
+    CalendarTime TimePoint::to_calendar() const noexcept
     {
         // floor the division, because a truncated one puts a pre-epoch timepoint
         // into the next second and makes the nanoseconds negative
@@ -649,9 +649,14 @@ namespace rpp
             return CalendarTime{ utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, nanos };
     #endif
 
-        // Linux reads the clock with clock_gettime(), which the standard C calendar accepts
+        // Linux reads the clock with clock_gettime(), which the standard C calendar accepts.
+        // A narrow time_t wraps silently, so reject the value before the cast narrows it
+        time_t secs = time_t(seconds);
+        if (int64(secs) != seconds)
+            return CalendarTime{};
+
         std::tm tm_utc {};
-        if (!gmtime_safe(time_t(seconds), tm_utc))
+        if (!gmtime_safe(secs, tm_utc))
             return CalendarTime{};
         return CalendarTime{ tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday,
                              tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, nanos };
@@ -663,19 +668,19 @@ namespace rpp
         if (bufsize < 28)
             return 0; // won't fit
 
-        CalendarTime utc = tp.to_utc();
-        if (!utc.is_valid())
+        CalendarTime cal = tp.to_calendar();
+        if (!cal.is_valid())
             return 0;
 
         char* end = buf;
-        end += print_4digits(utc.year, end, '-');
-        end += print_2digits(utc.month, end, '-');
-        end += print_2digits(utc.day, end, ' ');
-        end += print_2digits(utc.hour, end, ':');
-        end += print_2digits(utc.minute, end, ':');
-        end += print_2digits(utc.second, end);
+        end += print_4digits(cal.year, end, '-');
+        end += print_2digits(cal.month, end, '-');
+        end += print_2digits(cal.day, end, ' ');
+        end += print_2digits(cal.hour, end, ':');
+        end += print_2digits(cal.minute, end, ':');
+        end += print_2digits(cal.second, end);
         if (fraction_digits > 0)
-            end += print_fraction(utc.nanos, end, fraction_digits);
+            end += print_fraction(cal.nanos, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
     }
