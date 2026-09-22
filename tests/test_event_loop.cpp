@@ -1276,7 +1276,7 @@ TestImpl(test_event_loop)
 
     // ─── the drain notices a count which drops after the last event ─────
     // A worker posts its resume, then drops the count when it returns. A drain which waits
-    // on the queue alone sits out its whole timeout, because no event follows that drop.
+    // on the queue alone waits for the whole timeout, because no event follows that drop.
     TestCase(stop_and_wait_all_ready_returns_when_the_last_task_returns)
     {
         rpp::event_loop_test::run_background(*loop, [this]
@@ -1288,7 +1288,7 @@ TestImpl(test_event_loop)
         AssertThat(loop->stop_and_wait_all_ready(rpp::seconds(1)), true);
         double drain_ms = wall.elapsed_millis();
         print_info("stop_and_wait_all_ready: %.1fms\n", drain_ms);
-        AssertLess(drain_ms, 100.0); // a drain which waits on the queue alone burns the timeout
+        AssertLess(drain_ms, 100.0); // a drain which waits on the queue alone reaches the timeout
     }
 
     // ─── a delay() whose clock a swap replaces mid-wait ─────────
@@ -1342,6 +1342,47 @@ TestImpl(test_event_loop)
         stop = true;
         for (std::thread& r : readers) r.join();
         AssertGreater(reads.load(), 0);
+    }
+
+    // ─── a frame which mixes one clock's offset with another's generation ───
+    // The offset and the generation come from two atomics. A publish which leaves the old
+    // clock live beside the new generation lets a reader take one from each. See BUGS.md B26.
+    TestCase(a_frame_never_pairs_one_clocks_offset_with_another_generation)
+    {
+        constexpr int NUM_CLOCKS = 8; // clock i warps i+1 seconds, so its offset names it
+        std::vector<std::unique_ptr<rpp::AtomicTimeSource>> clocks;
+        for (int i = 0; i < NUM_CLOCKS; ++i)
+        {
+            clocks.push_back(std::make_unique<rpp::AtomicTimeSource>());
+            clocks.back()->warp_forward(rpp::seconds(i + 1));
+        }
+
+        std::atomic_bool stop { false };
+        std::atomic_int frames { 0 };
+        std::atomic_int skewed { 0 };
+        auto base = loop->get_time_source_frame().generation; // the clock the fixture attached
+        std::thread reader { [&]
+        {
+            while (!stop.load())
+            {
+                auto f = loop->get_time_source_frame();
+                if (!f.warpable || f.generation == base)
+                    continue;
+                int index = int((f.generation - base - 1) % NUM_CLOCKS);
+                frames.fetch_add(1);
+                if (f.offset_ns != rpp::seconds(index + 1).nsec)
+                    skewed.fetch_add(1);
+            }
+        }};
+
+        for (int i = 0; i < 20000; ++i)
+            loop->set_time_source(clocks[i % NUM_CLOCKS].get());
+        stop = true;
+        reader.join();
+        loop->set_time_source(nullptr); // the scope frees `clocks` next
+
+        AssertGreater(frames.load(), 0);
+        AssertThat(skewed.load(), 0);
     }
 
     // ─── a join_forks() which loses its clock mid-wait ──────────

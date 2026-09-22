@@ -215,7 +215,7 @@ namespace rpp
         // number of threads reading through time_source right now
         mutable std::atomic_int time_source_readers { 0 };
 
-        // bumps on every attach, so a frame can tell which clock built its offset
+        // bumps on every set_time_source(), so a frame can tell which clock built its offset
         std::atomic<rpp::uint32> time_source_generation { 0 };
 
         // thread-safe FIFO queue of resume events
@@ -274,11 +274,12 @@ namespace rpp
          */
         void set_time_source(rpp::AtomicTimeSource* clock) noexcept
         {
-            // the bump lands before the store, so a reader which sees the new clock never
-            // takes it for the old generation and moves a deadline onto the wrong timeline
+            // the drain runs between the clear and the bump, so no reader pairs the old
+            // clock with a newer generation. That pair moves a deadline off its timeline
+            time_source.store(nullptr, std::memory_order_seq_cst);
+            drain_time_source_readers();
             time_source_generation.fetch_add(1, std::memory_order_seq_cst);
             time_source.store(clock, std::memory_order_seq_cst);
-            drain_time_source_readers();
         }
 
         /** @returns the loop's current time: the warpable clock's virtual time if attached,

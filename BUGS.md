@@ -286,9 +286,20 @@ now goes through `wait_next_event()` with a `time_frame`, so no wait hands the r
 
 1. Every `set_time_source()` drains the readers, not only a clear to null. So an owner which
    frees the clock a swap replaced no longer reaches freed memory.
+   `a_swap_drains_the_readers_before_the_owner_frees_the_old_clock` reports a
+   heap-use-after-free 19 runs out of 22 under ASAN when the drain goes back to the null case.
 2. A `time_frame` carries the generation of the clock which built it, and a refresh which
    reads another generation leaves the frame alone. So a swap cannot move a pending deadline
    onto a timeline it never saw.
+
+**The publish order decides the pair.** A bump before the pointer store leaves one
+inconsistent pair, which is the old clock beside the new generation. A store before the bump
+mirrors that pair. It does not close the window, and a reader which loads the generation
+first mirrors it once more. `a_frame_never_pairs_one_clocks_offset_with_another_generation`
+fails 10 runs out of 10 on both orders, at 528 skewed frames on the first. So
+`set_time_source()` clears the pointer, drains, bumps, and only then stores the new clock. A
+reader inside that window reads null and keeps the offset of its own frame. That order passes
+20 runs out of 20, and it costs no second drain.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.
