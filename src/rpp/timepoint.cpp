@@ -25,15 +25,6 @@
     #include <thread>
 #elif RPP_BARE_METAL
     #define timegm mktime
-    #if RPP_USE_EYALROZ_PRINTF
-        #include <printf/printf.h>
-    #else
-        #include <cstdio>
-        #ifndef snprintf_
-            #define snprintf_ snprintf
-        #endif
-    #endif
-    #include <cstdarg>
 
     #if RPP_FREERTOS
         #include <FreeRTOS.h>
@@ -446,6 +437,17 @@ namespace rpp
         return 2;
     }
 
+    // the int64 nanosecond range keeps a calendar year at exactly 4 digits
+    inline static int print_4digits(int value, char* out, char sep) noexcept
+    {
+        *out++ = char((value / 1000) + '0');
+        *out++ = char(((value / 100) % 10) + '0');
+        *out++ = char(((value / 10) % 10) + '0');
+        *out++ = char((value % 10) + '0');
+        *out++ = sep;
+        return 5;
+    }
+
     inline static int print_2digits(int value, char* out, char sep) noexcept
     {
         *out++ = char((value / 10) + '0');
@@ -607,15 +609,14 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    static std::tm gmtime_safe(const time_t& time) noexcept
+    /** @returns false if the calendar cannot represent this time */
+    static bool gmtime_safe(const time_t& time, std::tm& time_tm) noexcept
     {
-        std::tm time_tm;
         #if _MSC_VER || __MINGW32__ // MSVC++ or MinGW
-            gmtime_s(&time_tm, &time); // arguments reversed for some reason
+            return gmtime_s(&time_tm, &time) == 0; // arguments reversed for some reason
         #else
-            gmtime_r(&time, &time_tm);
+            return gmtime_r(&time, &time_tm) != nullptr;
         #endif
-        return time_tm;
     }
 
     static std::tm localtime_safe(const time_t& time) noexcept
@@ -629,62 +630,57 @@ namespace rpp
         return time_tm;
     }
 
+    CalendarTime TimePoint::to_calendar() const noexcept
+    {
+        // floor the division, because a truncated one puts a pre-epoch timepoint
+        // into the next second and makes the nanoseconds negative
+        int64 ns = duration.nanos();
+        int64 seconds = ns / NANOS_PER_SEC;
+        int64 nanos = ns % NANOS_PER_SEC;
+        if (nanos < 0) { nanos += NANOS_PER_SEC; --seconds; }
+
+        // the calendar must use the same OS functions that TimePoint::now() reads the clock with
+    #if _MSC_VER
+        // Windows reads the clock as FILETIME ticks, so the calendar conversion goes back through one
+        int64 systime_ticks = int64(LINUX_EPOCH_TICKS) + seconds * (NANOS_PER_SEC / 100) + nanos / 100;
+        FILETIME filetime = to_filetime(uint64(systime_ticks));
+        SYSTEMTIME utc;
+        if (FileTimeToSystemTime(&filetime, &utc))
+            return CalendarTime{ utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, nanos };
+    #endif
+
+        // Linux reads the clock with clock_gettime(), which the standard C calendar accepts.
+        // A narrow time_t wraps silently, so reject the value before the cast narrows it
+        time_t secs = time_t(seconds);
+        if (int64(secs) != seconds)
+            return CalendarTime{};
+
+        std::tm tm_utc {};
+        if (!gmtime_safe(secs, tm_utc))
+            return CalendarTime{};
+        return CalendarTime{ tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday,
+                             tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, nanos };
+    }
+
     // YYYY-MM-DD HH:MM:SS.mmm
-    NOINLINE static int datetime_to_string(int64 ns, char* buf, int bufsize, int fraction_digits) noexcept
+    NOINLINE static int datetime_to_string(const TimePoint& tp, char* buf, int bufsize, int fraction_digits) noexcept
     {
         if (bufsize < 28)
             return 0; // won't fit
 
-        // for datetime we must use the same OS functions that we use for TimePoint::now()
-        // in order to get the accurate system time as a string
+        CalendarTime cal = tp.to_calendar();
+        if (!cal.is_valid())
+            return 0;
 
-    #if _MSC_VER
-        // for windows we used GetSystemTimePreciseAsFileTime(&filetime);
-        // which gives us the current time in 100ns ticks since 1601-01-01
-        // we can convert this to a string using FileTimeToSystemTime
-        // convert nanoseconds to 100ns ticks
-        int64 systime_ticks = LINUX_EPOCH_TICKS + (ns / 100LL);
-        FILETIME filetime = to_filetime(systime_ticks);
-        SYSTEMTIME utc_time;
-        if (FileTimeToSystemTime(&filetime, &utc_time))
-        {
-            // now format to YYYY-MM-DD HH:MM:SS.mmm
-            char* end = buf;
-            end += print_digits(utc_time.wYear, end, '-');
-            end += print_2digits(utc_time.wMonth, end, '-');
-            end += print_2digits(utc_time.wDay, end, ' ');
-            end += print_2digits(utc_time.wHour, end, ':');
-            end += print_2digits(utc_time.wMinute, end, ':');
-            end += print_2digits(utc_time.wSecond, end);
-            if (fraction_digits > 0)
-                end += print_fraction(ns % NANOS_PER_SEC, end, fraction_digits);
-            *end = '\0';
-            return int(end - buf);
-        }
-    #endif
-
-        // for linux we used clock_gettime(CLOCK_REALTIME, &t);
-        // which gives us the current time in seconds and nanoseconds
-        // we can convert this to a string using the standard C functions
-        time_t seconds = ns / NANOS_PER_SEC;
-        int64 nanos = ns % NANOS_PER_SEC;
-        struct tm tm_utc = gmtime_safe(seconds);
-
-        // Format the date and time in the buffer
-    #if RPP_BARE_METAL
-        // Use snprintf since strftime footprint is very large (~7KB)
-        char* end = buf + snprintf_(buf, bufsize, "%04d-%02d-%02d %02d:%02d:%02d",
-            tm_utc.tm_year + 1900,
-            tm_utc.tm_mon + 1,
-            tm_utc.tm_mday,
-            tm_utc.tm_hour,
-            tm_utc.tm_min,
-            tm_utc.tm_sec);
-    #else
-        char* end = buf + strftime(buf, bufsize, "%Y-%m-%d %H:%M:%S", &tm_utc);
-    #endif
+        char* end = buf;
+        end += print_4digits(cal.year, end, '-');
+        end += print_2digits(cal.month, end, '-');
+        end += print_2digits(cal.day, end, ' ');
+        end += print_2digits(cal.hour, end, ':');
+        end += print_2digits(cal.minute, end, ':');
+        end += print_2digits(cal.second, end);
         if (fraction_digits > 0)
-            end += print_fraction(nanos, end, fraction_digits);
+            end += print_fraction(cal.nanos, end, fraction_digits);
         *end = '\0';
         return int(end - buf);
     }
@@ -726,14 +722,14 @@ namespace rpp
 
     int TimePoint::to_string(char* buf, int bufsize, int fraction_digits) const noexcept
     {
-        return datetime_to_string(duration.nanos(), buf, bufsize, fraction_digits);
+        return datetime_to_string(*this, buf, bufsize, fraction_digits);
     }
 
 #if !RPP_BARE_METAL
     std::string TimePoint::to_string(int fraction_digits) const noexcept
     {
         char buf[64];
-        int len = datetime_to_string(duration.nanos(), buf, sizeof(buf), fraction_digits);
+        int len = datetime_to_string(*this, buf, sizeof(buf), fraction_digits);
         return {buf, buf+len};
     }
 #endif

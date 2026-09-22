@@ -30,6 +30,7 @@ export namespace rpp {
     using rpp::NANOS_PER_DAY;
     using rpp::NANOS_PER_HOUR;
     using rpp::NANOS_PER_MINUTE;
+    using rpp::CalendarTime;
     using rpp::seconds_f;
     using rpp::seconds;
     using rpp::millis_f;
