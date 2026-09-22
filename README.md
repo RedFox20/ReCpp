@@ -1421,27 +1421,27 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 
 | Class | Description |
 |-------|-------------|
-| [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L168) | Single-target function delegate |
-| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L748) | Multi-target event delegate (`event<>` alias) |
+| [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L166) | Single-target function delegate |
+| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L749) | Multi-target event delegate (`event<>` alias) |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](src/rpp/delegate.h#L687) | Invoke the delegate |
-| [`operator bool()`](src/rpp/delegate.h#L642) | True if delegate is bound |
-| [`reset()`](src/rpp/delegate.h#L587) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L678) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L633) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L578) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L831) / [`operator+=`](src/rpp/delegate.h#L891) | Register a callback |
-| [`operator-=`](src/rpp/delegate.h#L896) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L916) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L745) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L793) | Number of registered callbacks |
-| [`multicast_fwd<T>`](src/rpp/delegate.h#L910) | Trait to deduce forwarding reference type for multicast args |
+| [`add(delegate)`](src/rpp/delegate.h#L822) / [`operator+=`](src/rpp/delegate.h#L882) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L887) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L907) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L736) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L784) | Number of registered callbacks |
+| [`multicast_fwd<T>`](src/rpp/delegate.h#L903) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
 

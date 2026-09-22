@@ -311,15 +311,18 @@ jobs:
           # --compare-paths builds the same source through the headers and compares the report.
           # --unicode-off reaches the half of the module surface no consumer job builds, because
           # config.h turns unicode on for every one of them
+          # --warn-free proves an importer compiles a delegate with no cast warning, see BUGS.md B30
           JOBS=$(nproc)
           CC_NAME="${{ matrix.cc }}" # gcc-15 names the g++-15 this step runs
           UNICODE_OFF=""
+          WARN_FREE=""
           if [[ "${{ matrix.compiler }}" == "gcc" && "${{ matrix.expect }}" == "modules" ]]; then
             UNICODE_OFF="--unicode-off g++-${CC_NAME#gcc-}"
+            WARN_FREE="--warn-free g++-${CC_NAME#gcc-}"
           fi
           cd tests/module_consumer
           CXX20=1 taskset -c 0-$((JOBS - 1)) python3 run_test.py \
-              --compiler ${{ matrix.compiler }} --expect ${{ matrix.expect }} --compare-paths --jobs $JOBS $UNICODE_OFF
+              --compiler ${{ matrix.compiler }} --expect ${{ matrix.expect }} --compare-paths --jobs $JOBS $UNICODE_OFF $WARN_FREE
 
       # C++23 costs gcc more module source locations than C++20, see BUGS.md C28. A layout
       # which reads back on C++20 can still fail here, see BUGS.md B24, and only this step covers it
