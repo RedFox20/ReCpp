@@ -285,6 +285,32 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * @brief Calendar parts of a TimePoint, as the OS calendar reports them.
+     */
+    struct CalendarTime
+    {
+        int year = 0;    // the calendar year, which stays zero when the OS rejected the TimePoint
+        int month = 0;   // [1, 12] since Jan
+        int day = 0;     // [1, 31]
+        int hour = 0;    // [0, 23] since midnight
+        int minute = 0;  // [0, 59] after the hour
+        int second = 0;  // [0, 60] after the minute, which allows one positive leap second
+        int64 nanos = 0; // nanoseconds inside the second, always positive
+
+        /** @returns true if the OS converted the TimePoint into calendar parts */
+        constexpr bool is_valid() const noexcept { return year != 0; }
+
+        constexpr bool operator==(const CalendarTime& c) const noexcept
+        {
+            return year == c.year && month == c.month && day == c.day && hour == c.hour
+                && minute == c.minute && second == c.second && nanos == c.nanos;
+        }
+        constexpr bool operator!=(const CalendarTime& c) const noexcept { return !(*this == c); }
+    };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
      * @brief New TimePoint API for OS specific high accuracy timepoints
      *        which avoids floating point calculations.
      *
@@ -354,6 +380,14 @@ namespace rpp
 
         /** @returns TimeZone offset in seconds for the current system, e.g. 10800 for UTC+3 timezone */
         static int64 timezone_offset_seconds() noexcept;
+
+        /**
+         * @brief Splits this timepoint into UTC calendar parts, which is the inverse
+         *        of the TimePoint(year, month, day, ...) constructor.
+         * @note Use utc_to_local().to_utc() to get the parts in local time.
+         * @returns The calendar parts, or an invalid CalendarTime if the OS rejected this timepoint.
+         */
+        CalendarTime to_utc() const noexcept;
 
         /** @returns only the HH:MM:SS.NANOS part of the Duration */
         constexpr Duration time_of_day() const noexcept { return Duration{ duration.nsec % NANOS_PER_DAY }; }

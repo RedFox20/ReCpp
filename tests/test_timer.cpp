@@ -459,6 +459,39 @@ TestImpl(test_timer)
         AssertEqual(t3.to_string(9), "2024-03-04 09:08:07.123456789");
     }
 
+    TestCase(timepoint_to_utc)
+    {
+        rpp::CalendarTime utc = rpp::TimePoint(2024, 3, 4, 9, 8, 7, 123'456'789LL).to_utc();
+        AssertTrue(utc.is_valid());
+        AssertEqual(utc.year, 2024);
+        AssertEqual(utc.month, 3);
+        AssertEqual(utc.day, 4);
+        AssertEqual(utc.hour, 9);
+        AssertEqual(utc.minute, 8);
+        AssertEqual(utc.second, 7);
+        AssertEqual(utc.nanos, 123'456'789LL);
+
+        // a pre-epoch timepoint is negative, so a truncated division would report the next second
+        rpp::CalendarTime moon = rpp::TimePoint(1969, 7, 20, 20, 17, 40, 500'000'000LL).to_utc();
+        AssertTrue(moon.is_valid());
+        AssertEqual(moon.year, 1969);
+        AssertEqual(moon.month, 7);
+        AssertEqual(moon.day, 20);
+        AssertEqual(moon.hour, 20);
+        AssertEqual(moon.minute, 17);
+        AssertEqual(moon.second, 40);
+        AssertEqual(moon.nanos, 500'000'000LL);
+    }
+
+    TestCase(timepoint_to_utc_matches_to_string)
+    {
+        rpp::TimePoint now = rpp::TimePoint::now();
+        rpp::CalendarTime utc = now.to_utc();
+        AssertTrue(utc.is_valid());
+        rpp::TimePoint rebuilt { utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second, utc.nanos };
+        AssertEqual(rebuilt.to_string(9), now.to_string(9));
+    }
+
     TestCase(timepoint_handles_timezone_offset)
     {
         auto t1 = rpp::TimePoint(2021, 1, 1, 12, 34, 56, 789'010'000LL);
