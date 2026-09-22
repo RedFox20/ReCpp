@@ -1274,6 +1274,120 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // ─── the drain notices a count which drops after the last event ─────
+    // A worker posts its resume, then drops the count when it returns. A drain which waits
+    // on the queue alone waits for the whole timeout, because no event follows that drop.
+    TestCase(stop_and_wait_all_ready_returns_when_the_last_task_returns)
+    {
+        rpp::event_loop_test::run_background(*loop, [this]
+        {
+            loop->post_resume({}); // what every awaiter does last
+            rpp::sleep_us(200); // the drain reaches its wait before the count drops
+        });
+        rpp::Timer wall;
+        AssertThat(loop->stop_and_wait_all_ready(rpp::seconds(1)), true);
+        double drain_ms = wall.elapsed_millis();
+        print_info("stop_and_wait_all_ready: %.1fms\n", drain_ms);
+        AssertLess(drain_ms, 100.0); // a drain which waits on the queue alone reaches the timeout
+    }
+
+    // ─── a delay() whose clock a swap replaces mid-wait ─────────
+    // A deadline belongs to the clock which built it. A waiter which takes the offset of the
+    // new clock measures that deadline on a timeline it never saw. See BUGS.md B26.
+    TestCase(delay_keeps_its_own_clock_when_a_swap_replaces_it)
+    {
+        std::atomic_bool done { false };
+        loop->fork([&]() -> rpp::event_task
+        {
+            co_await loop->delay(rpp::millis(20));
+            done = true;
+        });
+        AssertThat(loop->pending_waiters(), 1); // the timer holds its frame before the swap
+
+        auto other = std::make_unique<rpp::AtomicTimeSource>();
+        other->warp_forward(rpp::seconds(3600)); // far past the deadline the old clock built
+        loop->set_time_source(other.get());
+
+        rpp::Duration waited = loop_until(rpp::seconds(1), [&]{ return done.load(); });
+        AssertThat(done.load(), true);
+        AssertGreater(waited.millis(), 15); // the new clock must not move a deadline the old one built
+
+        loop->set_time_source(nullptr); // the scope frees `other` next
+    }
+
+    // ─── a swap which frees the clock it replaced ───────────────
+    // Every attach drains the readers, so an owner may free the clock a swap replaced.
+    // Without that drain a reader holds the old pointer and ASAN reports the free. See B26.
+    TestCase(a_swap_drains_the_readers_before_the_owner_frees_the_old_clock)
+    {
+        std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
+        constexpr int NUM_READERS = 2; // more readers cost the drain far more time, see BUGS.md B26
+        std::vector<std::thread> readers;
+        readers.reserve(NUM_READERS);
+        for (int t = 0; t < NUM_READERS; ++t)
+            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
+
+        std::unique_ptr<rpp::AtomicTimeSource> live;
+        for (int i = 0; i < 20000; ++i)
+        {
+            auto next = std::make_unique<rpp::AtomicTimeSource>();
+            loop->set_time_source(next.get());
+            live = std::move(next); // frees the clock the swap above replaced, never the live one
+        }
+        loop->set_time_source(nullptr);
+        live.reset();
+
+        stop = true;
+        for (std::thread& r : readers) r.join();
+        AssertGreater(reads.load(), 0);
+    }
+
+    // ─── a frame which mixes one clock's offset with another's generation ───
+    // The offset and the generation come from two atomics. A publish which leaves the old
+    // clock live beside the new generation lets a reader take one from each. See BUGS.md B26.
+    TestCase(a_frame_never_pairs_one_clocks_offset_with_another_generation)
+    {
+        constexpr int NUM_CLOCKS = 8; // clock i warps i+1 seconds, so its offset names it
+        std::vector<std::unique_ptr<rpp::AtomicTimeSource>> clocks;
+        for (int i = 0; i < NUM_CLOCKS; ++i)
+        {
+            clocks.push_back(std::make_unique<rpp::AtomicTimeSource>());
+            clocks.back()->warp_forward(rpp::seconds(i + 1));
+        }
+
+        std::atomic_bool stop { false };
+        std::atomic_int reads { 0 };
+        std::atomic_int frames { 0 };
+        std::atomic_int skewed { 0 };
+        rpp::uint32 base = loop->get_time_source_frame().generation; // the clock the fixture attached
+        std::thread reader { [&]
+        {
+            while (!stop.load())
+            {
+                auto f = loop->get_time_source_frame();
+                reads.fetch_add(1);
+                if (!f.warpable || f.generation == base)
+                    continue;
+                int index = int((f.generation - base - 1) % NUM_CLOCKS);
+                frames.fetch_add(1);
+                if (f.offset_ns != rpp::seconds(index + 1).nsec)
+                    skewed.fetch_add(1);
+            }
+        }};
+        spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
+
+        for (int i = 0; i < 20000; ++i)
+            loop->set_time_source(clocks[i % NUM_CLOCKS].get());
+        stop = true;
+        reader.join();
+        loop->set_time_source(nullptr); // the scope frees `clocks` next
+
+        AssertGreater(frames.load(), 0);
+        AssertThat(skewed.load(), 0);
+    }
+
     // ─── a join_forks() which loses its clock mid-wait ──────────
     // The join timer keeps the last offset it read. A timer which re-reads a detached source
     // drops the warp below and then waits for real time to reach the deadline.

@@ -282,12 +282,27 @@ A live worker holds three borrowed things: the loop, the time source and the poo
 the `delay()` half. A poll step reads the offset under a reader guard, and
 `stop_and_wait_all_ready()` retires the pointer before the owner frees it. Every loop wait
 now goes through `wait_next_event()` with a `time_frame`, so no wait hands the raw pointer to
-`concurrent_queue` any more. Two gaps stay open.
+`concurrent_queue` any more. The two swap gaps are closed.
 
-1. `set_time_source(other_clock)` during a pending `delay()` overwrites the captured offset
-   with the offset of the new clock. A retire is safe. A swap re-arms the same stranding.
-2. An owner which frees a clock it swapped out for another still reaches freed memory,
-   because only a clear to null retires. Clear it before the free.
+1. Every `set_time_source()` drains the readers, not only a clear to null. So an owner which
+   frees the clock a swap replaced no longer reaches freed memory.
+   `a_swap_drains_the_readers_before_the_owner_frees_the_old_clock` reports a
+   heap-use-after-free 19 runs out of 22 under ASAN when the drain goes back to the null case.
+2. A `time_frame` carries the generation of the clock which built it, and a refresh which
+   reads another generation leaves the frame alone. So a swap cannot move a pending deadline
+   onto a timeline it never saw.
+
+**The publish order decides the pair.** A bump before the pointer store leaves one
+inconsistent pair, which is the old clock beside the new generation. A store before the bump
+mirrors that pair, and a reader which loads the generation first mirrors it once more.
+`a_frame_never_pairs_one_clocks_offset_with_another_generation` fails 10 runs out of 10 on
+both orders, at 528 skewed frames on the first.
+
+So `set_time_source()` clears the pointer, drains, bumps, and only then stores the new clock.
+A reader inside that null window keeps the offset of its own frame. That order passes 20 runs
+out of 20, and it costs no second drain. A frame captured inside the null window is not
+warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
+fresh frames, and outside a storm the window measures about 300ns per call.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.
@@ -309,6 +324,10 @@ under ASAN. A reader picks its count before it loads the pointer. So a reader wh
 count `g` and then stalled can hold the pointer an attach stored. The detach after it retires
 the other count, reads zero, and lets the caller free the clock. A correct split has to
 publish the pointer each reader holds, which is a hazard pointer, not a counter.
+
+The generation a `time_frame` carries is not that shape. It splits no reader count, and it
+decides one thing only, which is whether a refresh belongs to the frame. One count still
+guards every reader, and the drain still waits for all of them.
 
 **The pool window is closed.** `start_in_background()` now wraps the task and drops the count
 in a guard destructor. The decrement runs after the task returns, so no awaiter can add code
