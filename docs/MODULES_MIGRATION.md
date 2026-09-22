@@ -1177,6 +1177,12 @@ already used, so the public signature names no std type.
 
 ### 11.2 Open design follow-ups
 
+**`rpp::cfuture` derives from `std::future`, which binds the whole group.**
+[`FUTURE_MIGRATION.md`](FUTURE_MIGRATION.md) holds that plan. It adds `rpp::future` and
+`rpp::promise`, which own their shared state and name no std type. It leaves `cfuture` in
+the header for a consumer which includes. Removing `<future>` from the group fragment is
+what removes B28 condition 1.
+
 **A modules build should import its std names, not include them.** A translation unit
 built with modules still writes `#include <vector>` and `#include <future>` today. The
 target is an `import` for every std name. An `#include` then stays only for a shallow
