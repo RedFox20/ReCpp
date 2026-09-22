@@ -4,9 +4,11 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include <future>
+#include <type_traits>
 // C++20 makes <coroutine> mandatory, freestanding included, and config.h asserts C++20
 #include <coroutine>
+// This header must never reach <future>. gcc-14 crashes any importer of a module whose
+// fragment carries it, and every header which includes this one would carry it. See BUGS.md B16
 
 namespace rpp
 {
@@ -20,27 +22,8 @@ namespace rpp
     using suspend_always = std::suspend_always;
 
 
-    template<typename F>
-    concept IsFuture = requires(F f) {
-        requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
-              || std::is_same_v<F, std::future<decltype(f.get())>>;
-    };
-
-    template<typename F>
-    concept NotFuture = !IsFuture<F>;
-
     template<typename Function>
     concept IsFunction = std::is_invocable_v<Function>;
 
-    template<typename F>
-    concept IsFunctionReturningFuture = requires(F f)
-    {
-        requires IsFunction<F> && IsFuture<decltype(f())>;
-    };
-
-    template<typename F>
-    concept IsFunctionNotReturningFuture = requires(F f)
-    {
-        requires IsFunction<F> && NotFuture<decltype(f())>;
-    };
+    // IsFuture and the concepts built on it live in future.h, which owns <future>
 }

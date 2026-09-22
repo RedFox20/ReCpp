@@ -7,6 +7,7 @@ option(MSVC_NOCRTDBG "MSVC: No Debug CRT (enforce /MD or /MT)? This greatly impr
 set(BUILD_WITH_MODULES "AUTO" CACHE STRING
     "Experimental C++20 modules: AUTO builds them where the toolchain supports it, ON demands them, OFF never")
 set_property(CACHE BUILD_WITH_MODULES PROPERTY STRINGS AUTO ON OFF)
+option(RPP_MODULES_ALLOW_GCC14 "Build modules on GCC 14 anyway. The importer must keep to the BUGS.md B28 include set" OFF)
 option(MSVC_DYNAMIC  "MSVC: Use Dynamic CRT?" ON)
 option(RPP_USE_LIBCXX "On Clang, link against libc++ (LLVM stdlib). OFF uses the distro default (typically libstdc++ on Linux). Set OFF when ReCpp must interop with libstdc++-built runtimes — e.g. Ubuntu's libclang_rt.fuzzer." ON)
 
@@ -313,9 +314,9 @@ endif()
 ###################################################
 
 # Experimental C++20 Modules support
-# The first version of each compiler family that builds the rpp-*.cppm facades.
-# Below these, the same sources give hundreds of std redefinition or ambiguity errors.
-set(RPP_MODULES_MIN_GCC   14)     # GCC 13 has no CMake-usable module support
+# The first version of each compiler family a consumer of the rpp-*.cppm facades can use.
+# Below these, the same sources crash the compiler or give hundreds of std redefinition errors.
+set(RPP_MODULES_MIN_GCC   15)     # gcc-14 crashes an importer which names a cfuture, see BUGS.md B28
 set(RPP_MODULES_MIN_CLANG 21)     # Clang 18 mis-resolves the facade using-declarations
 set(RPP_MODULES_MIN_MSVC  19.34)  # VS 2022 17.4
 
@@ -328,8 +329,8 @@ elseif(RPP_CXX_STANDARD LESS 20)
 elseif(NOT CMAKE_GENERATOR MATCHES "Ninja|Visual Studio")
     # CMake drives module dependency scanning only on these two generators
     set(RPP_NO_MODULES "generator '${CMAKE_GENERATOR}' cannot scan module dependencies")
-elseif(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC})
-    set(RPP_NO_MODULES "GCC ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_GCC}")
+elseif(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC} AND NOT RPP_MODULES_ALLOW_GCC14)
+    set(RPP_NO_MODULES "GCC ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_GCC}, and RPP_MODULES_ALLOW_GCC14 is off")
 elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG})
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
@@ -364,6 +365,13 @@ endif()
 
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")
+    if(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC})
+        message(WARNING
+            "RPP_MODULES_ALLOW_GCC14 is on, so GCC ${CMAKE_CXX_COMPILER_VERSION} builds modules anyway. "
+            "An importer which names an rpp::cfuture must keep to <typeinfo>, <new>, <vector>, "
+            "<string> and <functional>. Adding <memory>, <chrono>, <thread>, <exception> or "
+            "<stdexcept> crashes the compiler. See BUGS.md B28.")
+    endif()
 
     # One unit per header group, each carrying its headers directly, because of the
     # gcc-14 source location budget in BUGS.md C28.
@@ -375,6 +383,7 @@ if(RPP_BUILD_MODULES)
         src/rpp/rpp-containers.cppm
         src/rpp/rpp-io.cppm
         src/rpp/rpp-threading.cppm
+        src/rpp/rpp-future.cppm
         src/rpp/rpp-testing.cppm
     )
 

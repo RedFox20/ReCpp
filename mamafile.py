@@ -1,6 +1,9 @@
 import mama
-from mama.utils.system import error
+from mama.utils.system import error, warning
 import os, sys, shlex, subprocess
+
+# mirrors RPP_MODULES_MIN_GCC in CMakeLists.txt. gcc-14 crashes an importer, see BUGS.md B28
+MODULES_MIN_GCC = (15, 0)
 
 class ReCpp(mama.BuildTarget):
 
@@ -17,7 +20,32 @@ class ReCpp(mama.BuildTarget):
             self.add_git('elfutils', 'https://github.com/RedFox20/elfutils-package.git')
 
 
+    def gcc_below_modules_minimum(self) -> str:
+        """@returns the GCC version when it is under the modules minimum, else an empty string."""
+        if not getattr(self.config, 'gcc', False): return ''
+        if os.getenv('RPP_MODULES_ALLOW_GCC14') in ('1', 'ON', 'TRUE'): return '' # the override, see BUGS.md B28
+        # answers the cached version, and resolves the compiler when the run has not picked one yet
+        try: version = self.config.get_preferred_compiler_paths()[2] or ''
+        except Exception: return '' # a run which cannot name its compiler fails later, with a clearer message
+        try: parts = tuple(int(p) for p in version.split('.')[:2])
+        except ValueError: return ''
+        return version if parts and parts < MODULES_MIN_GCC[:len(parts)] else ''
+
+
+    def warn_gcc_below_modules_minimum(self):
+        """Tells a GCC user below the modules minimum that this build takes the header path."""
+        version = self.gcc_below_modules_minimum()
+        if not version: return
+        min_gcc = '.'.join(str(p) for p in MODULES_MIN_GCC).removesuffix('.0')
+        warning(f'GCC {version} is below the ReCpp modules minimum of GCC {min_gcc}, so this build ' + \
+                'takes the header path. GCC 14.2 and 14.4 crash on an importer which names an ' + \
+                'rpp::cfuture beside <memory>, at every optimization level. The header path carries ' + \
+                'no such limit, and it supports every compiler. See BUGS.md B28.')
+
+
     def configure(self):
+        self.warn_gcc_below_modules_minimum()
+
         # follow mama's clang stdlib choice; getattr keeps this working on older mamabuild
         if getattr(self.config, 'clang_stdlib', 'libc++') != 'libc++':
             self.add_cmake_options('RPP_USE_LIBCXX=OFF')
@@ -32,9 +60,12 @@ class ReCpp(mama.BuildTarget):
         self.enable_from_env('CXX23', force=self.is_enabled_cxx23())
         self.enable_from_env('CXX26', force=self.is_enabled_cxx26())
         self.enable_from_env('BUILD_WITH_MODULES')
+        self.enable_from_env('RPP_MODULES_ALLOW_GCC14')
 
 
     def package(self):
+        # a consumer compiles the exported .cppm itself, so a GCC under the minimum must receive none
+        if self.gcc_below_modules_minimum(): self.no_export_modules()
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)

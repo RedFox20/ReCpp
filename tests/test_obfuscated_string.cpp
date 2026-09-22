@@ -34,7 +34,7 @@ TestImpl(test_obfuscated_string)
     TestCase(the_binary_holds_no_plaintext)
     {
         // this asserts the end result. It does not pin the volatile read, see BUGS.md B7
-        constexpr auto probe = rpp::make_obfuscated("kratt-plaintext-probe-9f3a");
+        constexpr auto probe = rpp::make_obfuscated("recpp-plaintext-probe-9f3a");
         std::string secret = probe.to_string(); // built at runtime, so it is no literal here
         AssertEqual((int)secret.size(), 26);
         AssertFalse(binary_holds(secret));

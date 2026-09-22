@@ -50,7 +50,7 @@ IncludeCategories:
     Priority: 1
   - Regex: '^<(gtest|test)/.*>$'
     Priority: 3
-  - Regex: '^<(krattutil|rpp|rtp|mavlink|mavlink2)/.*>$'
+  - Regex: '^<(rpp|rtp|mavlink|mavlink2)/.*>$'
     Priority: 4
   - Regex: '^<.*/.*'
     Priority: 2
