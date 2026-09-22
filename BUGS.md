@@ -428,6 +428,11 @@ Sixth sighting on 8dc779d, on `ubuntu-cpp20-tsan-gcc13`, and again the same two 
 commit edits three markdown files, so the rate alone moved it, not the code. All 556 cases
 passed and TSAN set exit 66 on its own.
 
+Seventh sighting on 202654a, again on `ubuntu-cpp20-tsan-gcc13`, with the same two lines and
+the same creation stack. That commit edits two build files and two markdown files, so no C++
+changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
+set exit 66 on its own.
+
 ### B15. Six headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
