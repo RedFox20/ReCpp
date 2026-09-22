@@ -1199,6 +1199,31 @@ Two includes survive the change either way. An importer of `rpp.future` keeps `<
 and `<new>`, because a template instantiates in the importer and libstdc++ names `typeid`
 there. See `BUGS.md` **B28**.
 
+**A public header earns each heavy std include, or it drops it.** A header include reaches
+every module fragment which carries that header, and B28 lists which ones then crash a
+gcc-14 importer. Counted over `src/rpp/*.h`:
+
+| Header | Public header sites | On the B28 ICE list |
+|---|---|---|
+| `<functional>` | 0 | no |
+| `<chrono>` | 0 | yes |
+| `<future>` | 1 | it is the condition 1 carrier |
+| `<thread>` | 1 | yes |
+| `<memory>` | 4 | yes |
+| `<stdexcept>` | 4 | yes |
+| `<exception>` | 5 | yes |
+
+`<functional>` already sits at zero, because `rpp::delegate` replaced it. That is the shape
+the rest should reach. `<future>` leaves in the future plan, and `<thread>` has one site.
+
+**The weight is in the last three rows, not the first.** `<exception>`, `<stdexcept>` and
+`<memory>` hold 13 of the 15 public header slots, and every one of them makes gcc-14 crash
+an importer. A pass over those three buys more than the two headers which already read as
+the obvious offenders.
+
+A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono>` and
+`<thread>` appear in four `.cpp` files between them, and none of those sites matter here.
+
 ---
 
 ## 12. Risks
