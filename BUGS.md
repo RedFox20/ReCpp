@@ -8,28 +8,37 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B33. `proc_cpu_times` expects user CPU time before the process has any
+`test_timer::proc_cpu_times` asserts that `t1.user_time_us` is above zero at `test_timer.cpp:721`,
+before it spins. The case alone failed `t1.user_time_us => '0'` in 11 of 40 plain gcc-14 runs,
+and a batch of 20 at a load average of 0.02 failed 4 times. In a full clang-18 TSAN run, `t1` read
+6671 ms of user time, because the earlier cases ran first.
+
 ### B32. `monotonic_epoch_offset()` fills its offset table with no synchronization
 Two pool workers read and write the static `offsets` table in `monotonic_epoch_offset()` on first
 use. A probe process whose first `TimePoint::monotonic_now()` calls ran on two pool workers made
 clang-18 TSAN report it 3 of 3.
 
-T2 `rpp_task_2` reads `offsets[index]` at `timepoint.cpp:811`, under
-`pool_worker::wait_for_new_job()`. T1 `rpp_task_1` writes it at `timepoint.cpp:816`, under
-`TimePoint::now()`. Each thread samples both clocks on its own, so two threads can use two
-different offsets. The full suite never reports it, because the runner calls
+T2 `rpp_task_2` reads `offsets[index]` at `timepoint.cpp:811`, and T1 `rpp_task_1` writes it at
+`timepoint.cpp:816`. Both stacks call `TimePoint::monotonic_now()` from `semaphore::wait()` in
+`pool_worker::wait_for_new_job()`. Each thread samples both clocks on its own, so two threads can
+use two different offsets. A 32-bit target can split the `int64` access, so a reader can also get
+a torn offset. The full suite never reports it, because the runner calls
 `TimePoint::monotonic_now()` on the main thread first, at `tests.cpp:1088`.
 
-### B31. `async()` can free an exception after the handler read it
+### B31. TSAN can blame the `async()` worker for freeing an exception the handler read
 C31 moved the error out of the state, and one path remains. `async()` calls `set_exception()`
 inside its catch block at `async.h:211`, so the pool worker still holds the exception after it
 publishes. When the handler finishes first, that worker frees the exception in `__cxa_end_catch`.
+libc++abi counts the reference in uninstrumented code, so TSAN sees no edge from the read to the
+free.
 
 T1 `rpp_task_1` calls `free` from `__cxa_end_catch`, under the delegate call at
 `thread_pool.cpp:335`. T2 `rpp_task_2` read the exception before, in the handler, under
 `detail::handle()` and `future<void>::continue_with()`. A probe in the shape of
 `continue_with_handler_recovers` reported it 3 of 3 on clang-18 TSAN with libc++, with
 `rpp::sleep_ms(10)` after `set_exception()` in that catch block. Without the delay it reported 0
-of 3.
+of 3, but the same runs reported B32 3 of 3.
 
 `set_exception()` has the same shape on libc++ 18. It assigns its parameter with `std::move` at
 `async.h:146`, which copies, so the parameter holds a reference until the call returns. A
@@ -615,9 +624,8 @@ event, not on the clock.
 
 A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
 and requires 45 ms of CPU time at `test_timer.cpp:737`. A local clang-18 TSAN run got
-`cpu_delta => '42103'`, and the case alone failed that floor 1 of 5 times on a 4 core VM. A
-fresh process which runs only this case also fails `t1.user_time_us => '0'` at
-`test_timer.cpp:721`, 7 of 20 times on gcc-14.
+`cpu_delta => '42103'`. The case alone failed that floor 1 of 5 times under TSAN, and 1 of 20
+times on gcc-14 with a load average of 0.02.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
