@@ -1464,47 +1464,50 @@ Composable futures which own their shared state, with C++20 coroutine support. T
 
 | Item | Description |
 |------|-------------|
-| [`future<T>`](src/rpp/async.h#L244) | Composable future which owns its shared state and names no std future |
+| [`future<T>`](src/rpp/async.h#L261) | Composable future which owns its shared state and names no std future |
 | [`promise<T>`](src/rpp/async.h#L98) | Producer half of `future<T>`, which publishes one value or one exception |
-| [`async(Task task)`](src/rpp/async.h#L168) | Runs a task on the thread pool, and returns `future<T>` |
-| [`ready_future(T value)`](src/rpp/async.h#L462) | Creates a future which already holds the value |
-| [`ready_future()`](src/rpp/async.h#L471) | Creates a `future<void>` which already finished |
-| [`exceptional_future(E e)`](src/rpp/async.h#L481) | Creates a future whose `get()` throws the exception |
-| [`wait_all(futures)`](src/rpp/async.h#L491) | Blocks until every future holds its result |
-| [`get_all(futures)`](src/rpp/async.h#L499) | Blocks and gathers every result, and rethrows the first exception |
+| [`async(Task task)`](src/rpp/async.h#L185) | Runs a task on the thread pool, and returns `future<T>` |
+| [`ready_future(T value)`](src/rpp/async.h#L480) | Creates a future which already holds the value |
+| [`ready_future()`](src/rpp/async.h#L489) | Creates a `future<void>` which already finished |
+| [`exceptional_future(std::exception_ptr e)`](src/rpp/async.h#L499) | Creates a future whose `get()` rethrows the exception `e` points at |
+| [`exceptional_future(E e)`](src/rpp/async.h#L509) | Creates a future whose `get()` throws the exception |
+| [`wait_all(futures)`](src/rpp/async.h#L516) | Blocks until every future holds its result |
+| [`get_all(futures)`](src/rpp/async.h#L540) | Blocks and gathers every result. It collects every future, then rethrows the first exception |
 
 ### future Methods
 
 | Method | Description |
 |--------|-------------|
-| [`~future()`](src/rpp/async.h#L269) | Collects a ready result. An unready future terminates, because nobody awaited it |
-| [`valid()`](src/rpp/async.h#L272) | Returns `true` while the future holds a state, which `get()` consumes |
-| [`get()`](src/rpp/async.h#L290) | Blocks, then returns the result or rethrows its exception. The future is invalid afterwards |
-| [`wait()`](src/rpp/async.h#L278) | Blocks until the result arrives |
-| [`wait_for(Duration timeout)`](src/rpp/async.h#L281) | Returns `wait_result::finished` when the result arrives before the timeout |
-| [`wait_until(TimePoint until)`](src/rpp/async.h#L287) | Returns `wait_result::finished` when the result arrives before the deadline |
-| [`then(Task task, Handlers... handlers)`](src/rpp/async.h#L326) | Continues on the pool with the result. The first handler whose exception type matches recovers the chain |
-| [`then(future<U>&& next)`](src/rpp/async.h#L338) | Waits for this future, then returns the result of `next` |
-| [`then()`](src/rpp/async.h#L354) | Downcasts to `future<void>`, which drops the value |
-| [`continue_with(Task task, Handlers... handlers)`](src/rpp/async.h#L362) | Runs the task with the result on the pool, and returns no future |
-| [`detach()`](src/rpp/async.h#L372) | Abandons the result without a wait. Nobody sees its exception |
-| [`chain_async(Task task)`](src/rpp/async.h#L389) | Runs the task after this future. An invalid future starts it at once |
-| [`chain_async(future&& next)`](src/rpp/async.h#L402) | Chains another future after this one |
-| [`await_ready()`](src/rpp/async.h#L275) | Returns `true` when the result arrived, without a block |
-| [`collect_ready(T* result)`](src/rpp/async.h#L299) | Collects a finished result without a block. Returns `false` while the result has not arrived |
-| [`collect_wait(T* result)`](src/rpp/async.h#L302) | Blocks for the result and collects it. Returns `false` on an invalid future |
-| [`await_suspend(coro_handle<> cont)`](src/rpp/async.h#L410) | Resumes the coroutine on a pool thread after the result arrives |
-| [`await_resume()`](src/rpp/async.h#L422) | Returns the result to the coroutine, or rethrows its exception |
-| [`promise_type`](src/rpp/async.h#L253) | Coroutine promise. It publishes the result after the frame destroys its locals, and before its by-value parameters |
+| [`~future()`](src/rpp/async.h#L286) | Collects a ready result. An unready future terminates, because nobody awaited it |
+| [`operator=(future&& f)`](src/rpp/async.h#L274) | Ends the old state as the destructor does, then takes the state of `f` |
+| [`valid()`](src/rpp/async.h#L289) | Returns `true` while the future holds a state, which `get()` consumes |
+| [`get()`](src/rpp/async.h#L307) | Blocks, then returns the result or rethrows its exception. The future is invalid afterwards |
+| [`wait()`](src/rpp/async.h#L295) | Blocks until the result arrives |
+| [`wait_for(Duration timeout)`](src/rpp/async.h#L298) | Returns `wait_result::finished` when the result arrives before the timeout |
+| [`wait_until(TimePoint until)`](src/rpp/async.h#L304) | Returns `wait_result::finished` when the result arrives before the deadline |
+| [`then(Task task, Handlers... handlers)`](src/rpp/async.h#L343) | Continues on the pool with the result. The first handler whose exception type matches recovers the chain |
+| [`then(future<U>&& next)`](src/rpp/async.h#L355) | Waits for this future, then returns the result of `next` |
+| [`then()`](src/rpp/async.h#L371) | Downcasts to `future<void>`, which drops the value |
+| [`continue_with(Task task, Handlers... handlers)`](src/rpp/async.h#L379) | Runs the task with the result on the pool, and returns no future |
+| [`detach()`](src/rpp/async.h#L360) | Abandons the result without a wait. Nobody sees its exception |
+| [`chain_async(Task task)`](src/rpp/async.h#L406) | Runs the task after this future. An invalid future starts it at once |
+| [`chain_async(future&& next)`](src/rpp/async.h#L419) | Chains another future after this one |
+| [`await_ready()`](src/rpp/async.h#L292) | Returns `true` when the result arrived, without a block |
+| [`collect_ready(T* result)`](src/rpp/async.h#L316) | Collects a finished result without a block. Returns `false` while the result has not arrived |
+| [`collect_wait(T* result)`](src/rpp/async.h#L319) | Blocks for the result and collects it. Returns `false` on an invalid future |
+| [`await_suspend(coro_handle<> cont)`](src/rpp/async.h#L427) | Resumes the coroutine on a pool thread after the result arrives |
+| [`await_resume()`](src/rpp/async.h#L439) | Returns the result to the coroutine, or rethrows its exception |
+| [`promise_type`](src/rpp/async.h#L270) | Coroutine promise. It publishes the result after the frame destroys its locals, and before its by-value parameters |
 
 ### promise Methods
 
 | Method | Description |
 |--------|-------------|
-| [`get_future()`](src/rpp/async.h#L124) | Returns the one future which receives the result, also after the promise published it |
-| [`set_value(Args&&... args)`](src/rpp/async.h#L134) | Stores the value and wakes the waiter |
-| [`set_exception(std::exception_ptr e)`](src/rpp/async.h#L141) | Stores the exception which `get()` rethrows, and wakes the waiter |
-| [`~promise()`](src/rpp/async.h#L111) | Publishes a `std::logic_error` when the promise never published a result |
+| [`get_future()`](src/rpp/async.h#L127) | Returns the one future which receives the result, also after the promise published it |
+| [`set_value(Args&&... args)`](src/rpp/async.h#L137) | Stores the value and wakes the waiter |
+| [`set_exception(std::exception_ptr e)`](src/rpp/async.h#L144) | Stores the exception which `get()` rethrows, and wakes the waiter |
+| [`~promise()`](src/rpp/async.h#L124) | Publishes a `std::logic_error` when the promise never published a result |
+| [`operator=(promise&& p)`](src/rpp/async.h#L110) | Abandons the old state as the destructor does, then takes the state of `p` |
 
 ### Example: `rpp::future` from a coroutine
 
@@ -1527,31 +1530,31 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 |------|-------------|
 | [`cfuture<T>`](src/rpp/future.h#L174) | Extended `std::future` with composition and coroutine support |
 | [`async_task(task)`](src/rpp/future.h#L73) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L997) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L1014) | Create an already-errored future |
-| [`wait_all(const std::vector<cfuture<T>>& vf)`](src/rpp/future.h#L1023) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L1036) | Block and gather results from all futures |
+| [`make_ready_future(value)`](src/rpp/future.h#L999) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L1016) | Create an already-errored future |
+| [`wait_all(const std::vector<cfuture<T>>& vf)`](src/rpp/future.h#L1025) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L1038) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
 | [`~cfuture()`](src/rpp/future.h#L188) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
-| [`then()`](src/rpp/future.h#L217) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
-| [`then(Task task)`](src/rpp/future.h#L234) | Chain a continuation that receives the result (runs via `async_task`) |
-| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L261) | Chain with 1–4 typed exception recovery handlers |
-| [`then(cfuture<U>&& next)`](src/rpp/future.h#L313) | Chain by waiting for this future, then returning the result of `next` |
-| [`continue_with(Task task)`](src/rpp/future.h#L329) | Fire-and-forget continuation (moves `*this` into background) |
-| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L337) | Fire-and-forget continuation with 1–4 typed exception handlers |
-| [`detach()`](src/rpp/future.h#L392) | Abandon future, wait in background (swallows exceptions) |
-| [`chain_async(Task task)`](src/rpp/future.h#L424) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
-| [`chain_async(cfuture&& next)`](src/rpp/future.h#L437) | Sequential chaining with another future |
-| [`await_ready()`](src/rpp/future.h#L451) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L482) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L500) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L511) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L530) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L550) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`then()`](src/rpp/future.h#L218) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L235) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L262) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L314) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L330) | Fire-and-forget continuation (moves `*this` into background) |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L338) | Fire-and-forget continuation with 1–4 typed exception handlers |
+| [`detach()`](src/rpp/future.h#L393) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L425) | Sequential chaining: if invalid, starts a new async task; if valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L438) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L452) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L483) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L501) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L512) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L531) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L551) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
 | [`coro_handle<T>`](src/rpp/future_types.h#L29) | Alias for `std::coroutine_handle<T>` |
 | [`suspend_never`](src/rpp/future_types.h#L30) | Alias for the standard never-suspend awaiter |
 | [`suspend_always`](src/rpp/future_types.h#L31) | Alias for the standard always-suspend awaiter |

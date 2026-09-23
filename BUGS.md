@@ -318,6 +318,16 @@ it counts no frame and asserts nothing about skew.
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 
+**The skew check fired once in CI.** `android-cpp20-r27-clang-tidy-clang18` reported
+`skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1388`, on a commit which
+changes no `event_loop` code. That job runs the tests under QEMU on an x86 runner. So one reader
+paired an offset with another generation, which the publish order above exists to stop.
+
+| Where | Result |
+|---|---|
+| `android-cpp20-r27-clang-tidy-clang18` | 1 run in 3 failed, and its re-run passed |
+| `test_event_loop` locally, gcc-14 | 20 runs out of 20 pass on 4 cores, and 20 out of 20 on one core |
+
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
@@ -739,11 +749,15 @@ A tie between candidates goes to the line nearest the old reference. After an ed
 declaration, the nearest line can be a call, a trailing comment, or a forward declaration.
 `--check` then passes, because it only asks whether the row names some candidate.
 
-Eight rows sat on such a line, and each one points at its declaration now. They are
-`future.h` `wait_all` and `await_resume`, `thread_pool.h` `pool_worker`, both `parallel_for`
-rows, the free `parallel_task`, and `async.h` `collect_wait` and `await_resume`. Two of them also
-needed display text equal to the declaration, because a call scored higher. A fix ranks a
-declaration above a call before the distance breaks the tie.
+Nine rows still sit on such a line, so they reproduce it:
+
+| Row | Points at |
+|---|---|
+| `sprint.h` `string_buffer`, `task.h` `task<T>` and `deferred<T>`, `tests.h` `test` | a forward declaration |
+| `sprint.h` `write_cont`, `delegate.h` `reset()`, `collections.h` `find_smallest` and `find_largest`, `concurrent_queue.h` `try_pop` | a call |
+
+A display text which names a parameter the call also names scores the call higher, so it wins
+without a tie. A fix ranks a declaration above a call before the distance breaks the tie.
 
 ## Closed
 

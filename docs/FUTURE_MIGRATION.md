@@ -101,6 +101,10 @@ The names below read the same on both types, so a mechanical port compiles.
 `detach()` keeps its name and drops its cost. It releases the state at once, so no pool thread
 blocks on an abandoned result.
 
+`get_all()` keeps its name and collects every future before it rethrows the first exception.
+The `cfuture` overload stops at the first one, so a later future which is not ready terminates
+in its destructor.
+
 `rpp::task<T>` does not overlap this. A task resumes on the loop thread and spawns nothing.
 A future blocks a thread and carries `.then()`. See `task.h`.
 

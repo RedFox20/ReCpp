@@ -105,20 +105,23 @@ namespace rpp
     public:
         promise() = default;
         promise(promise&& p) noexcept : state{p.state}, retrieved{p.retrieved}, published{p.published} { p.state = nullptr; }
-        promise& operator=(promise&&) = delete;
+
+        /// Abandons the state this promise holds, as the destructor does, then takes the state of `p`
+        promise& operator=(promise&& p) noexcept
+        {
+            if (this != &p)
+            {
+                abandon();
+                state = p.state;
+                retrieved = p.retrieved;
+                published = p.published;
+                p.state = nullptr;
+            }
+            return *this;
+        }
 
         /// Publishes the stored result. A promise with a future and no result publishes a std::logic_error
-        ~promise() noexcept
-        {
-            if (!state) return;
-            if (!published && retrieved && !state->value && !state->error)
-            {
-                std::logic_error broken { "rpp::promise published no result before its destructor ran" };
-                state->error = std::make_exception_ptr(broken);
-            }
-            if (!published) state->done.notify_all(); // the stored result, or the error above
-            state->release();
-        }
+        ~promise() noexcept { abandon(); }
 
         /// @returns the future which receives the result. Throws std::logic_error on a second call
         RPP_CORO_WRAPPER future<T> get_future()
@@ -156,6 +159,20 @@ namespace rpp
         {
             published = true;
             state->done.notify_all();
+        }
+
+        // the destructor and the move assignment both end the life of a state
+        void abandon() noexcept
+        {
+            if (!state) return;
+            if (!published && retrieved && !state->value && !state->error)
+            {
+                std::logic_error broken { "rpp::promise released its state with no result" };
+                state->error = std::make_exception_ptr(broken);
+            }
+            if (!published) state->done.notify_all(); // the stored result, or the error above
+            state->release();
+            state = nullptr;
         }
     };
 
@@ -448,6 +465,7 @@ namespace rpp
             {
                 try { (void)get(); }
                 catch (const std::exception& e) { __assertion_failure("rpp::future<T> dropped an exception: %s", e.what()); }
+                catch (...) { __assertion_failure("rpp::future<T> dropped an exception of an unknown type"); }
                 return; // collected, so only an unready future reaches the terminate below
             }
             // fail fast: std::future blocks here in silence, and that hides the missing await
@@ -476,14 +494,21 @@ namespace rpp
         return f;
     }
 
+    /// @returns a future whose get() rethrows the exception `e` points at
+    template<typename T>
+    RPP_CORO_WRAPPER future<T> exceptional_future(std::exception_ptr e)
+    {
+        promise<T> p;
+        future<T> f = p.get_future();
+        p.set_exception(std::move(e));
+        return f;
+    }
+
     /// @returns a future whose get() throws `e`
     template<typename T, typename E>
     RPP_CORO_WRAPPER future<T> exceptional_future(E e)
     {
-        promise<T> p;
-        future<T> f = p.get_future();
-        p.set_exception(std::make_exception_ptr(std::move(e)));
-        return f;
+        return rpp::exceptional_future<T>(std::make_exception_ptr(std::move(e)));
     }
 
     /// Blocks until every future holds its result, and collects none of them
@@ -494,21 +519,35 @@ namespace rpp
             f.wait();
     }
 
-    /// @returns every result in order. Rethrows the first exception
+    namespace detail
+    {
+        /// Collects every future, then rethrows the first exception, so the vector keeps no valid future
+        template<class T, class Collect>
+        void collect_all(std::vector<future<T>>& futures, const Collect& collect)
+        {
+            std::exception_ptr first;
+            for (future<T>& f : futures)
+            {
+                try { collect(f); }
+                catch (...) { if (!first) first = std::current_exception(); }
+            }
+            if (first) std::rethrow_exception(first);
+        }
+    }
+
+    /// @returns every result in order. Collects every future, then rethrows the first exception
     template<typename T>
     std::vector<T> get_all(std::vector<future<T>>& futures)
     {
         std::vector<T> all;
         all.reserve(futures.size());
-        for (future<T>& f : futures)
-            all.emplace_back(f.get());
+        detail::collect_all(futures, [&](future<T>& f) { all.emplace_back(f.get()); });
         return all;
     }
 
-    /// Blocks until every future finishes. Rethrows the first exception
+    /// Blocks until every future finishes. Collects every future, then rethrows the first exception
     inline void get_all(std::vector<future<void>>& futures)
     {
-        for (future<void>& f : futures)
-            f.get();
+        detail::collect_all(futures, [](future<void>& f) { f.get(); });
     }
 } // namespace rpp
