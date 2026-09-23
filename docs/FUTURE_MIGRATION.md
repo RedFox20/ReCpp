@@ -56,6 +56,7 @@ Each row is a std behavior which no longer exists, not one which moved.
 | `std::future_error` | a missing state or a broken promise throws `std::logic_error`, the base of `std::future_error` |
 | `wait_result::deferred` | `rpp::async` always starts the task on the pool, so no wait reports a deferred state |
 | `run_tasks()` | its launcher returns a `cfuture<void>`, so it stays in `future.h` |
+| the silent release in a move assignment | a move assignment over an unready future terminates, as the destructor does |
 
 **`share()` never arrives, and nothing asks for it.** A grep over `src` and `tests` finds no
 `.share()` call and no `std::shared_future`. A shared future needs a refcounted state and a
@@ -115,7 +116,7 @@ Eight are source and twelve are tests.
 | `coroutines.h` | 11 | keeps the `rpp::future` awaiter, and the std awaiters move out |
 | `task.h`, `thread_pool.h` | 8 | doc comments only |
 | `future_types.h` | 1 | a second forward declaration |
-| `rpp-future.cppm` | generated | the export list names the new type and drops `cfuture` |
+| `rpp-future.cppm` | generated | the export list drops `cfuture`, because `rpp.threading` exports the new type |
 
 ### 5.1 Three headers, and no shared awaiter
 
