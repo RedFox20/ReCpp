@@ -790,9 +790,9 @@ without a tie. A fix ranks a declaration above a call before the distance breaks
 ## Closed
 
 ### C32. TSAN blamed the `async()` worker for freeing an exception the handler read (was B31)
-`async()` published the error inside its catch block, and `set_exception()` kept a copy on libc++
-18, so the worker could free the exception last. Both now publish with no reference left on the
-worker.
+`async()` published the exception inside its catch block, and `set_exception()` and
+`exceptional_future()` kept a reference on libc++ 18. All three now publish with no reference left,
+and each has a `test_async` case which fails on the old code with libc++.
 
 ### C31. TSAN blamed a pool worker for freeing an exception a handler had read
 `future_state::take()` rethrew a copy of the error, so a late `~promise()` on another pool worker

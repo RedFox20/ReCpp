@@ -190,7 +190,7 @@ namespace rpp
         // the pool destroys this lambda late, so reset() runs the task destructor before the result publishes
         rpp::parallel_task_detached([task=std::optional<Task>{std::move(task)}, p=std::move(p)]() mutable noexcept
         {
-            std::exception_ptr error; // published after the catch, so this worker frees no error, see BUGS.md C32
+            std::exception_ptr error; // the worker publishes after the catch ends, so it keeps no reference, see BUGS.md C32
             try
             {
                 if constexpr (std::is_void_v<T>)
@@ -500,7 +500,7 @@ namespace rpp
     {
         promise<T> p;
         future<T> f = p.get_future();
-        p.set_exception(std::move(e));
+        p.set_exception(std::exchange(e, nullptr)); // the caller may destroy `e` late, see BUGS.md C32
         return f;
     }
 

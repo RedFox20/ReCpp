@@ -3,8 +3,10 @@
 #include <rpp/timepoint.h>
 #include <rpp/tests.h>
 #include <atomic>
+#include <exception> // std::current_exception, std::exception_ptr
 #include <stdexcept>
 #include <string> // std::string
+#include <utility> // std::exchange
 #include <vector>
 using namespace rpp;
 using namespace std::string_literals;
@@ -368,6 +370,63 @@ TestImpl(test_async)
     {
         AssertThat(exceptions_left_after_get<void>(), 0);
         AssertThat(exceptions_left_after_get<int>(), 0);
+    }
+
+    // records whether the last owner of the task destroyed it inside a catch block
+    struct catch_probe
+    {
+        bool* insideCatch;
+        explicit catch_probe(bool* inside) noexcept : insideCatch{inside} {}
+        catch_probe(catch_probe&& p) noexcept : insideCatch{std::exchange(p.insideCatch, nullptr)} {}
+        ~catch_probe() { if (insideCatch) *insideCatch = std::current_exception() != nullptr; }
+    };
+
+    // the worker destroys the task and publishes after its catch block ends. See BUGS.md C32
+    TestCase(async_publishes_after_its_catch_block)
+    {
+        bool insideCatch = true; // a destructor which never runs also fails the case
+        future<void> f = rpp::async([probe=catch_probe{&insideCatch}] { throw std::runtime_error{"catch_probe_msg"}; });
+        AssertThrows(f.get(), std::runtime_error);
+        AssertThat(insideCatch, false);
+    }
+
+    // the argument lives to the end of the comma expression on the Itanium ABI, so it must hold no reference
+    TestCase(set_exception_keeps_no_reference)
+    {
+        int alive = 0;
+        bool caught = false;
+        promise<void> p;
+        future<void> f = p.get_future();
+        rpp::semaphore consumed;
+        future<void> consumer = rpp::async([&] {
+            try { f.get(); } catch (const counted_error&) { caught = true; }
+            consumed.notify();
+        });
+        std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
+        int aliveAfterConsumer = -1;
+        (p.set_exception(std::exchange(error, nullptr)), (void)consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        consumer.get();
+        AssertThat(caught, true);
+        AssertThat(aliveAfterConsumer, 0);
+    }
+
+    // the argument lives to the end of the comma expression on the Itanium ABI, so it must hold no reference
+    TestCase(exceptional_future_keeps_no_reference)
+    {
+        int alive = 0;
+        bool caught = false;
+        future<void> f;
+        future<void> consumer;
+        rpp::semaphore consumed;
+        std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
+        int aliveAfterConsumer = -1;
+        (f = rpp::exceptional_future<void>(std::exchange(error, nullptr)), consumer = rpp::async([&] {
+            try { f.get(); } catch (const counted_error&) { caught = true; }
+            consumed.notify();
+        }), (void)consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        consumer.get();
+        AssertThat(caught, true);
+        AssertThat(aliveAfterConsumer, 0);
     }
 
     TestCase(basic_async_task)
