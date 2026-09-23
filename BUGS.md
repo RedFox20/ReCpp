@@ -8,6 +8,33 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B32. `monotonic_epoch_offset()` fills its offset table with no synchronization
+Two pool workers read and write the static `offsets` table in `monotonic_epoch_offset()` on first
+use. A probe process whose first `TimePoint::monotonic_now()` calls ran on two pool workers made
+clang-18 TSAN report it 3 of 3.
+
+T2 `rpp_task_2` reads `offsets[index]` at `timepoint.cpp:811`, under
+`pool_worker::wait_for_new_job()`. T1 `rpp_task_1` writes it at `timepoint.cpp:816`, under
+`TimePoint::now()`. Each thread samples both clocks on its own, so two threads can use two
+different offsets. The full suite never reports it, because the runner calls
+`TimePoint::monotonic_now()` on the main thread first, at `tests.cpp:1088`.
+
+### B31. `async()` can free an exception after the handler read it
+C31 moved the error out of the state, and one path remains. `async()` calls `set_exception()`
+inside its catch block at `async.h:211`, so the pool worker still holds the exception after it
+publishes. When the handler finishes first, that worker frees the exception in `__cxa_end_catch`.
+
+T1 `rpp_task_1` calls `free` from `__cxa_end_catch`, under the delegate call at
+`thread_pool.cpp:335`. T2 `rpp_task_2` read the exception before, in the handler, under
+`detail::handle()` and `future<void>::continue_with()`. A probe in the shape of
+`continue_with_handler_recovers` reported it 3 of 3 on clang-18 TSAN with libc++, with
+`rpp::sleep_ms(10)` after `set_exception()` in that catch block. Without the delay it reported 0
+of 3.
+
+`set_exception()` has the same shape on libc++ 18. It assigns its parameter with `std::move` at
+`async.h:146`, which copies, so the parameter holds a reference until the call returns. A
+regression test needs a hook inside `async()` to force this order.
+
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
@@ -586,9 +613,11 @@ A third shape compares two measured times, as
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
 
-A fourth shape trusts the CPU time a VM gives a spin. `test_timer::proc_cpu_times` spins 50 ms
-and requires 45 ms of CPU time, and a local clang-18 TSAN run got `cpu_delta => '42103'`. The
-case failed 1 of 5 runs alone on a 4 core VM. The change under test touched no timer code.
+A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
+and requires 45 ms of CPU time at `test_timer.cpp:737`. A local clang-18 TSAN run got
+`cpu_delta => '42103'`, and the case alone failed that floor 1 of 5 times on a 4 core VM. A
+fresh process which runs only this case also fails `t1.user_time_us => '0'` at
+`test_timer.cpp:721`, 7 of 20 times on gcc-14.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
@@ -770,16 +799,9 @@ without a tie. A fix ranks a declaration above a call before the distance breaks
 ## Closed
 
 ### C31. TSAN blamed a pool worker for freeing an exception a handler had read
-`ubuntu-cpp23-tsan-clang18` reported one race on 0b97f7d, and all 625 cases passed. Thread T1
-`rpp_task_1` freed the exception in `__cxa_decrement_exception_refcount`, under `~promise()` at
-the delegate reset. Thread T2 `rpp_task_2` had read it in the handler of
-`continue_with_handler_recovers`.
-
-`future_state::take()` rethrew a copy of the error, so the state kept a reference until the
-promise released it. libc++abi counts that reference in uninstrumented code, so TSAN saw no edge
-from the read to the free. `take()` now exchanges the error for null, because libc++ 18 copies an
-`exception_ptr` on a move. A forced order reproduced the report 3/3 on clang-18 before the fix and
-0/3 after. `get_takes_ownership_of_the_exception` pins both branches.
+`future_state::take()` rethrew a copy of the error, so a late `~promise()` on another pool worker
+freed an exception which a handler had read. `take()` now exchanges the error for null, which
+`get_takes_ownership_of_the_exception` pins.
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
 A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker
