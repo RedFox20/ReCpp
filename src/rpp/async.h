@@ -47,7 +47,7 @@ namespace rpp
                     delete this;
             }
 
-            /// Moves the result out, so the taker also frees it, then drops the reference of the future. See BUGS.md C31
+            /// Moves the result out and leaves no copy of the error, then drops the reference of the future. See BUGS.md C31
             T take()
             {
                 struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(); } } ref { this };
