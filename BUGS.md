@@ -8,11 +8,11 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
-### B33. `proc_cpu_times` expects user CPU time before the process has any
-`test_timer::proc_cpu_times` asserts that `t1.user_time_us` is above zero at `test_timer.cpp:721`,
-before it spins. The case alone failed `t1.user_time_us => '0'` in 11 of 40 plain gcc-14 runs,
-and a batch of 20 at a load average of 0.02 failed 4 times. In a full clang-18 TSAN run, `t1` read
-6671 ms of user time, because the earlier cases ran first.
+### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
+`test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:721` that
+`t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
+gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
+full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
 
 ### B32. `monotonic_epoch_offset()` fills its offset table with no synchronization
 Two pool workers read and write the static `offsets` table in `monotonic_epoch_offset()` on first
@@ -624,8 +624,9 @@ event, not on the clock.
 
 A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
 and requires 45 ms of CPU time at `test_timer.cpp:737`. A local clang-18 TSAN run got
-`cpu_delta => '42103'`. The case alone failed that floor 1 of 5 times under TSAN, and 1 of 20
-times on gcc-14 with a load average of 0.02.
+`cpu_delta => '42103'`. On a 4 core VM, the case alone failed that floor 1 of 5 times under TSAN.
+It failed 1 of 20 times on plain gcc-14, at a load average of 0.02. `/proc/stat` on that VM
+reports steal time, which its load average does not show.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
