@@ -26,24 +26,6 @@ use two different offsets. A 32-bit target can split the `int64` access, so a re
 a torn offset. The full suite never reports it, because the runner calls
 `TimePoint::monotonic_now()` on the main thread first, at `tests.cpp:1088`.
 
-### B31. TSAN can blame the `async()` worker for freeing an exception the handler read
-C31 moved the error out of the state, and one path remains. `async()` calls `set_exception()`
-inside its catch block at `async.h:211`, so the pool worker still holds the exception after it
-publishes. When the handler finishes first, that worker frees the exception in `__cxa_end_catch`.
-libc++abi counts the reference in uninstrumented code, so TSAN sees no edge from the read to the
-free.
-
-T1 `rpp_task_1` calls `free` from `__cxa_end_catch`, under the delegate call at
-`thread_pool.cpp:335`. T2 `rpp_task_2` read the exception before, in the handler, under
-`detail::handle()` and `future<void>::continue_with()`. A probe in the shape of
-`continue_with_handler_recovers` reported it 3 of 3 on clang-18 TSAN with libc++, with
-`rpp::sleep_ms(10)` after `set_exception()` in that catch block. Without the delay it reported 0
-of 3, but the same runs reported B32 3 of 3.
-
-`set_exception()` has the same shape on libc++ 18. It assigns its parameter with `std::move` at
-`async.h:146`, which copies, so the parameter holds a reference until the call returns. A
-regression test needs a hook inside `async()` to force this order.
-
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
@@ -806,6 +788,11 @@ A display text which names a parameter the call also names scores the call highe
 without a tie. A fix ranks a declaration above a call before the distance breaks the tie.
 
 ## Closed
+
+### C32. TSAN blamed the `async()` worker for freeing an exception the handler read (was B31)
+`async()` published the error inside its catch block, and `set_exception()` kept a copy on libc++
+18, so the worker could free the exception last. Both now publish with no reference left on the
+worker.
 
 ### C31. TSAN blamed a pool worker for freeing an exception a handler had read
 `future_state::take()` rethrew a copy of the error, so a late `~promise()` on another pool worker
