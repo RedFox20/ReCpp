@@ -189,11 +189,12 @@ namespace rpp
         {
             if (this->valid())
             {
-                // check if we have waited for the future before destruction
-                if (await_ready())
+                // await_ready() counts a deferred task as ready, and get() would run that task here
+                if (super::wait_for(std::chrono::microseconds{0}) == std::future_status::ready)
                 {
                     try { (void)this->get(); }
                     catch (const std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
+                    catch (...) { __assertion_failure("cfuture<T> threw an unknown exception type in destructor"); }
                     return; // collected, so only an unready future reaches the terminate below
                 }
                 // NOTE: This is a fail-fast strategy to catch programming bugs
@@ -608,11 +609,12 @@ namespace rpp
         {
             if (this->valid())
             {
-                // check if we have waited for the future before destruction
-                if (await_ready())
+                // await_ready() counts a deferred task as ready, and get() would run that task here
+                if (super::wait_for(std::chrono::microseconds{0}) == std::future_status::ready)
                 {
                     try { (void)this->get(); }
                     catch (std::exception& e) { __assertion_failure("cfuture<void> threw exception in destructor: %s", e.what()); }
+                    catch (...) { __assertion_failure("cfuture<void> threw an unknown exception type in destructor"); }
                     return; // collected, so only an unready future reaches the terminate below
                 }
                 // NOTE: This is a fail-fast strategy to catch programming bugs

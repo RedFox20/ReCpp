@@ -335,6 +335,14 @@ TestImpl(test_async)
         AssertThat(exceptionWasThrown, true);
     }
 
+    // an exception_ptr from catch (...) names the error, so get() rethrows that error and not the pointer
+    TestCase(exceptional_future_keeps_an_exception_ptr)
+    {
+        std::exception_ptr e = std::make_exception_ptr(std::runtime_error{"kept_msg"});
+        future<int> f = rpp::exceptional_future<int>(e);
+        AssertThrows((void)f.get(), std::runtime_error);
+    }
+
     TestCase(basic_async_task)
     {
         future<std::string> f = rpp::async([] {
@@ -456,6 +464,19 @@ TestImpl(test_async)
         AssertThat(f.get(), 7);
     }
 
+    // std::vector::erase() needs the move assignment, which breaks the promise it replaces
+    TestCase(a_promise_moves_like_std_promise)
+    {
+        std::vector<promise<int>> promises(2);
+        future<int> first = promises[0].get_future();
+        promises.erase(promises.begin());
+        AssertThrows((void)first.get(), std::logic_error);
+
+        future<int> second = promises[0].get_future();
+        promises[0].set_value(5);
+        AssertThat(second.get(), 5);
+    }
+
     TestCase(detach_abandons_an_unready_future)
     {
         promise<std::string> p;
@@ -533,6 +554,24 @@ TestImpl(test_async)
         nothing.push_back(rpp::ready_future());
         get_all(nothing);
         AssertThat(nothing[0].valid(), false);
+    }
+
+    // a future which stays valid in the vector would terminate in its destructor, so get_all() collects every one
+    TestCase(get_all_collects_every_future_before_it_rethrows)
+    {
+        std::vector<future<int>> ints;
+        ints.push_back(rpp::exceptional_future<int>(std::runtime_error{"first_msg"}));
+        ints.push_back(rpp::async([] { return 2; }));
+        ints.push_back(rpp::exceptional_future<int>(std::domain_error{"second_msg"}));
+        AssertThrows((void)get_all(ints), std::runtime_error);
+        AssertThat(ints[1].valid(), false);
+        AssertThat(ints[2].valid(), false);
+
+        std::vector<future<void>> nothing;
+        nothing.push_back(rpp::exceptional_future<void>(std::runtime_error{"first_msg"}));
+        nothing.push_back(rpp::exceptional_future<void>(std::domain_error{"second_msg"}));
+        AssertThrows(get_all(nothing), std::runtime_error);
+        AssertThat(nothing[1].valid(), false);
     }
 
     static future<int> twice_async(int x)
