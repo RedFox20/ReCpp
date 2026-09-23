@@ -143,7 +143,7 @@ namespace rpp
         /// Stores the exception which get() rethrows, and wakes the waiter
         void set_exception(std::exception_ptr e)
         {
-            live().error = std::move(e);
+            live().error = std::exchange(e, nullptr); // libc++ 18 copies an exception_ptr on a move, see BUGS.md C32
             publish();
         }
 
@@ -190,6 +190,7 @@ namespace rpp
         // the pool destroys this lambda late, so reset() runs the task destructor before the result publishes
         rpp::parallel_task_detached([task=std::optional<Task>{std::move(task)}, p=std::move(p)]() mutable noexcept
         {
+            std::exception_ptr error; // published after the catch, so this worker frees no error, see BUGS.md C32
             try
             {
                 if constexpr (std::is_void_v<T>)
@@ -205,11 +206,10 @@ namespace rpp
                     p.set_value(std::move(value));
                 }
             }
-            catch (...)
-            {
-                task.reset();
-                p.set_exception(std::current_exception());
-            }
+            catch (...) { error = std::current_exception(); }
+            task.reset();
+            if (error)
+                p.set_exception(std::exchange(error, nullptr));
         });
         return f;
     }
