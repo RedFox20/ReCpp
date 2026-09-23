@@ -100,22 +100,24 @@ namespace rpp
     protected:
         detail::future_state<T>* state = new detail::future_state<T>{};
         bool retrieved = false; // get_future() gives exactly one future
+        bool published = false;
 
     public:
         promise() = default;
-        promise(promise&& p) noexcept : state{p.state}, retrieved{p.retrieved} { p.state = nullptr; }
+        promise(promise&& p) noexcept : state{p.state}, retrieved{p.retrieved}, published{p.published} { p.state = nullptr; }
         promise& operator=(promise&&) = delete;
 
         /// Publishes the stored result. A promise with a future and no result publishes a std::logic_error
         ~promise() noexcept
         {
             if (!state) return;
-            if (retrieved && !state->value && !state->error)
+            if (!published && retrieved && !state->value && !state->error)
             {
                 std::logic_error broken { "rpp::promise published no result before its destructor ran" };
                 state->error = std::make_exception_ptr(broken);
             }
-            publish();
+            if (!published) state->done.notify_all(); // the stored result, or the error above
+            state->release();
         }
 
         /// @returns the future which receives the result. Throws std::logic_error on a second call
@@ -145,15 +147,15 @@ namespace rpp
     protected:
         detail::future_state<T>& live() const
         {
-            if (!state) throw std::logic_error{"rpp::promise already published its result, or it moved"};
+            if (!state || published) throw std::logic_error{"rpp::promise already published its result, or it moved"};
             return *state;
         }
 
+        // the promise keeps its reference after the publish, so get_future() still works afterwards
         void publish() noexcept
         {
+            published = true;
             state->done.notify_all();
-            state->release();
-            state = nullptr;
         }
     };
 
@@ -198,7 +200,7 @@ namespace rpp
 
     namespace detail
     {
-        /// The coroutine hooks of future<T>. ~promise() publishes the result after the frame destroyed every local
+        /// Coroutine hooks of future<T>. ~promise() publishes after the frame destroys its locals, before its by-value parameters
         template<class T>
         struct coro_promise_base : promise<T>
         {
@@ -366,7 +368,7 @@ namespace rpp
             });
         }
 
-        /// Abandons the result, so no destructor waits for it. Nobody sees the exception of the result
+        /// Abandons the result, so the destructor does not terminate on it. Nobody sees the exception of the result
         void detach() noexcept
         {
             if (state) state->release();
@@ -407,7 +409,7 @@ namespace rpp
         /// Resumes `cont` on a pool thread after the result arrives. @returns false on an invalid future
         bool await_suspend(rpp::coro_handle<> cont) noexcept
         {
-            if (!valid()) return false; // resumes at once, and await_resume() throws
+            if (!valid()) return false; // resumes at once, so await_resume throws
             rpp::parallel_task_detached([this, cont]()
             {
                 wait();
@@ -445,7 +447,7 @@ namespace rpp
             if (state->done.is_set())
             {
                 try { (void)get(); }
-                catch (const std::exception& e) { __assertion_failure("rpp::future<T> dropped an uncollected exception: %s", e.what()); }
+                catch (const std::exception& e) { __assertion_failure("rpp::future<T> dropped an exception: %s", e.what()); }
                 return; // collected, so only an unready future reaches the terminate below
             }
             // fail fast: std::future blocks here in silence, and that hides the missing await

@@ -446,6 +446,16 @@ TestImpl(test_async)
         AssertThat(f.get(), 1);
     }
 
+    // std::promise gives its future after set_value(), and a port from cpromise relies on that order
+    TestCase(a_promise_gives_its_future_after_it_published)
+    {
+        promise<int> p;
+        p.set_value(7);
+        future<int> f = p.get_future();
+        AssertThat(f.await_ready(), true);
+        AssertThat(f.get(), 7);
+    }
+
     TestCase(detach_abandons_an_unready_future)
     {
         promise<std::string> p;

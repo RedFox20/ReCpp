@@ -483,12 +483,12 @@ the same creation stack. That commit edits two build files and two markdown file
 changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
 set exit 66 on its own.
 
-### B15. Six headers do not compile on bare metal
+### B15. Seven headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
 `cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
-function for call to 'wait'`. `thread_pool.h`, `future.h`, `event_loop.h` and
+function for call to 'wait'`. `thread_pool.h`, `future.h`, `async.h`, `event_loop.h` and
 `coroutines.h` reach one of those two, so they report the same.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
@@ -498,7 +498,7 @@ bare metal takes that branch too, and it needs a target which can run the result
 `event_loop.h` carries a second gap of its own. It calls `rpp::get_thread_id()` at lines
 445 and 517, and `threads.h:31` declares that name only when `!RPP_BARE_METAL`.
 
-All six headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
+All seven headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
 
 ### B16. gcc-14 crashes an importer which instantiates `std::promise` at `-O1` and above
@@ -700,18 +700,22 @@ g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c u.cpp -o u.o    # 0 errors under R
 Put the offending line back into the generated block by hand to watch it fail. Only gcc 14.2
 ran this check, so retry on clang-21 and on a newer gcc.
 
-### B9. `--check-undocumented` reads 29 of the 48 headers and reports the rest as clean
-`extract_public_decls` returns nothing for 19 headers, so the gate never asks whether
+### B9. `--check-undocumented` reads 28 of the 50 headers and reports the rest as clean
+`extract_public_decls` returns nothing for 22 headers, so the gate never asks whether
 README.md documents them. It reported "All public declarations are documented" while the
 `sort.h` table listed 1 of its 4 functions.
 
 ```
-headers the extractor reads: 29
-headers it returns nothing for: 19
-  bitutils.h close_sync.h concurrent_queue.h condition_variable.h coroutines.h debugging.h
-  debugging.macros.h future.h jni_cpp.h log_colors.h math.h memory_pool.h obfuscated_string.h
-  predicates.h proc_utils.h semaphore.h sort.h task.h traits.h
+headers the extractor reads: 28
+headers it returns nothing for: 22
+  async.h bitutils.h close_sync.h concurrent_queue.h condition_variable.h coroutines.h
+  debugging.h debugging.macros.h future.h future_types.h jni_cpp.h log_colors.h math.h
+  memory_pool.h obfuscated_string.h predicates.h proc_utils.h semaphore.h sort.h task.h
+  tests.macros.h traits.h
 ```
+
+`async.h` is new and blind to the gate, so a manual read matched a README.md row to each of
+its public names.
 
 Reproduce it with the loop which produced that count:
 ```bash
@@ -724,12 +728,22 @@ for h in sorted(os.listdir('src/rpp')):
 "
 ```
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
-the 19 headers then owe README.md. The count decides whether the gate can stay green.
+the 22 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
+### B5. `update_doc_linerefs.py` points a row at a call or a comment, and `--check` accepts it
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
+
+A tie between candidates goes to the line nearest the old reference. After an edit moves the
+declaration, the nearest line can be a call, a trailing comment, or a forward declaration.
+`--check` then passes, because it only asks whether the row names some candidate.
+
+Eight rows sat on such a line, and each one points at its declaration now. They are
+`future.h` `wait_all` and `await_resume`, `thread_pool.h` `pool_worker`, both `parallel_for`
+rows, the free `parallel_task`, and `async.h` `collect_wait` and `await_resume`. Two of them also
+needed display text equal to the declaration, because a call scored higher. A fix ranks a
+declaration above a call before the distance breaks the tie.
 
 ## Closed
 
