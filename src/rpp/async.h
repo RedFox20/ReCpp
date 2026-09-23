@@ -16,7 +16,7 @@
 #include <optional>
 #include <stdexcept> // std::logic_error
 #include <type_traits>
-#include <utility> // std::move, std::forward
+#include <utility> // std::move, std::forward, std::exchange
 #include <vector>
 // This header must never reach <future>, so a module which carries it stays clear of BUGS.md B28
 
@@ -47,18 +47,18 @@ namespace rpp
                     delete this;
             }
 
-            /// Moves the value out or rethrows the error, then drops the reference of the future
+            /// Moves the result out, so the taker also frees it, then drops the reference of the future. See BUGS.md C31
             T take()
             {
                 struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(); } } ref { this };
                 if constexpr (std::is_void_v<T>)
                 {
-                    if (error) std::rethrow_exception(error);
+                    if (error) std::rethrow_exception(std::exchange(error, nullptr));
                 }
                 else
                 {
                     if (value) return std::move(*value);
-                    std::rethrow_exception(error);
+                    std::rethrow_exception(std::exchange(error, nullptr)); // libc++ 18 copies an exception_ptr on a move
                 }
             }
         };

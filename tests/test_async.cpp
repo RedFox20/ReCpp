@@ -343,6 +343,33 @@ TestImpl(test_async)
         AssertThrows((void)f.get(), std::runtime_error);
     }
 
+    // counts its live copies, so a case sees when the last owner freed the exception
+    struct counted_error : std::runtime_error
+    {
+        int* alive;
+        explicit counted_error(int* counter) : std::runtime_error{"counted_error"}, alive{counter} { ++*alive; }
+        counted_error(const counted_error& e) noexcept : std::runtime_error{e}, alive{e.alive} { ++*alive; }
+        ~counted_error() override { --*alive; }
+    };
+
+    // the live copies after get() rethrew one, while the promise still holds the state
+    template<class T> static int exceptions_left_after_get()
+    {
+        int alive = 0;
+        promise<T> p;
+        future<T> f = p.get_future();
+        p.set_exception(std::make_exception_ptr(counted_error{&alive}));
+        AssertThrows((void)f.get(), counted_error);
+        return alive;
+    }
+
+    // the future frees the exception it took, so a late ~promise() on another thread never does. See BUGS.md C31
+    TestCase(get_takes_ownership_of_the_exception)
+    {
+        AssertThat(exceptions_left_after_get<void>(), 0);
+        AssertThat(exceptions_left_after_get<int>(), 0);
+    }
+
     TestCase(basic_async_task)
     {
         future<std::string> f = rpp::async([] {

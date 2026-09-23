@@ -1489,7 +1489,7 @@ Composable futures which own their shared state, with C++20 coroutine support. T
 | [`then(future<U>&& next)`](src/rpp/async.h#L355) | Waits for this future, then returns the result of `next` |
 | [`then()`](src/rpp/async.h#L371) | Downcasts to `future<void>`, which drops the value |
 | [`continue_with(Task task, Handlers... handlers)`](src/rpp/async.h#L379) | Runs the task with the result on the pool, and returns no future |
-| [`detach()`](src/rpp/async.h#L360) | Abandons the result without a wait. Nobody sees its exception |
+| [`detach()`](src/rpp/async.h#L389) | Abandons the result without a wait. Nobody sees its exception |
 | [`chain_async(Task task)`](src/rpp/async.h#L406) | Runs the task after this future. An invalid future starts it at once |
 | [`chain_async(future&& next)`](src/rpp/async.h#L419) | Chains another future after this one |
 | [`await_ready()`](src/rpp/async.h#L292) | Returns `true` when the result arrived, without a block |

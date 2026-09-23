@@ -271,6 +271,9 @@ Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
 run. B17 reported on the same commit instead, which is a different race in another test.
 
+C31 has the same shape in `rpp::future`. libc++ `__assoc_state::move()` rethrows a copy of
+`__exception_`, so the `std::future` state inside `cfuture` keeps the exception after `get()`.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
@@ -570,7 +573,7 @@ No export list removes the crash. Only the fragment which carries `<future>` dec
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
-This has three shapes. A bound too tight reports the overrun, as
+This has four shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
@@ -582,6 +585,11 @@ A third shape compares two measured times, as
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
+
+A fourth shape trusts the CPU time a VM gives a spin. `test_timer::proc_cpu_times` spins 50 ms
+and requires 45 ms of CPU time, and a local clang-18 TSAN run got `cpu_delta => '42103'`. The
+case failed 1 of 5 runs alone on a 4 core VM. The change under test touched no timer code.
+
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
 for h in 1 2; do taskset -c 0 bash -c 'while :; do :; done' & done
@@ -760,6 +768,18 @@ A display text which names a parameter the call also names scores the call highe
 without a tie. A fix ranks a declaration above a call before the distance breaks the tie.
 
 ## Closed
+
+### C31. TSAN blamed a pool worker for freeing an exception a handler had read
+`ubuntu-cpp23-tsan-clang18` reported one race on 0b97f7d, and all 625 cases passed. Thread T1
+`rpp_task_1` freed the exception in `__cxa_decrement_exception_refcount`, under `~promise()` at
+the delegate reset. Thread T2 `rpp_task_2` had read it in the handler of
+`continue_with_handler_recovers`.
+
+`future_state::take()` rethrew a copy of the error, so the state kept a reference until the
+promise released it. libc++abi counts that reference in uninstrumented code, so TSAN saw no edge
+from the read to the free. `take()` now exchanges the error for null, because libc++ 18 copies an
+`exception_ptr` on a move. A forced order reproduced the report 3/3 on clang-18 before the fix and
+0/3 after. `get_takes_ownership_of_the_exception` pins both branches.
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
 A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker
