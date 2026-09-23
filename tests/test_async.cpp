@@ -404,8 +404,10 @@ TestImpl(test_async)
         });
         std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
         int aliveAfterConsumer = -1;
-        (p.set_exception(std::exchange(error, nullptr)), (void)consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        rpp::semaphore::wait_result woke = rpp::semaphore::timeout;
+        (p.set_exception(std::exchange(error, nullptr)), woke = consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
         consumer.get();
+        AssertThat(woke, rpp::semaphore::notified); // a hang guard, the consumer releases it
         AssertThat(caught, true);
         AssertThat(aliveAfterConsumer, 0);
     }
@@ -420,11 +422,13 @@ TestImpl(test_async)
         rpp::semaphore consumed;
         std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
         int aliveAfterConsumer = -1;
+        rpp::semaphore::wait_result woke = rpp::semaphore::timeout;
         (f = rpp::exceptional_future<void>(std::exchange(error, nullptr)), consumer = rpp::async([&] {
             try { f.get(); } catch (const counted_error&) { caught = true; }
             consumed.notify();
-        }), (void)consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        }), woke = consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
         consumer.get();
+        AssertThat(woke, rpp::semaphore::notified); // a hang guard, the consumer releases it
         AssertThat(caught, true);
         AssertThat(aliveAfterConsumer, 0);
     }
