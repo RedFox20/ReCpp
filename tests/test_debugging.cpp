@@ -27,6 +27,11 @@ static void slow_log_handler(void* context, LogSeverity /*severity*/, const char
 
 static void quiet_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept {}
 
+static void busy_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+{
+    rpp::sleep_us(50); // a log call spends almost all its time inside this handler
+}
+
 static std::atomic_int old_style_calls {0};
 static void count_old_style_a(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
 static void count_old_style_b(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
@@ -246,5 +251,33 @@ TestImpl(test_debugging)
         logging = false;
         logger.join();
         AssertThat(old_style_calls.load(), logged.load());
+    }
+
+    // an edit waits only for the log calls on the list it replaced, so busy loggers cannot starve it
+    TestCase(an_edit_finishes_while_other_threads_keep_calling_handlers)
+    {
+        SetLogHandler(&count_old_style_a); // the fixture handler writes a string, which four loggers would race on
+        int busy = 0;
+        int other = 0;
+        rpp::add_log_handler(&busy, &busy_log_handler);
+        std::atomic_bool logging {true};
+        std::thread loggers[4];
+        for (std::thread& logger : loggers)
+            logger = std::thread{[&] { while (logging) LogInfo("x"); }};
+        rpp::semaphore edited;
+        std::thread editor{[&]
+        {
+            rpp::add_log_handler(&other, &quiet_log_handler);
+            rpp::remove_log_handler(&other, &quiet_log_handler);
+            edited.notify();
+        }};
+        // a hang guard: stopping the loggers below also releases a starved edit
+        const bool edited_in_time = edited.wait(rpp::seconds(1)) == rpp::semaphore::notified;
+        logging = false;
+        for (std::thread& logger : loggers)
+            logger.join();
+        editor.join();
+        rpp::remove_log_handler(&busy, &busy_log_handler);
+        AssertThat(edited_in_time, true);
     }
 };

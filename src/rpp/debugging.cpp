@@ -68,7 +68,7 @@ struct LogHandlerList
 // a dispatch never waits: an edit writes the list no dispatch reads, then publishes it
 static LogHandlerList LogHandlerLists[2];
 static std::atomic<LogHandlerList*> LogHandlers {&LogHandlerLists[0]};
-static std::atomic_int LogDispatches {0};
+static std::atomic_int LogDispatches[2] {}; // the dispatches on each list, so an edit waits only for the list it replaced
 static std::atomic_bool LogHandlersEditing {false};
 static LogExceptCallback ExceptHandler;
 static std::atomic_bool DisableFunctionNames {false};
@@ -118,9 +118,9 @@ namespace rpp
 
     static void publish_log_handlers(LogHandlerList& edit) noexcept
     {
-        // seq_cst pairs with dispatch_log(): either this drain counts a dispatch, or it loads `edit`
-        LogHandlers.store(&edit, std::memory_order_seq_cst);
-        while (LogDispatches.load(std::memory_order_seq_cst) != 0)
+        // seq_cst pairs with dispatch_log(): either this drain counts a dispatch on `replaced`, or it loads `edit`
+        LogHandlerList* replaced = LogHandlers.exchange(&edit, std::memory_order_seq_cst);
+        while (LogDispatches[replaced - LogHandlerLists].load(std::memory_order_seq_cst) != 0)
             rpp::yield(); // a dispatch can still run a removed handler, and its owner frees the context next
         LogHandlersEditing.store(false, std::memory_order_release);
     }
@@ -153,12 +153,21 @@ namespace rpp
 // calls every handler of the published list, and returns false when the list is empty
 static FINLINE bool dispatch_log(LogSeverity severity, const char* message, int len) noexcept
 {
-    LogDispatches.fetch_add(1, std::memory_order_seq_cst);
     const LogHandlerList* list = LogHandlers.load(std::memory_order_seq_cst);
+    for (;;)
+    {
+        LogDispatches[list - LogHandlerLists].fetch_add(1, std::memory_order_seq_cst);
+        const LogHandlerList* published = LogHandlers.load(std::memory_order_seq_cst);
+        if (published == list)
+            break;
+        // an edit published the other list before this count, so its drain may not see this dispatch
+        LogDispatches[list - LogHandlerLists].fetch_sub(1, std::memory_order_release);
+        list = published;
+    }
     const int size = list->size;
     for (int i = 0; i < size; ++i)
         list->items[i].handler(list->items[i].context, severity, message, len);
-    LogDispatches.fetch_sub(1, std::memory_order_release);
+    LogDispatches[list - LogHandlerLists].fetch_sub(1, std::memory_order_release);
     return size != 0;
 }
 
