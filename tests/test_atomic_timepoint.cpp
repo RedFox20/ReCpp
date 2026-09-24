@@ -364,6 +364,18 @@ TestImpl(test_atomic_timepoint)
         AssertLess(diff.nsec, Duration::from_millis(1100).nsec);
     }
 
+    // ProcessCPU starts near zero, far from the realtime epoch, so it shows which clock the source reads
+    TestCase(timesource_reads_its_base_clock)
+    {
+        AtomicTimeSource ts;
+        ts.set_base_clock(ClockType::ProcessCPU);
+        ts.set_sync_offset(Duration::from_seconds(1));
+        Duration unsynced_error = ts.time_unsynced() - TimePoint::now(ClockType::ProcessCPU);
+        Duration synced_error = ts.time_now() - TimePoint::now(ClockType::ProcessCPU) - Duration::from_seconds(1);
+        AssertLess(unsynced_error.abs().nsec, Duration::from_seconds(1).nsec);
+        AssertLess(synced_error.abs().nsec, Duration::from_seconds(1).nsec);
+    }
+
     TestCase(timesource_concurrent_warp_forward)
     {
         AtomicTimeSource ts;

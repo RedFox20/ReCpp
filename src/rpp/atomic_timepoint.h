@@ -143,15 +143,18 @@ namespace rpp
         // time warp offset to apply to current time, can be used for time warping in simulations
         std::atomic<rpp::int64> warp_offset_ns {};
 
+        // Realtime follows each wall clock step, and Monotonic keeps waits and timers through it
+        std::atomic<rpp::ClockType> base_clock { rpp::ClockType::Realtime };
+
     public:
 
         /**
          * @returns The virtual time according to this time source,
-         *           which is the current system time plus the combined offset (sync + warp).
+         *           which is the base clock time plus the combined offset (sync + warp).
          */
         rpp::TimePoint time_now() const noexcept
         {
-            rpp::TimePoint base_now = rpp::TimePoint::system_now();
+            rpp::TimePoint base_now = base_time_now();
             rpp::int64 offset_ns = combined_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_now.duration.nsec + offset_ns };
         }
@@ -162,7 +165,7 @@ namespace rpp
          */
         rpp::TimePoint time_unsynced() const noexcept
         {
-            rpp::TimePoint base_local = rpp::TimePoint::system_now();
+            rpp::TimePoint base_local = base_time_now();
             rpp::int64 warp_ns = warp_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_local.duration.nsec + warp_ns };
         }
@@ -195,6 +198,18 @@ namespace rpp
         {
             return rpp::Duration{ sync_offset_ns.load(std::memory_order_relaxed) };
         }
+
+        /** @returns The time of the base clock, without the sync and warp offsets */
+        rpp::TimePoint base_time_now() const noexcept { return rpp::TimePoint::now(base_clock.load(std::memory_order_relaxed)); }
+
+        /** @returns The clock under the sync and warp offsets, Realtime by default */
+        rpp::ClockType get_base_clock() const noexcept { return base_clock.load(std::memory_order_relaxed); }
+
+        /**
+         * @brief Sets the clock under the sync and warp offsets. Set it before the first read.
+         *        Monotonic ignores a wall clock step, so a wait or a timer does not stall.
+         */
+        void set_base_clock(rpp::ClockType clock) noexcept { base_clock.store(clock, std::memory_order_relaxed); }
 
         /**
          * @brief Warps time forward atomically by the given delta

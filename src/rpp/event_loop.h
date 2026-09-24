@@ -164,16 +164,19 @@ namespace rpp
         {
             rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
             rpp::uint32 generation = 0; // the clock which built this frame, so a swap cannot move it
+            rpp::ClockType base_clock = rpp::ClockType::Realtime; // the clock under the source offsets
             bool warpable = false; // a time source was attached at capture time
 
             time_frame() noexcept = default;
             explicit time_frame(const rpp::AtomicTimeSource* src) noexcept
-                : offset_ns{src ? src->total_offset().nsec : 0}, warpable{src != nullptr} {}
+                : offset_ns{src ? src->total_offset().nsec : 0}
+                , base_clock{src ? src->get_base_clock() : rpp::ClockType::Realtime}
+                , warpable{src != nullptr} {}
 
             /** @returns the time on this frame's clock: the one definition this loop uses. */
             rpp::TimePoint now() const noexcept
             {
-                return warpable ? rpp::TimePoint{ rpp::TimePoint::system_now().duration.nsec + offset_ns }
+                return warpable ? rpp::TimePoint{ rpp::TimePoint::now(base_clock).duration.nsec + offset_ns }
                                 : rpp::TimePoint::monotonic_now();
             }
         };
@@ -293,11 +296,10 @@ namespace rpp
          *  @returns the current time on that frame's clock. */
         rpp::TimePoint current_time(time_frame& frame) const noexcept
         {
-            rpp::int64 offset_ns = frame.offset_ns;
-            rpp::uint32 generation = 0;
-            read_time_source(offset_ns, generation);
-            if (generation == frame.generation) // a swap leaves the frame on the clock which built it
-                frame.offset_ns = offset_ns;
+            time_frame live = frame;
+            read_time_source(live);
+            if (live.generation == frame.generation) // a swap leaves the frame on the clock which built it
+                frame = live;
             return frame.now();
         }
 
@@ -305,8 +307,8 @@ namespace rpp
         time_frame get_time_source_frame() const noexcept;
 
     private:
-        // reads the live source offset and its generation while the reader guard is up
-        bool read_time_source(rpp::int64& offset_ns, rpp::uint32& generation) const noexcept;
+        // reads the live source offset, base clock and generation while the reader guard is up
+        bool read_time_source(time_frame& frame) const noexcept;
 
         // waits for every reader to drop the old clock, so the owner may free it
         void drain_time_source_readers() const noexcept;

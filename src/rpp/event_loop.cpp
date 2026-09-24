@@ -63,14 +63,18 @@ namespace rpp
         set_time_source(nullptr); // a worker which outlived the wait must not read a freed clock
     }
 
-    bool event_loop::read_time_source(rpp::int64& offset_ns, rpp::uint32& generation) const noexcept
+    bool event_loop::read_time_source(time_frame& frame) const noexcept
     {
         // seq_cst on both sides: either set_time_source() sees this count, or this load
         // sees the new pointer, so this never dereferences a retired clock
         time_source_readers.fetch_add(1, std::memory_order_seq_cst);
         rpp::AtomicTimeSource* src = time_source.load(std::memory_order_seq_cst);
-        generation = time_source_generation.load(std::memory_order_seq_cst);
-        if (src) offset_ns = src->total_offset().nsec;
+        frame.generation = time_source_generation.load(std::memory_order_seq_cst);
+        if (src)
+        {
+            frame.offset_ns = src->total_offset().nsec;
+            frame.base_clock = src->get_base_clock();
+        }
         time_source_readers.fetch_sub(1, std::memory_order_release);
         return src != nullptr;
     }
@@ -85,7 +89,7 @@ namespace rpp
     event_loop::time_frame event_loop::get_time_source_frame() const noexcept
     {
         time_frame frame;
-        frame.warpable = read_time_source(frame.offset_ns, frame.generation);
+        frame.warpable = read_time_source(frame);
         return frame;
     }
 
