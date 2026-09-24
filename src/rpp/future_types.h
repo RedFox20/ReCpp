@@ -19,7 +19,7 @@ namespace rpp
     /// The outcome of a timed wait on a task or a future
     enum class wait_result : int
     {
-        finished, // task finished successfully
+        finished, // the result is ready, and it can hold an exception
         timeout,  // waiting on task timed out
         deferred, // the task runs on get(), so no wait can finish it
     };

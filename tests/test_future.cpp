@@ -368,7 +368,7 @@ TestImpl(test_future)
     }
 
     // a ready future which nobody collected was not abandoned, so its destructor collects it
-    // and returns. Only an unready future is a fatal error, so this case fails by terminating
+    // and returns. If the destructor terminates on a ready result, the test run stops here
     TestCase(destructor_collects_a_ready_future)
     {
         { cfuture<int> value = make_ready_future(42); }

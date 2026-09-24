@@ -1539,7 +1539,7 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L188) | **Fail-fast destructor**: if a valid future is not awaited before destruction, calls `std::terminate()`. If the future was already completed, any stored exception is caught and triggers an assertion failure. This is a deliberate deviation from `std::future` which silently blocks in the destructor — ReCpp terminates immediately to surface programming bugs. |
+| [`~cfuture()`](src/rpp/future.h#L188) | **Fail-fast destructor**: collects a ready result, and a stored exception triggers an assertion failure. A valid future which is not ready, a deferred one included, calls `std::terminate()`. `std::future` blocks in its destructor instead, and ReCpp terminates so that the programming bug surfaces at once. |
 | [`then()`](src/rpp/future.h#L218) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
 | [`then(Task task)`](src/rpp/future.h#L235) | Chain a continuation that receives the result (runs via `async_task`) |
 | [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L262) | Chain with 1–4 typed exception recovery handlers |
