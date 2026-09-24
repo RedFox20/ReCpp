@@ -2,6 +2,7 @@
 #include "timer.h" // rpp::TimePoint
 #include "stack_trace.h"
 #include "strview.h"
+#include "threads.h" // rpp::yield
 #if RPP_CORTEX_M_ARCH
 # include "mutex.h" // rpp::critical_section
 #endif
@@ -59,8 +60,16 @@ struct LogHandler
     void* context;
     rpp::LogMsgHandler handler;
 };
-static std::atomic_int NumLogHandlers {0};
-static std::array<LogHandler, MAX_LOG_HANDLERS> LogHandlers;
+struct LogHandlerList
+{
+    int size = 0;
+    std::array<LogHandler, MAX_LOG_HANDLERS> items;
+};
+// a dispatch never waits: an edit writes the list no dispatch reads, then publishes it
+static LogHandlerList LogHandlerLists[2];
+static std::atomic<LogHandlerList*> LogHandlers {&LogHandlerLists[0]};
+static std::atomic_int LogDispatches {0};
+static std::atomic_bool LogHandlersEditing {false};
 static LogExceptCallback ExceptHandler;
 static std::atomic_bool DisableFunctionNames {false};
 static std::atomic_bool EnableTimestamps {false};
@@ -77,61 +86,80 @@ static std::atomic_int TimePrecision {3};
 // new logging API
 namespace rpp
 {
-    static int index_of(const LogHandler& handler) noexcept
+    static int index_of(const LogHandlerList& list, const LogHandler& handler) noexcept
     {
-        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
-        for (int i = 0; i < numHandlers; ++i)
+        for (int i = 0; i < list.size; ++i)
         {
-            const LogHandler& h = LogHandlers[i];
+            const LogHandler& h = list.items[i];
             if (h.context == handler.context && h.handler == handler.handler)
                 return i;
         }
         return -1;
     }
 
-    static int index_of(LogMsgHandler handler_func) noexcept
+    static int index_of(const LogHandlerList& list, LogMsgHandler handler_func) noexcept
     {
-        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
-        for (int i = 0; i < numHandlers; ++i)
-            if (LogHandlers[i].handler == handler_func)
+        for (int i = 0; i < list.size; ++i)
+            if (list.items[i].handler == handler_func)
                 return i;
         return -1;
     }
 
+    // returns a copy of the published list, in the buffer which the last publish drained
+    static LogHandlerList& edit_log_handlers() noexcept
+    {
+        while (LogHandlersEditing.exchange(true, std::memory_order_acquire))
+            rpp::yield();
+        LogHandlerList* published = LogHandlers.load(std::memory_order_relaxed);
+        LogHandlerList& edit = LogHandlerLists[published == &LogHandlerLists[0] ? 1 : 0];
+        edit = *published;
+        return edit;
+    }
+
+    static void publish_log_handlers(LogHandlerList& edit) noexcept
+    {
+        // seq_cst pairs with dispatch_log(): either this drain counts a dispatch, or it loads `edit`
+        LogHandlers.store(&edit, std::memory_order_seq_cst);
+        while (LogDispatches.load(std::memory_order_seq_cst) != 0)
+            rpp::yield(); // a dispatch can still run a removed handler, and its owner frees the context next
+        LogHandlersEditing.store(false, std::memory_order_release);
+    }
+
+    static void remove_at(LogHandlerList& list, int index) noexcept
+    {
+        --list.size;
+        for (int i = index; i < list.size; ++i) // unshift, preserving order
+            list.items[i] = list.items[i + 1];
+    }
+
     void add_log_handler(void* context, LogMsgHandler handler) noexcept
     {
-        int numHandlers = NumLogHandlers.load(std::memory_order_acquire);
-        if (numHandlers < MAX_LOG_HANDLERS)
-        {
-            if (index_of({ context, handler }) == -1)
-            {
-                LogHandlers[numHandlers] = { context, handler };
-                ++NumLogHandlers; // publish the new handler count after storing the handler
-            }
-        }
+        LogHandlerList& edit = edit_log_handlers();
+        if (handler && edit.size < MAX_LOG_HANDLERS && index_of(edit, { context, handler }) == -1)
+            edit.items[edit.size++] = { context, handler };
+        publish_log_handlers(edit);
     }
 
     void remove_log_handler(void* context, LogMsgHandler handler) noexcept
     {
-        int index = index_of({ context, handler });
-        if (index != -1)
-        {
-            int newSize = --NumLogHandlers;
-            for (int i = index; i < newSize; ++i) // unshift, preserving order
-                LogHandlers[i] = LogHandlers[i + 1];
-        }
+        LogHandlerList& edit = edit_log_handlers();
+        if (int index = index_of(edit, { context, handler }); index != -1)
+            remove_at(edit, index);
+        publish_log_handlers(edit);
     }
 
-    void remove_log_handler_func(LogMsgHandler handler_func) noexcept
-    {
-        int index = index_of(handler_func);
-        if (index != -1)
-        {
-            int newSize = --NumLogHandlers;
-            for (int i = index; i < newSize; ++i) // unshift, preserving order
-                LogHandlers[i] = LogHandlers[i + 1];
-        }
-    }
+}
+
+// calls every handler of the published list, and returns false when the list is empty
+static FINLINE bool dispatch_log(LogSeverity severity, const char* message, int len) noexcept
+{
+    LogDispatches.fetch_add(1, std::memory_order_seq_cst);
+    const LogHandlerList* list = LogHandlers.load(std::memory_order_seq_cst);
+    const int size = list->size;
+    for (int i = 0; i < size; ++i)
+        list->items[i].handler(list->items[i].context, severity, message, len);
+    LogDispatches.fetch_sub(1, std::memory_order_release);
+    return size != 0;
 }
 
 // old-style API adapter
@@ -143,12 +171,13 @@ static void LogHandlerProxy(void* context, LogSeverity severity, const char* mes
 
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler) noexcept
 {
-    // always remove the current proxy, since we can only have one at a time
-    rpp::remove_log_handler_func(&LogHandlerProxy);
-    if (loghandler)
-    {
-        rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
-    }
+    // one edit replaces the proxy, so two setters cannot leave two proxies behind
+    LogHandlerList& edit = rpp::edit_log_handlers();
+    if (int index = rpp::index_of(edit, &LogHandlerProxy); index != -1)
+        rpp::remove_at(edit, index);
+    if (loghandler && edit.size < MAX_LOG_HANDLERS)
+        edit.items[edit.size++] = { reinterpret_cast<void*>(loghandler), &LogHandlerProxy };
+    rpp::publish_log_handlers(edit);
 }
 RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler) noexcept
 {
@@ -344,19 +373,8 @@ RPPCAPI void LogFormatv(LogSeverity severity, const char* format, va_list ap)
         ShortFilePathMessage(ptr, len);
     #endif
 
-    if (int num_handlers = NumLogHandlers.load(std::memory_order_acquire))
-    {
-        for (int i = 0; i < num_handlers; ++i)
-        {
-            auto& h = LogHandlers[i];
-            if (h.handler)
-                h.handler(h.context, severity, ptr, len);
-        }
-    }
-    else
-    {
+    if (!dispatch_log(severity, ptr, len))
         LogWriteToDefaultOutput("ReCpp", severity, ptr, len);
-    }
 }
 
 
@@ -364,19 +382,8 @@ RPPCAPI void LogWrite(LogSeverity severity, const char* message, int len)
 {
     if (severity < Filter)
         return;
-    if (int num_handlers = NumLogHandlers.load(std::memory_order_acquire))
-    {
-        for (int i = 0; i < num_handlers; ++i)
-        {
-            auto& h = LogHandlers[i];
-            if (h.handler)
-                h.handler(h.context, severity, message, len);
-        }
-    }
-    else
-    {
+    if (!dispatch_log(severity, message, len))
         LogWriteToDefaultOutput("ReCpp", severity, message, len);
-    }
 }
 
 #define WrappedLogFormatv(severity, format) \

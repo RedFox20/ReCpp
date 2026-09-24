@@ -1,9 +1,35 @@
 #include <rpp/debugging.h>
+#include <rpp/semaphore.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
+#include <atomic>
+#include <thread>
 using namespace rpp;
 
 static std::string log_output;
+
+struct slow_log_target
+{
+    rpp::semaphore entered;
+    std::atomic_bool removing {false};
+    std::atomic_bool done {false};
+};
+
+static void slow_log_handler(void* context, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+{
+    slow_log_target* target = static_cast<slow_log_target*>(context);
+    target->entered.notify();
+    while (!target->removing) // the sleep starts once the remover runs, so it cannot end first
+        rpp::yield();
+    rpp::sleep_ms(5);
+    target->done = true;
+}
+
+static void quiet_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept {}
+
+static std::atomic_int old_style_calls {0};
+static void count_old_style_a(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
+static void count_old_style_b(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
@@ -174,5 +200,51 @@ TestImpl(test_debugging)
     TestCase(assert_throws)
     {
         AssertThrows(throw std::runtime_error{"error!"}, std::runtime_error);
+    }
+
+    // the owner frees the context after the remove, so the remove waits for the running handler
+    TestCase(remove_log_handler_waits_for_a_running_handler)
+    {
+        slow_log_target target;
+        rpp::add_log_handler(&target, &slow_log_handler);
+        std::thread logger{[] { LogInfo("slow"); }};
+        target.entered.wait();
+        target.removing = true;
+        rpp::remove_log_handler(&target, &slow_log_handler);
+        AssertThat(target.done.load(), true);
+        logger.join();
+    }
+
+    // add and remove edit the handler list while another thread calls the handlers
+    TestCase(add_and_remove_log_handlers_while_another_thread_logs)
+    {
+        int a = 0;
+        int b = 0;
+        std::atomic_bool logging {true};
+        std::thread logger{[&] { while (logging) LogInfo("x"); }};
+        for (int i = 0; i < 200; ++i)
+        {
+            rpp::add_log_handler(&a, &quiet_log_handler);
+            rpp::add_log_handler(&b, &quiet_log_handler);
+            rpp::remove_log_handler(&a, &quiet_log_handler);
+            rpp::remove_log_handler(&b, &quiet_log_handler);
+        }
+        logging = false;
+        logger.join();
+    }
+
+    // SetLogHandler() swaps the old style handler in one edit, so each log call reaches exactly one of the two
+    TestCase(set_log_handler_swaps_the_handler_without_a_gap)
+    {
+        SetLogHandler(&count_old_style_a);
+        old_style_calls = 0;
+        std::atomic_int logged {0};
+        std::atomic_bool logging {true};
+        std::thread logger{[&] { while (logging) { LogInfo("x"); ++logged; } }};
+        for (int i = 0; logged < 2000; ++i) // swap while the other thread logs
+            SetLogHandler(i % 2 == 0 ? &count_old_style_b : &count_old_style_a);
+        logging = false;
+        logger.join();
+        AssertThat(old_style_calls.load(), logged.load());
     }
 };
