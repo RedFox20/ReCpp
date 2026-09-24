@@ -330,9 +330,9 @@ it counts no frame and asserts nothing about skew.
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 | `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
 
-**The skew check fired twice in CI.** Both android jobs reported
+**The skew check fired twice in CI.** Two android jobs reported
 `skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1388`, each on a commit which
-changes no `event_loop` code. Both jobs run the tests under QEMU on an x86 runner. So one reader
+changes no `event_loop` code. Both run the tests under QEMU on an x86 runner. So one reader
 paired an offset with another generation, which the publish order above exists to stop.
 
 | Where | Result |

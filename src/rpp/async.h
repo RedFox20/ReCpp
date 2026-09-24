@@ -246,7 +246,7 @@ namespace rpp
 
     /**
      * A chainable and awaitable result, which owns its shared state and never names a std future.
-     * A ready future collects its result in the destructor. An unready one terminates, because nobody awaited it.
+     * The destructor collects a ready result, and a stored exception fails an assertion. An unready one terminates as unawaited.
      * @code
      *     rpp::async([=]{
      *         return downloadZipFile(url);
@@ -282,7 +282,7 @@ namespace rpp
             return *this;
         }
 
-        /// Collects a ready result. An unready future terminates, because nobody awaited it
+        /// Collects a ready result, and a stored exception fails an assertion. An unready future terminates as unawaited
         ~future() noexcept { drop(); }
 
         /// @returns true while this future holds a state, which get() consumes
