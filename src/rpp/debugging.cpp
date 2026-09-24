@@ -118,7 +118,7 @@ namespace rpp
 
     static void publish_log_handlers(LogHandlerList& edit) noexcept
     {
-        // seq_cst pairs with dispatch_log(): either this drain counts a dispatch on `replaced`, or it loads `edit`
+        // seq_cst pairs with dispatch_log(): either this drain counts a dispatch on `replaced`, or the dispatch loads `edit`
         LogHandlerList* replaced = LogHandlers.exchange(&edit, std::memory_order_seq_cst);
         while (LogDispatches[replaced - LogHandlerLists].load(std::memory_order_seq_cst) != 0)
             rpp::yield(); // a dispatch can still run a removed handler, and its owner frees the context next
@@ -160,7 +160,7 @@ static FINLINE bool dispatch_log(LogSeverity severity, const char* message, int 
         const LogHandlerList* published = LogHandlers.load(std::memory_order_seq_cst);
         if (published == list)
             break;
-        // an edit published the other list before this count, so its drain may not see this dispatch
+        // an edit published the other list, maybe before this count, so its drain can miss this dispatch
         LogDispatches[list - LogHandlerLists].fetch_sub(1, std::memory_order_release);
         list = published;
     }

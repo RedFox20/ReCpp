@@ -27,9 +27,33 @@ static void slow_log_handler(void* context, LogSeverity /*severity*/, const char
 
 static void quiet_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept {}
 
-static void busy_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+struct edit_order
 {
-    rpp::sleep_us(50); // a log call spends almost all its time inside this handler
+    rpp::semaphore gate_entered;
+    rpp::semaphore edited;
+    std::atomic_bool gate_taken {false};
+    std::atomic_bool gate_open {false};
+    std::atomic_bool on_new_list {false};
+    std::atomic_bool edit_returned {false};
+};
+
+static void gate_log_handler(void* context, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+{
+    edit_order* order = static_cast<edit_order*>(context);
+    if (!order->gate_taken.exchange(true)) // only the first log call holds the old list
+    {
+        order->gate_entered.notify();
+        while (!order->gate_open)
+            rpp::yield();
+    }
+}
+
+static void new_list_log_handler(void* context, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+{
+    edit_order* order = static_cast<edit_order*>(context);
+    order->on_new_list = true;
+    // a hang guard: the edit notifies it, and a starved edit returns only after this timeout
+    order->edit_returned = order->edited.wait(rpp::seconds(1)) == rpp::semaphore::notified;
 }
 
 static std::atomic_int old_style_calls {0};
@@ -253,31 +277,28 @@ TestImpl(test_debugging)
         AssertThat(old_style_calls.load(), logged.load());
     }
 
-    // an edit waits only for the log calls on the list it replaced, so busy loggers cannot starve it
-    TestCase(an_edit_finishes_while_other_threads_keep_calling_handlers)
+    // an edit waits only for the log calls on the list it replaced, so a log call on the new list cannot hold it
+    TestCase(an_edit_does_not_wait_for_a_log_call_on_the_new_list)
     {
-        SetLogHandler(&count_old_style_a); // the fixture handler writes a string, which four loggers would race on
-        int busy = 0;
-        int other = 0;
-        rpp::add_log_handler(&busy, &busy_log_handler);
-        std::atomic_bool logging {true};
-        std::thread loggers[4];
-        for (std::thread& logger : loggers)
-            logger = std::thread{[&] { while (logging) LogInfo("x"); }};
-        rpp::semaphore edited;
+        SetLogHandler(&count_old_style_a); // the fixture handler writes a string, which two loggers would race on
+        edit_order order;
+        rpp::add_log_handler(&order, &gate_log_handler);
+        std::thread old_logger{[] { LogInfo("old"); }};
+        order.gate_entered.wait();
         std::thread editor{[&]
         {
-            rpp::add_log_handler(&other, &quiet_log_handler);
-            rpp::remove_log_handler(&other, &quiet_log_handler);
-            edited.notify();
+            rpp::add_log_handler(&order, &new_list_log_handler);
+            order.edited.notify();
         }};
-        // a hang guard: stopping the loggers below also releases a starved edit
-        const bool edited_in_time = edited.wait(rpp::seconds(1)) == rpp::semaphore::notified;
-        logging = false;
-        for (std::thread& logger : loggers)
-            logger.join();
+        std::thread new_logger{[&] { while (!order.on_new_list) LogInfo("new"); }};
+        while (!order.on_new_list)
+            rpp::yield();
+        order.gate_open = true;
+        new_logger.join();
+        old_logger.join();
         editor.join();
-        rpp::remove_log_handler(&busy, &busy_log_handler);
-        AssertThat(edited_in_time, true);
+        rpp::remove_log_handler(&order, &new_list_log_handler);
+        rpp::remove_log_handler(&order, &gate_log_handler);
+        AssertThat(order.edit_returned.load(), true);
     }
 };
