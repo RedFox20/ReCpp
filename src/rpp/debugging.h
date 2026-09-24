@@ -181,7 +181,9 @@ namespace rpp
 
     /**
      * @brief Removes a matching log handler to prevent further logging calls
-     *        on the `context` object.
+     *        on the `context` object. It returns after every running call of the handler
+     *        ends, so the caller may free `context` next. Do not call it or add_log_handler()
+     *        from a log handler, or while you hold a lock which a log handler takes.
      */
     void remove_log_handler(void* context, LogMsgHandler handler) noexcept;
 }

@@ -794,28 +794,23 @@ namespace rpp
     }
 
     // returns the realtime epoch offset for a monotonic clock type,
-    // lazily captured once per clock type on first use
+    // captured once for every clock type on the first call
     static int64 monotonic_epoch_offset(ClockType clock) noexcept
     {
-        constexpr int64 UNINITIALIZED = RPP_INT64_MAX;
-        static int64 offsets[NUM_CLOCKS] = {
-            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
-            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
-            UNINITIALIZED, UNINITIALIZED, UNINITIALIZED,
-        };
-
         int index = static_cast<int>(clock);
         if (index < 0 || index >= NUM_CLOCKS)
             return 0;
 
-        int64 offset = offsets[index];
-        if (offset == UNINITIALIZED)
+        struct epoch_offsets { int64 ns[NUM_CLOCKS]; };
+        // the compiler guards a static local initializer, so every thread reads the same offsets
+        static const epoch_offsets offsets = []
         {
-            // sample both clocks as close together as possible
-            offset = raw_clock_ns(ClockType::Realtime) - raw_clock_ns(clock);
-            offsets[index] = offset;
-        }
-        return offset;
+            epoch_offsets o {};
+            for (int i = 0; i < NUM_CLOCKS; ++i) // sample both clocks as close together as possible
+                o.ns[i] = raw_clock_ns(ClockType::Realtime) - raw_clock_ns(static_cast<ClockType>(i));
+            return o;
+        }();
+        return offsets.ns[index];
     }
 
     TimePoint TimePoint::now(ClockType clock) noexcept

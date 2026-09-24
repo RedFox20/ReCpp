@@ -1,9 +1,28 @@
 #include <rpp/debugging.h>
+#include <rpp/semaphore.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
+#include <atomic>
+#include <thread>
 using namespace rpp;
 
 static std::string log_output;
+
+struct slow_log_target
+{
+    rpp::semaphore entered;
+    std::atomic_bool done {false};
+};
+
+static void slow_log_handler(void* context, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept
+{
+    slow_log_target* target = static_cast<slow_log_target*>(context);
+    target->entered.notify();
+    rpp::sleep_ms(5);
+    target->done = true;
+}
+
+static void quiet_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept {}
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
@@ -174,5 +193,35 @@ TestImpl(test_debugging)
     TestCase(assert_throws)
     {
         AssertThrows(throw std::runtime_error{"error!"}, std::runtime_error);
+    }
+
+    // the owner frees the context after the remove, so the remove waits for the running handler
+    TestCase(remove_log_handler_waits_for_a_running_handler)
+    {
+        slow_log_target target;
+        rpp::add_log_handler(&target, &slow_log_handler);
+        std::thread logger{[] { LogInfo("slow"); }};
+        target.entered.wait();
+        rpp::remove_log_handler(&target, &slow_log_handler);
+        AssertThat(target.done.load(), true);
+        logger.join();
+    }
+
+    // add and remove edit the handler list while another thread calls the handlers
+    TestCase(add_and_remove_log_handlers_while_another_thread_logs)
+    {
+        int a = 0;
+        int b = 0;
+        std::atomic_bool logging {true};
+        std::thread logger{[&] { while (logging) LogInfo("x"); }};
+        for (int i = 0; i < 200; ++i)
+        {
+            rpp::add_log_handler(&a, &quiet_log_handler);
+            rpp::add_log_handler(&b, &quiet_log_handler);
+            rpp::remove_log_handler(&a, &quiet_log_handler);
+            rpp::remove_log_handler(&b, &quiet_log_handler);
+        }
+        logging = false;
+        logger.join();
     }
 };

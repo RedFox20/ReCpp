@@ -611,6 +611,18 @@ TestImpl(test_timer)
         AssertLessOrEqual(elapsed_ms, 200);
     }
 
+    // no case reads Boottime before this one, so both threads take the first read of its offset
+    TestCase(two_threads_read_a_new_clock_offset_without_a_race)
+    {
+        rpp::TimePoint a;
+        rpp::TimePoint b;
+        std::thread first{[&] { a = rpp::TimePoint::now(rpp::ClockType::Boottime); }};
+        std::thread second{[&] { b = rpp::TimePoint::now(rpp::ClockType::Boottime); }};
+        first.join();
+        second.join();
+        AssertThat(a.is_valid() && b.is_valid(), true);
+    }
+
     TestCase(clock_type_boottime)
     {
         rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Boottime);
