@@ -1,4 +1,5 @@
 #include <rpp/async.h>
+#include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
 #include <rpp/semaphore.h>
 #include <rpp/threads.h> // rpp::get_thread_id
@@ -663,6 +664,44 @@ TestImpl(test_async)
         AssertThat(third, first);
     }
 
+    // chain_async() attaches the next task, so the worker which ran the first task also runs the second
+    TestCase(chain_async_runs_the_next_task_on_the_worker_which_ran_the_first)
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        rpp::uint64 first = 0;
+        rpp::uint64 second = 0;
+        future<void> tasks;
+        tasks.chain_async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until the second task attached
+            first = rpp::get_thread_id();
+        }).chain_async([&] { second = rpp::get_thread_id(); });
+        gate.notify();
+        tasks.get();
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(second, first);
+    }
+
+    // then(future&&) forwards a result which is already out on the same worker, so no thread waits for either future
+    TestCase(then_a_ready_future_runs_on_the_worker_which_ran_the_first_task)
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        rpp::uint64 first = 0;
+        rpp::uint64 after = 0;
+        future<int> f = rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until the steps after it attached
+            first = rpp::get_thread_id();
+        }).then(rpp::ready_future(2)).then([&](int x) {
+            after = rpp::get_thread_id();
+            return x;
+        });
+        gate.notify();
+        AssertThat(f.get(), 2);
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(after, first);
+    }
+
     // the address of this frame, which moves down the stack while one step runs inside another
     static NOINLINE std::uintptr_t frame_address() noexcept
     {
@@ -833,7 +872,48 @@ TestImpl(test_async)
         AssertThat(resumedOn, worker);
     }
 
-    // runs `loop` on this thread until `f` holds its result, for one second at most
+    // sets the flag when the coroutine frame destroys its copy. A moved-from copy sets nothing
+    struct flag_on_exit
+    {
+        std::atomic_bool* flag;
+        explicit flag_on_exit(std::atomic_bool* f) noexcept : flag{f} {}
+        flag_on_exit(flag_on_exit&& other) noexcept : flag{std::exchange(other.flag, nullptr)} {}
+        ~flag_on_exit() { if (flag) *flag = true; }
+    };
+
+    static future<rpp::uint64> thread_after_await_with(future<int> f, flag_on_exit /*onExit*/)
+    {
+        (void)co_await f;
+        co_return rpp::get_thread_id();
+    }
+
+    // the frame ends with its parameters before the result publishes, then the worker runs the next step inline
+    TestCase(the_step_after_a_coroutine_runs_on_its_worker_after_the_frame_ends)
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        std::atomic_bool parameterEnded = false;
+        bool endedFirst = false;
+        rpp::uint64 worker = 0;
+        rpp::uint64 ranOn = 0;
+        future<rpp::uint64> f = thread_after_await_with(rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until the step after the coroutine attached
+            worker = rpp::get_thread_id();
+            return 1;
+        }), flag_on_exit{&parameterEnded}).then([&](rpp::uint64 resumedOn) {
+            endedFirst = parameterEnded.load();
+            ranOn = rpp::get_thread_id();
+            return resumedOn;
+        });
+        gate.notify();
+        rpp::uint64 resumedOn = f.get();
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(resumedOn, worker);
+        AssertThat(ranOn, worker);
+        AssertThat(endedFirst, true);
+    }
+
+    // runs `loop` on this thread until `f` holds its result, or until the hang guard ends
     template<class T> static bool run_until_ready(rpp::event_loop& loop, future<T>& f)
     {
         rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1);
@@ -871,18 +951,39 @@ TestImpl(test_async)
         AssertThat(ranOn, rpp::get_thread_id());
     }
 
-    // a step on the loop thread starts the next step as a pool task, so a slow step never holds the loop
+    // a step on the thread of an event loop starts the next step as a pool task, so a slow step never holds the loop
     TestCase(the_step_after_a_loop_step_runs_on_the_pool)
     {
-        rpp::event_loop loop;
+        rpp::uint64 loopThread = 0;
         rpp::uint64 ranOn = 0;
-        future<int> f = rpp::async([] { return 1; }).then(loop, [](int x) { return x; }).then([&](int x) {
-            ranOn = rpp::get_thread_id();
-            return x;
-        });
-        AssertThat(run_until_ready(loop, f), true); // a hang guard, the loop runs the first step
-        AssertThat(f.get(), 1);
-        AssertNotEqual(ranOn, rpp::get_thread_id());
+        bool ran = rpp::async([&] {
+            rpp::event_loop loop; // runs inside a pool step, where a promise of the library may run the next step inline
+            loopThread = rpp::get_thread_id();
+            future<int> f = rpp::async([] { return 1; }).then(loop, [](int x) { return x; }).then([&](int x) {
+                ranOn = rpp::get_thread_id();
+                return x;
+            });
+            return run_until_ready(loop, f) && f.get() == 1;
+        }).get();
+        AssertThat(ran, true); // a hang guard, the loop runs the first step
+        AssertNotEqual(ranOn, loopThread);
+    }
+
+    // an event loop which drops every delegate, as a loop which stopped does
+    struct dropping_loop
+    {
+        static void post(rpp::delegate<void()>&& callback) noexcept { rpp::delegate<void()> dropped { std::move(callback) }; }
+    };
+
+    // the posted delegate owns the step, so a loop which drops it ends the promise of the step at once
+    TestCase(a_loop_which_drops_the_step_ends_its_promise)
+    {
+        dropping_loop loop;
+        future<int> f = rpp::ready_future(1).then(loop, [](int x) { return x; });
+        bool ended = f.await_ready();
+        if (ended) AssertThrows((void)f.get(), std::logic_error);
+        else f.detach(); // the case fails below, and the destructor does not terminate on it
+        AssertThat(ended, true);
     }
 };
 
