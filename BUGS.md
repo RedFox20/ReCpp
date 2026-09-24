@@ -315,14 +315,16 @@ fresh frames, and outside a storm the window measures about 300ns per call.
 
 **The `frames` guard fired in CI, and the skew assertion did not.**
 `ubuntu-cpp20-modules-clang21` reported `frames.load() => '0' must be greater than '0'` on a
-commit which changes no C++. That is the guard which stops the case passing vacuously, not
-the pair check. A reader starved for the whole swap storm reads only the base generation, so
+commit which changes no C++. `ubuntu-cpp20-asan-clang18` reported it at
+`test_event_loop.cpp:1387`, on a commit which changes no `event_loop` code. That is the guard
+which stops the case passing vacuously, not the pair check. A reader starved for the whole swap storm reads only the base generation, so
 it counts no frame and asserts nothing about skew.
 
 | Where | Result |
 |---|---|
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
+| `ubuntu-cpp20-asan-clang18`, one run | `frames` reached 0, and 632 of 633 cases passed |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
