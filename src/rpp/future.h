@@ -183,7 +183,7 @@ namespace rpp
         cfuture& operator=(cfuture&& f)        noexcept { super::operator=(std::move(f)); return *this; }
 
         /**
-         * @warning If the future is not waited before destruction, program will std::terminate()
+         * @warning Collects a ready result. A future which is not ready, a deferred one included, calls std::terminate()
          */
         ~cfuture() noexcept
         {
@@ -603,7 +603,7 @@ namespace rpp
         cfuture& operator=(cfuture&& f)           noexcept { super::operator=(std::move(f)); return *this; }
 
         /**
-         * @warning If the future is not waited before destruction, program will std::terminate()
+         * @warning Collects a ready result. A future which is not ready, a deferred one included, calls std::terminate()
          */
         ~cfuture() noexcept
         {

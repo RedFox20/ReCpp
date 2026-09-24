@@ -472,7 +472,7 @@ TestImpl(test_async)
     }
 
     // a ready future which nobody collected was not abandoned, so its destructor collects it
-    // and returns. Only an unready future is a fatal error, so this case fails by terminating
+    // and returns. If the destructor terminates on a ready result, the test run stops here
     TestCase(destructor_collects_a_ready_future)
     {
         { future<int> value = rpp::ready_future(42); }
