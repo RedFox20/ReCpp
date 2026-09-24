@@ -26,7 +26,7 @@ namespace rpp
     template<class T = void>
     class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND future;
 
-    /// Matches a loop which runs a posted callback on its own thread, as rpp::event_loop does
+    /// Matches an event loop which runs a posted delegate on its own thread, as rpp::event_loop does
     template<class Loop>
     concept IsEventLoop = requires(Loop& loop, rpp::delegate<void()>&& callback) { loop.post(std::move(callback)); };
 
@@ -77,7 +77,7 @@ namespace rpp
             void run() noexcept override { step(); }
             void start(bool /*may_run_here*/) noexcept override
             {
-                // the callback owns the step, so a loop which drops the callback still ends the promise of the step
+                // the delegate owns the step, so a loop which drops the delegate still ends the promise of the step
                 loop->post([self=std::unique_ptr<continuation>{this}] { run_outside_pool_steps(*self); });
             }
         };
@@ -145,11 +145,12 @@ namespace rpp
         };
 
         /// Starts `c` after the result of `s` arrives. An invalid future, or a result which is already out, starts it now
+        /// @param may_run_here lets a result which is already out run `c` inline on this pool step
         template<class T>
-        void start_after(future_state<T>* s, continuation* c) noexcept
+        void start_after(future_state<T>* s, continuation* c, bool may_run_here = false) noexcept
         {
             if (!s || !s->attach(c))
-                c->start(false);
+                c->start(may_run_here);
         }
 
         // task(value) continues a future<T>, and task() continues a future<void>
@@ -277,7 +278,7 @@ namespace rpp
             step_promise() { this->library = true; }
         };
 
-        /// @returns a step which runs `work`, destroys it, then publishes what it returned or threw into `p`
+        /// @returns a step which runs `work` and destroys it before it publishes into `p`, because its owner frees the step late
         template<class R, class Work>
         auto publishing_step(Work work, step_promise<R>&& p)
         {
@@ -324,14 +325,27 @@ namespace rpp
 
     namespace detail
     {
-        /// Coroutine hooks of future<T>. ~promise() publishes after the frame destroys its locals, before its by-value parameters
+        /// Coroutine hooks of future<T>. The result publishes after the frame ends, so the next step never runs inside it
         template<class T>
         struct coro_promise_base : promise<T>
         {
+            /// Destroys the frame and its parameters, then publishes the result which the frame stored
+            struct publish_after_frame
+            {
+                bool await_ready() const noexcept { return false; }
+                template<class Promise>
+                void await_suspend(rpp::coro_handle<Promise> frame) const noexcept
+                {
+                    rpp::promise<T> publisher { std::move(frame.promise()) }; // its destructor publishes after the frame ends
+                    frame.destroy(); // this awaiter lives in the frame, so nothing below this line may touch it
+                }
+                void await_resume() const noexcept {}
+            };
+
             coro_promise_base() { this->library = true; } // a frame which ends on a pool step runs the next step there
             RPP_CORO_WRAPPER future<T> get_return_object() { return this->get_future(); }
             rpp::suspend_never initial_suspend() const noexcept { return {}; }
-            rpp::suspend_never final_suspend() const noexcept { return {}; }
+            publish_after_frame final_suspend() const noexcept { return {}; }
             void unhandled_exception() noexcept { this->state->error = std::current_exception(); }
         };
 
@@ -615,21 +629,24 @@ namespace rpp
                 if (!error)
                 {
                     std::move(n).publish_into(std::move(p));
-                    return;
                 }
-                n.detach(); // the chain fails with this error, so nobody awaits `next`
-                p.set_exception(std::exchange(error, nullptr));
+                else
+                {
+                    n.detach(); // the chain fails with this error, so nobody awaits `next`
+                    p.set_exception(std::exchange(error, nullptr));
+                }
             };
             detail::start_after(s, detail::make_continuation(std::move(step)));
             return result;
         }
 
-        // publishes the result of this future into `p` after it arrives
+        // publishes this result into `p` after it arrives. A result which is already out publishes on this pool step
         void publish_into(detail::step_promise<T>&& p) && noexcept
         {
             detail::future_state<T>* s = state;
             auto work = [f=std::move(*this)]() mutable -> T { return f.get(); };
-            detail::start_after(s, detail::make_continuation(detail::publishing_step(std::move(work), std::move(p))));
+            detail::continuation* c = detail::make_continuation(detail::publishing_step(std::move(work), std::move(p)));
+            detail::start_after(s, c, detail::in_pool_step());
         }
 
         // the destructor and the move assignment both end the life of a state
