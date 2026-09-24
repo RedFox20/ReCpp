@@ -806,8 +806,10 @@ namespace rpp
         static const epoch_offsets offsets = []
         {
             epoch_offsets o {};
-            for (int i = 0; i < NUM_CLOCKS; ++i) // sample both clocks as close together as possible
-                o.ns[i] = raw_clock_ns(ClockType::Realtime) - raw_clock_ns(static_cast<ClockType>(i));
+            // sample both clocks close together, and only for the clocks which now() shifts.
+            // A kernel without CLOCK_TAI fails the read of that clock.
+            for (ClockType c : { ClockType::Monotonic, ClockType::MonotonicRaw, ClockType::MonotonicCoarse, ClockType::Boottime })
+                o.ns[static_cast<int>(c)] = raw_clock_ns(ClockType::Realtime) - raw_clock_ns(c);
             return o;
         }();
         return offsets.ns[index];

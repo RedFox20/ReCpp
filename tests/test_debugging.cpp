@@ -11,6 +11,7 @@ static std::string log_output;
 struct slow_log_target
 {
     rpp::semaphore entered;
+    std::atomic_bool removing {false};
     std::atomic_bool done {false};
 };
 
@@ -18,11 +19,17 @@ static void slow_log_handler(void* context, LogSeverity /*severity*/, const char
 {
     slow_log_target* target = static_cast<slow_log_target*>(context);
     target->entered.notify();
+    while (!target->removing) // the sleep starts once the remover runs, so it cannot end first
+        rpp::yield();
     rpp::sleep_ms(5);
     target->done = true;
 }
 
 static void quiet_log_handler(void* /*context*/, LogSeverity /*severity*/, const char* /*message*/, int /*len*/) noexcept {}
+
+static std::atomic_int old_style_calls {0};
+static void count_old_style_a(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
+static void count_old_style_b(LogSeverity /*severity*/, const char* /*message*/, int /*len*/) { ++old_style_calls; }
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
@@ -202,6 +209,7 @@ TestImpl(test_debugging)
         rpp::add_log_handler(&target, &slow_log_handler);
         std::thread logger{[] { LogInfo("slow"); }};
         target.entered.wait();
+        target.removing = true;
         rpp::remove_log_handler(&target, &slow_log_handler);
         AssertThat(target.done.load(), true);
         logger.join();
@@ -223,5 +231,20 @@ TestImpl(test_debugging)
         }
         logging = false;
         logger.join();
+    }
+
+    // SetLogHandler() swaps the old style handler in one edit, so each log call reaches exactly one of the two
+    TestCase(set_log_handler_swaps_the_handler_without_a_gap)
+    {
+        SetLogHandler(&count_old_style_a);
+        old_style_calls = 0;
+        std::atomic_int logged {0};
+        std::atomic_bool logging {true};
+        std::thread logger{[&] { while (logging) { LogInfo("x"); ++logged; } }};
+        for (int i = 0; logged < 2000; ++i) // swap while the other thread logs
+            SetLogHandler(i % 2 == 0 ? &count_old_style_b : &count_old_style_a);
+        logging = false;
+        logger.join();
+        AssertThat(old_style_calls.load(), logged.load());
     }
 };

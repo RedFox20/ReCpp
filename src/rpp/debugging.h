@@ -177,6 +177,7 @@ namespace rpp
      * @brief Adds an additional log handler that is able to receive log messages
      *        when standard LogInfo(), LogWarning(), LogError() are called.
      *        The handler must not throw, because a throw from a log call terminates.
+     *        It waits for the running log handlers, so the rules of remove_log_handler() apply.
      */
     void add_log_handler(void* context, LogMsgHandler handler) noexcept;
 

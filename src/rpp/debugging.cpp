@@ -148,13 +148,6 @@ namespace rpp
         publish_log_handlers(edit);
     }
 
-    void remove_log_handler_func(LogMsgHandler handler_func) noexcept
-    {
-        LogHandlerList& edit = edit_log_handlers();
-        if (int index = index_of(edit, handler_func); index != -1)
-            remove_at(edit, index);
-        publish_log_handlers(edit);
-    }
 }
 
 // calls every handler of the published list, and returns false when the list is empty
@@ -178,12 +171,13 @@ static void LogHandlerProxy(void* context, LogSeverity severity, const char* mes
 
 RPPCAPI void SetLogHandler(LogMessageCallback loghandler) noexcept
 {
-    // always remove the current proxy, since we can only have one at a time
-    rpp::remove_log_handler_func(&LogHandlerProxy);
-    if (loghandler)
-    {
-        rpp::add_log_handler(reinterpret_cast<void*>(loghandler), &LogHandlerProxy);
-    }
+    // one edit replaces the proxy, so two setters cannot leave two proxies behind
+    LogHandlerList& edit = rpp::edit_log_handlers();
+    if (int index = rpp::index_of(edit, &LogHandlerProxy); index != -1)
+        rpp::remove_at(edit, index);
+    if (loghandler && edit.size < MAX_LOG_HANDLERS)
+        edit.items[edit.size++] = { reinterpret_cast<void*>(loghandler), &LogHandlerProxy };
+    rpp::publish_log_handlers(edit);
 }
 RPPCAPI void SetLogExceptHandler(LogExceptCallback exceptHandler) noexcept
 {
