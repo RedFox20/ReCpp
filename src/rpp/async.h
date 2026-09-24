@@ -590,7 +590,7 @@ namespace rpp
 
         // runs `body(f)` with this future `f` after its result arrives. @returns a future which receives what `body` returns
         template<class R, class Body, class... Loop>
-        future<R> chain(Body body, Loop&... loop) noexcept
+        RPP_CORO_WRAPPER future<R> chain(Body body, Loop&... loop) noexcept
         {
             detail::step_promise<R> p;
             future<R> next = p.get_future();
@@ -602,7 +602,7 @@ namespace rpp
 
         // after this result arrives, `next` publishes into the future this returns. `stop_on_error` lets an error end the chain
         template<class U>
-        future<U> forward_after(future<U>&& next, bool stop_on_error) noexcept
+        RPP_CORO_WRAPPER future<U> forward_after(future<U>&& next, bool stop_on_error) noexcept
         {
             detail::step_promise<U> p;
             future<U> result = p.get_future();
