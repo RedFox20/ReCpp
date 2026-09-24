@@ -67,6 +67,7 @@ export namespace rpp {
     using rpp::exclusive_lock;
     using rpp::close_sync;
     using rpp::future;
+    using rpp::IsEventLoop;
     using rpp::promise;
     using rpp::async;
     using rpp::ready_future;

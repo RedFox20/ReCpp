@@ -313,31 +313,32 @@ out of 20, and it costs no second drain. A frame captured inside the null window
 warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
 fresh frames, and outside a storm the window measures about 300ns per call.
 
-**The `frames` guard fired in CI, and the skew assertion did not.**
-`ubuntu-cpp20-modules-clang21` reported `frames.load() => '0' must be greater than '0'` on a
-commit which changes no C++. `ubuntu-cpp20-asan-clang18` reported it at
-`test_event_loop.cpp:1387`, on a commit which changes no `event_loop` code. That is the guard
-which stops the case passing vacuously, not the pair check. A reader starved for the whole swap storm reads only the base generation, so
-it counts no frame and asserts nothing about skew.
+**The `frames` guard fired three times in CI, and the skew assertion did not.** CI reported
+`frames.load() => '0' must be greater than '0'` at `test_event_loop.cpp:1387`, each time on a
+commit which changes no `event_loop` code. That is the guard which stops the case passing
+vacuously, not the pair check. A reader starved for the whole swap storm reads only the base
+generation, so it counts no frame and asserts nothing about skew.
 
 | Where | Result |
 |---|---|
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
 | `ubuntu-cpp20-asan-clang18`, one run | `frames` reached 0, and 632 of 633 cases passed |
+| `ubuntu-cpp20-modules-clang21`, a second run | `frames` reached 0, and the re-run passed |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 
-**The skew check fired twice in CI.** Two android jobs reported
+**The skew check fired three times in CI.** Three android jobs reported
 `skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1388`, each on a commit which
-changes no `event_loop` code. Both run the tests under QEMU on an x86 runner. So one reader
+changes no `event_loop` code. Each one runs the tests under QEMU on an x86 runner. So one reader
 paired an offset with another generation, which the publish order above exists to stop.
 
 | Where | Result |
 |---|---|
 | `android-cpp20-r27-clang-tidy-clang18` | 1 run in 3 failed, and its re-run passed |
 | `android-cpp20-r28b-clang-tidy-clang19` | 1 run failed, and 632 of 633 cases passed |
+| `android-cpp20-r29-ninja` | 1 run failed, and its re-run passed |
 | `test_event_loop` locally, gcc-14 | 20 runs out of 20 pass on 4 cores, and 20 out of 20 on one core |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU

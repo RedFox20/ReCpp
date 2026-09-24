@@ -1,13 +1,20 @@
 #include <rpp/async.h>
+#include <rpp/event_loop.h>
 #include <rpp/semaphore.h>
+#include <rpp/threads.h> // rpp::get_thread_id
 #include <rpp/timepoint.h>
 #include <rpp/tests.h>
 #include <atomic>
+#include <cstdint> // std::uintptr_t
 #include <exception> // std::current_exception, std::exception_ptr
+#include <map>
 #include <stdexcept>
 #include <string> // std::string
-#include <utility> // std::exchange
+#include <utility> // std::exchange, std::pair
 #include <vector>
+#if _MSC_VER
+#  include <intrin.h> // _AddressOfReturnAddress
+#endif
 using namespace rpp;
 using namespace std::string_literals;
 
@@ -27,7 +34,7 @@ TestImpl(test_async)
         {
             return !arg.empty() && arg == "future string";
         });
-        loadString.set_value("future string"); // the continuation waits on the pool until this line
+        loadString.set_value("future string"); // this line starts the continuation as a pool task
         AssertThat(chain.get(), true);
     }
 
@@ -630,6 +637,89 @@ TestImpl(test_async)
         AssertThat(handled, "continue_with_exception_msg"s);
     }
 
+    // the worker which publishes runs the next step inline, so no pool thread waits for a result
+    TestCase(a_chain_runs_on_the_worker_which_ran_the_first_task)
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        rpp::uint64 first = 0;
+        rpp::uint64 second = 0;
+        rpp::uint64 third = 0;
+        future<int> f = rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until both steps attached
+            first = rpp::get_thread_id();
+            return 1;
+        }).then([&](int x) {
+            second = rpp::get_thread_id();
+            return x + 1;
+        }).then([&](int x) {
+            third = rpp::get_thread_id();
+            return x + 1;
+        });
+        gate.notify();
+        AssertThat(f.get(), 3);
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(second, first);
+        AssertThat(third, first);
+    }
+
+    // the address of this frame, which moves down the stack while one step runs inside another
+    static NOINLINE std::uintptr_t frame_address() noexcept
+    {
+    #if _MSC_VER
+        return reinterpret_cast<std::uintptr_t>(_AddressOfReturnAddress());
+    #else
+        return reinterpret_cast<std::uintptr_t>(__builtin_frame_address(0));
+    #endif
+    }
+
+    // each step publishes inside the step before it, so a long chain must move to a new pool task before the stack grows deep
+    TestCase(a_long_chain_keeps_the_stack_of_each_thread_short)
+    {
+        constexpr int steps = 4000;
+        std::map<rpp::uint64, std::pair<std::uintptr_t, std::uintptr_t>> spans; // the lowest and highest frame on each thread
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        future<int> f = rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until every step attached
+            return 0;
+        });
+        for (int i = 0; i < steps; ++i)
+        {
+            f = f.then([&](int x) {
+                std::uintptr_t frame = frame_address();
+                auto span = spans.try_emplace(rpp::get_thread_id(), frame, frame).first;
+                if (frame < span->second.first) span->second.first = frame;
+                if (frame > span->second.second) span->second.second = frame;
+                return x + 1;
+            });
+        }
+        gate.notify();
+        AssertThat(f.get(), steps);
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+
+        std::uintptr_t deepest = 0;
+        for (const auto& [thread, span] : spans)
+            if (span.second - span.first > deepest) deepest = span.second - span.first;
+        AssertLess(deepest, std::uintptr_t{256 * 1024});
+    }
+
+    // a promise of the caller may publish under a lock, so its next step starts as a pool task and never inline
+    TestCase(a_user_promise_starts_the_next_step_as_a_pool_task)
+    {
+        rpp::uint64 publisher = 0;
+        rpp::uint64 ranOn = 0;
+        future<int> next;
+        rpp::async([&] {
+            promise<int> p;
+            next = p.get_future().then([&](int x) { ranOn = rpp::get_thread_id(); return x; });
+            publisher = rpp::get_thread_id();
+            p.set_value(1);
+        }).get();
+        AssertThat(next.get(), 1);
+        AssertNotEqual(ranOn, publisher);
+    }
+
     TestCase(wait_all_and_get_all)
     {
         std::vector<future<int>> ints;
@@ -718,6 +808,81 @@ TestImpl(test_async)
         future<int> f = coro_with_a_local(&localDestroyed);
         AssertThat(f.get(), 42);
         AssertThat(localDestroyed.load(), true);
+    }
+
+    static future<rpp::uint64> thread_after_await(future<int> f)
+    {
+        (void)co_await f;
+        co_return rpp::get_thread_id();
+    }
+
+    // the worker which publishes resumes the coroutine, so no pool thread waits for the result
+    TestCase(a_coroutine_resumes_on_the_worker_which_published)
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        rpp::uint64 worker = 0;
+        future<rpp::uint64> resumed = thread_after_await(rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until the coroutine suspended
+            worker = rpp::get_thread_id();
+            return 1;
+        }));
+        gate.notify();
+        rpp::uint64 resumedOn = resumed.get();
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(resumedOn, worker);
+    }
+
+    // runs `loop` on this thread until `f` holds its result, for one second at most
+    template<class T> static bool run_until_ready(rpp::event_loop& loop, future<T>& f)
+    {
+        rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1);
+        while (!f.await_ready() && rpp::TimePoint::monotonic_now() < deadline)
+            loop.run_once(rpp::millis(5));
+        if (f.await_ready()) return true;
+        f.detach(); // the case fails on the result, and the destructor does not terminate on it
+        return false;
+    }
+
+    TestCase(then_on_a_loop_runs_the_task_on_the_loop_thread)
+    {
+        rpp::event_loop loop;
+        rpp::uint64 ranOn = 0;
+        future<int> f = rpp::async([] { return 20; }).then(loop, [&](int x) {
+            ranOn = rpp::get_thread_id();
+            return x + 1;
+        });
+        AssertThat(run_until_ready(loop, f), true); // a hang guard, the loop runs the task
+        AssertThat(f.get(), 21);
+        AssertThat(ranOn, rpp::get_thread_id());
+    }
+
+    TestCase(continue_with_on_a_loop_runs_the_task_on_the_loop_thread)
+    {
+        rpp::event_loop loop;
+        rpp::uint64 ranOn = 0;
+        promise<void> ran;
+        future<void> done = ran.get_future();
+        rpp::async([] { return 42; }).continue_with(loop, [&](int x) {
+            ranOn = x == 42 ? rpp::get_thread_id() : 0;
+            ran.set_value();
+        });
+        AssertThat(run_until_ready(loop, done), true); // a hang guard, the loop runs the task
+        AssertThat(ranOn, rpp::get_thread_id());
+    }
+
+    // a step on the loop thread starts the next step as a pool task, so a slow step never holds the loop
+    TestCase(the_step_after_a_loop_step_runs_on_the_pool)
+    {
+        rpp::event_loop loop;
+        rpp::uint64 ranOn = 0;
+        future<int> f = rpp::async([] { return 1; }).then(loop, [](int x) { return x; }).then([&](int x) {
+            ranOn = rpp::get_thread_id();
+            return x;
+        });
+        AssertThat(run_until_ready(loop, f), true); // a hang guard, the loop runs the first step
+        AssertThat(f.get(), 1);
+        AssertNotEqual(ranOn, rpp::get_thread_id());
     }
 };
 
