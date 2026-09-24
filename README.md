@@ -1478,7 +1478,7 @@ Composable futures which own their shared state, with C++20 coroutine support. T
 
 | Method | Description |
 |--------|-------------|
-| [`~future()`](src/rpp/async.h#L286) | Collects a ready result. An unready future terminates, because nobody awaited it |
+| [`~future()`](src/rpp/async.h#L286) | Collects a ready result, fails an assertion on a stored exception, and terminates for an unready future |
 | [`operator=(future&& f)`](src/rpp/async.h#L274) | Ends the old state as the destructor does, then takes the state of `f` |
 | [`valid()`](src/rpp/async.h#L289) | Returns `true` while the future holds a state, which `get()` consumes |
 | [`get()`](src/rpp/async.h#L307) | Blocks, then returns the result or rethrows its exception. The future is invalid afterwards |
@@ -1539,7 +1539,7 @@ Composable futures with C++20 coroutine support. Uses `rpp/thread_pool.h` for ba
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L188) | **Fail-fast destructor**: collects a ready result, and a stored exception triggers an assertion failure. A valid future which is not ready, a deferred one included, calls `std::terminate()`. `std::future` blocks in its destructor instead, and ReCpp terminates so that the programming bug surfaces at once. |
+| [`~cfuture()`](src/rpp/future.h#L188) | **Fail-fast destructor**: collects a ready result, fails an assertion on a stored exception, and calls `std::terminate()` for a valid unready future, deferred included |
 | [`then()`](src/rpp/future.h#L218) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
 | [`then(Task task)`](src/rpp/future.h#L235) | Chain a continuation that receives the result (runs via `async_task`) |
 | [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L262) | Chain with 1–4 typed exception recovery handlers |
