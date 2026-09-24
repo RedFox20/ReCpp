@@ -135,7 +135,7 @@ namespace rpp
     void add_log_handler(void* context, LogMsgHandler handler) noexcept
     {
         LogHandlerList& edit = edit_log_handlers();
-        if (edit.size < MAX_LOG_HANDLERS && index_of(edit, { context, handler }) == -1)
+        if (handler && edit.size < MAX_LOG_HANDLERS && index_of(edit, { context, handler }) == -1)
             edit.items[edit.size++] = { context, handler };
         publish_log_handlers(edit);
     }
@@ -158,19 +158,15 @@ namespace rpp
 }
 
 // calls every handler of the published list, and returns false when the list is empty
-static bool dispatch_log(LogSeverity severity, const char* message, int len) noexcept
+static FINLINE bool dispatch_log(LogSeverity severity, const char* message, int len) noexcept
 {
     LogDispatches.fetch_add(1, std::memory_order_seq_cst);
     const LogHandlerList* list = LogHandlers.load(std::memory_order_seq_cst);
-    for (int i = 0; i < list->size; ++i)
-    {
-        const LogHandler& h = list->items[i];
-        if (h.handler)
-            h.handler(h.context, severity, message, len);
-    }
-    const bool handled = list->size != 0;
+    const int size = list->size;
+    for (int i = 0; i < size; ++i)
+        list->items[i].handler(list->items[i].context, severity, message, len);
     LogDispatches.fetch_sub(1, std::memory_order_release);
-    return handled;
+    return size != 0;
 }
 
 // old-style API adapter

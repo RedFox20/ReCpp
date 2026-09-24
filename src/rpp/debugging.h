@@ -175,15 +175,18 @@ namespace rpp
 
     /**
      * @brief Adds an additional log handler that is able to receive log messages
-     *        when standard LogInfo(), LogWarning(), LogError() are called
+     *        when standard LogInfo(), LogWarning(), LogError() are called.
+     *        The handler must not throw, because a throw from a log call terminates.
      */
     void add_log_handler(void* context, LogMsgHandler handler) noexcept;
 
     /**
      * @brief Removes a matching log handler to prevent further logging calls
      *        on the `context` object. It returns after every running call of the handler
-     *        ends, so the caller may free `context` next. Do not call it or add_log_handler()
-     *        from a log handler, or while you hold a lock which a log handler takes.
+     *        ends, so the caller may free `context` next.
+     *        Do not call it, add_log_handler() or SetLogHandler() from a log handler or an ISR.
+     *        Do not call it while you hold a lock which a log handler takes.
+     *        On FreeRTOS, call it from a task whose priority is not above the priority of a task which logs.
      */
     void remove_log_handler(void* context, LogMsgHandler handler) noexcept;
 }
