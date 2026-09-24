@@ -9,22 +9,10 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ## Open
 
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
-`test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:721` that
+`test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that
 `t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
 gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
 full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
-
-### B32. `monotonic_epoch_offset()` fills its offset table with no synchronization
-Two pool workers read and write the static `offsets` table in `monotonic_epoch_offset()` on first
-use. A probe process whose first `TimePoint::monotonic_now()` calls ran on two pool workers made
-clang-18 TSAN report it 3 of 3.
-
-T2 `rpp_task_2` reads `offsets[index]` at `timepoint.cpp:811`, and T1 `rpp_task_1` writes it at
-`timepoint.cpp:816`. Both stacks call `TimePoint::monotonic_now()` from `semaphore::wait()` in
-`pool_worker::wait_for_new_job()`. Each thread samples both clocks on its own, so two threads can
-use two different offsets. A 32-bit target can split the `int64` access, so a reader can also get
-a torn offset. The full suite never reports it, because the runner calls
-`TimePoint::monotonic_now()` on the main thread first, at `tests.cpp:1088`.
 
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
@@ -605,7 +593,7 @@ gives a parallel loop no margin over a single thread. AGENTS.md R2 already says 
 event, not on the clock.
 
 A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
-and requires 45 ms of CPU time at `test_timer.cpp:737`. A local clang-18 TSAN run got
+and requires 45 ms of CPU time at `test_timer.cpp:749`. A local clang-18 TSAN run got
 `cpu_delta => '42103'`. On a 4 core VM, the case alone failed that floor 1 of 5 times under TSAN.
 It failed 1 of 20 times on plain gcc-14, at a load average of 0.02. `/proc/stat` on that VM
 reports steal time, which its load average does not show.
