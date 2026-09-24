@@ -79,8 +79,8 @@ rpp::cfuture<int> a = rpp::async_task([]{ return 7; }); // the header, unchanged
 rpp::future<int>  b = rpp::async([]{ return 7; });      // the module
 ```
 
-`then()`, `continue_with()` and `chain_async()` all call the launcher inside, so each one
-returns the matching type without a caller naming it. A port is one word per call site.
+`then()`, `continue_with()` and `chain_async()` return the matching type, so a caller never
+names it. A port is one word per call site.
 
 The two factories take new names for the same reason. `rpp::ready_future()` and
 `rpp::exceptional_future()` return the new type. `make_ready_future()` and
@@ -101,12 +101,19 @@ The names below read the same on both types, so a mechanical port compiles.
 `detach()` keeps its name and drops its cost. It releases the state at once, so no pool thread
 blocks on an abandoned result.
 
+`then()`, `continue_with()` and `co_await` keep their names and park no thread. The step
+attaches to the shared state, and the pool thread which publishes the result runs it inline.
+So a chain of `rpp::async` steps runs on one worker. `cfuture` parks one pool thread for each
+pending step. A promise of the caller starts the step as a pool task, because the caller can
+publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the step on the
+thread of an `rpp::event_loop` instead.
+
 `get_all()` keeps its name and collects every future before it rethrows the first exception.
 The `cfuture` overload stops at the first one, so a later future which is not ready terminates
 in its destructor.
 
 `rpp::task<T>` does not overlap this. A task resumes on the loop thread and spawns nothing.
-A future blocks a thread and carries `.then()`. See `task.h`.
+A future carries `.then()`, and its `get()` blocks the caller. See `task.h`.
 
 ## 5. The ReCpp surface which moves
 
