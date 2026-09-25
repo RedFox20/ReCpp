@@ -325,27 +325,14 @@ namespace rpp
 
     namespace detail
     {
-        /// Coroutine hooks of future<T>. The result publishes after the frame ends, so the next step never runs inside it
+        /// Coroutine hooks of future<T>. ~promise() publishes after the locals end, but before the parameters do.
+        /// So this is no promise of the library, and the next step starts as a pool task outside the frame
         template<class T>
         struct coro_promise_base : promise<T>
         {
-            /// Destroys the frame and its parameters, then publishes the result which the frame stored
-            struct publish_after_frame
-            {
-                bool await_ready() const noexcept { return false; }
-                template<class Promise>
-                void await_suspend(rpp::coro_handle<Promise> frame) const noexcept
-                {
-                    rpp::promise<T> publisher { std::move(frame.promise()) }; // its destructor publishes after the frame ends
-                    frame.destroy(); // this awaiter lives in the frame, so nothing below this line may touch it
-                }
-                void await_resume() const noexcept {}
-            };
-
-            coro_promise_base() { this->library = true; } // a frame which ends on a pool step runs the next step there
             RPP_CORO_WRAPPER future<T> get_return_object() { return this->get_future(); }
             rpp::suspend_never initial_suspend() const noexcept { return {}; }
-            publish_after_frame final_suspend() const noexcept { return {}; }
+            rpp::suspend_never final_suspend() const noexcept { return {}; }
             void unhandled_exception() noexcept { this->state->error = std::current_exception(); }
         };
 

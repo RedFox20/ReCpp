@@ -872,45 +872,43 @@ TestImpl(test_async)
         AssertThat(resumedOn, worker);
     }
 
-    // sets the flag when the coroutine frame destroys its copy. A moved-from copy sets nothing
-    struct flag_on_exit
+    // notifies `ended` when the coroutine frame destroys its copy. A moved-from copy notifies nothing
+    struct notify_on_exit
     {
-        std::atomic_bool* flag;
-        explicit flag_on_exit(std::atomic_bool* f) noexcept : flag{f} {}
-        flag_on_exit(flag_on_exit&& other) noexcept : flag{std::exchange(other.flag, nullptr)} {}
-        ~flag_on_exit() { if (flag) *flag = true; }
+        rpp::semaphore* ended;
+        explicit notify_on_exit(rpp::semaphore* s) noexcept : ended{s} {}
+        notify_on_exit(notify_on_exit&& other) noexcept : ended{std::exchange(other.ended, nullptr)} {}
+        ~notify_on_exit() { if (ended) ended->notify(); }
     };
 
-    static future<rpp::uint64> thread_after_await_with(future<int> f, flag_on_exit /*onExit*/)
+    static future<int> await_with_a_parameter(future<int> f, notify_on_exit /*onExit*/)
     {
-        (void)co_await f;
-        co_return rpp::get_thread_id();
+        co_return co_await f;
     }
 
-    // the frame ends with its parameters before the result publishes, then the worker runs the next step inline
-    TestCase(the_step_after_a_coroutine_runs_on_its_worker_after_the_frame_ends)
+    // the frame still holds its parameters when the result publishes, so the next step runs as a pool task outside it
+    TestCase(the_step_after_a_coroutine_never_runs_inside_its_frame)
     {
         rpp::semaphore gate;
+        rpp::semaphore parameterEnded;
         rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        std::atomic_bool parameterEnded = false;
-        bool endedFirst = false;
+        rpp::semaphore::wait_result ended = rpp::semaphore::timeout;
         rpp::uint64 worker = 0;
         rpp::uint64 ranOn = 0;
-        future<rpp::uint64> f = thread_after_await_with(rpp::async([&] {
+        future<int> f = await_with_a_parameter(rpp::async([&] {
             opened = gate.wait(rpp::seconds(1)); // holds the task until the step after the coroutine attached
             worker = rpp::get_thread_id();
             return 1;
-        }), flag_on_exit{&parameterEnded}).then([&](rpp::uint64 resumedOn) {
-            endedFirst = parameterEnded.load();
+        }), notify_on_exit{&parameterEnded}).then([&](int x) {
             ranOn = rpp::get_thread_id();
-            return resumedOn;
+            ended = parameterEnded.wait(rpp::seconds(1)); // a hang guard, the frame releases it after the result published
+            return x;
         });
         gate.notify();
-        rpp::uint64 resumedOn = f.get();
+        AssertThat(f.get(), 1);
         AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
-        AssertThat(resumedOn, worker);
-        AssertThat(ranOn, worker);
-        AssertThat(endedFirst, true);
+        AssertThat(ended, rpp::semaphore::notified);
+        AssertNotEqual(ranOn, worker);
     }
 
     // runs `loop` on this thread until `f` holds its result, or until the hang guard ends
