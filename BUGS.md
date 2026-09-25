@@ -323,6 +323,14 @@ during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop 
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
 than on the scheduler.
 
+**qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
+on a6c2bd6 in #109, and 2 on the re-run. qemu-user on an x86 host fences before an STLR store
+and after an LDAR load. So the clear can pass the drain load, the drain sees no reader, and a
+reader pairs the old clock with the new generation. The clear is an `exchange()` now, which
+becomes a locked host operation. A copy of the handshake under qemu-aarch64 8.2 skews 22 runs
+out of 60 with the store, and 0 out of 60 with the exchange. The real case passes 100 runs
+out of 100 there, so the copy is the local reproducer.
+
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.
 

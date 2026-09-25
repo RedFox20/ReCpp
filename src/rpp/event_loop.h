@@ -277,7 +277,7 @@ namespace rpp
         {
             // the drain runs between the clear and the bump, so no reader pairs the old
             // clock with a newer generation. That pair moves a deadline off its timeline
-            time_source.store(nullptr, std::memory_order_seq_cst);
+            time_source.exchange(nullptr, std::memory_order_seq_cst); // qemu-user lets a plain store pass the drain load
             drain_time_source_readers();
             time_source_generation.fetch_add(1, std::memory_order_seq_cst);
             time_source.store(clock, std::memory_order_seq_cst);

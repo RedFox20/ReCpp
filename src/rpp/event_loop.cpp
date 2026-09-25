@@ -69,7 +69,6 @@ namespace rpp
         // sees the new pointer, so this never dereferences a retired clock
         time_source_readers.fetch_add(1, std::memory_order_seq_cst);
         rpp::AtomicTimeSource* src = time_source.load(std::memory_order_seq_cst);
-        // the Android qemu jobs skew frames when the offset read sits between the pointer and the generation loads
         rpp::uint32 generation = time_source_generation.load(std::memory_order_seq_cst);
         if (src) frame = time_frame{src};
         frame.generation = generation;
