@@ -1179,6 +1179,17 @@ TestImpl(test_event_loop)
         return rpp::TimePoint::monotonic_now() - start;
     }
 
+    // ProcessCPU starts near zero, far from the realtime epoch, so it shows which clock the loop reads
+    TestCase(loop_clock_reads_the_base_clock_of_its_time_source)
+    {
+        rpp::AtomicTimeSource cpu_clock;
+        cpu_clock.set_base_clock(rpp::ClockType::ProcessCPU);
+        loop->set_time_source(&cpu_clock);
+        rpp::Duration error = loop->current_time() - rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
+        loop->set_time_source(nullptr); // the scope frees `cpu_clock` next
+        AssertLess(error.abs().nsec, rpp::seconds(1).nsec);
+    }
+
     // ─── warpable clock: delay() tracks an AtomicTimeSource so warp_forward releases it ──
     // A 10-virtual-second delay can only complete within a 2s wall budget if warp_forward()
     // advanced the loop's clock past the deadline.

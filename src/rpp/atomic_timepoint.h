@@ -142,16 +142,16 @@ namespace rpp
 
         // time warp offset to apply to current time, can be used for time warping in simulations
         std::atomic<rpp::int64> warp_offset_ns {};
+        std::atomic<rpp::ClockType> base_clock { rpp::ClockType::Realtime }; // Monotonic ignores a wall clock step
 
     public:
-
         /**
          * @returns The virtual time according to this time source,
-         *           which is the current system time plus the combined offset (sync + warp).
+         *           which is the base clock time plus the combined offset (sync + warp).
          */
         rpp::TimePoint time_now() const noexcept
         {
-            rpp::TimePoint base_now = rpp::TimePoint::system_now();
+            rpp::TimePoint base_now = rpp::TimePoint::now(get_base_clock());
             rpp::int64 offset_ns = combined_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_now.duration.nsec + offset_ns };
         }
@@ -162,7 +162,7 @@ namespace rpp
          */
         rpp::TimePoint time_unsynced() const noexcept
         {
-            rpp::TimePoint base_local = rpp::TimePoint::system_now();
+            rpp::TimePoint base_local = rpp::TimePoint::now(get_base_clock());
             rpp::int64 warp_ns = warp_offset_ns.load(std::memory_order_relaxed);
             return rpp::TimePoint{ base_local.duration.nsec + warp_ns };
         }
@@ -239,6 +239,12 @@ namespace rpp
             rpp::int64 offset_diff = new_offset.nsec - old_offset;
             combined_offset_ns.fetch_add(offset_diff, std::memory_order_seq_cst);
         }
+
+        /** @returns The clock under the sync and warp offsets, Realtime by default */
+        rpp::ClockType get_base_clock() const noexcept { return base_clock.load(std::memory_order_relaxed); }
+
+        /** @brief Sets the clock under the sync and warp offsets. Set it before the first read */
+        void set_base_clock(rpp::ClockType clock) noexcept { base_clock.store(clock, std::memory_order_relaxed); }
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////

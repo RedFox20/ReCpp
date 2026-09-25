@@ -304,7 +304,7 @@ out of 20, and it costs no second drain. A frame captured inside the null window
 warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
 fresh frames, and outside a storm the window measures about 300ns per call.
 
-**The `frames` guard fired once in CI, and the skew assertion did not.**
+**The `frames` guard fired in CI, and the skew assertion did not.**
 `ubuntu-cpp20-modules-clang21` reported `frames.load() => '0' must be greater than '0'` on a
 commit which changes no C++. That is the guard which stops the case passing vacuously, not
 the pair check. A reader starved for the whole swap storm reads only the base generation, so
@@ -315,11 +315,21 @@ it counts no frame and asserts nothing about skew.
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
+| `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
+| `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
 than on the scheduler.
+
+**qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
+on a6c2bd6 in #109, and 2 on the re-run. qemu-user on an x86 host fences before an STLR store
+and after an LDAR load. So the clear can pass the drain load, the drain sees no reader, and a
+reader pairs the old clock with the new generation. The clear is an `exchange()` now, which
+becomes a locked host operation. A copy of the handshake under qemu-aarch64 8.2 skews 22 runs
+out of 60 with the store, and 0 out of 60 with the exchange. The real case passes 100 runs
+out of 100 there, so the copy is the local reproducer.
 
 So the destructor must never return while a task is live. A shared pointer is not the fix,
 because it changes the borrow contract of every consumer.

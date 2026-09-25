@@ -1701,11 +1701,11 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1055) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
 | [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1033) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L163) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
-| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L275) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
-| [`current_time()`](src/rpp/event_loop.h#L287) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
-| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L290) | The virtual time of `src`, or the monotonic wall clock when it is null |
-| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L294) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
-| [`get_time_source_frame()`](src/rpp/event_loop.h#L287) | Snapshot the loop clock on the thread which builds a deadline |
+| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L276) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
+| [`current_time()`](src/rpp/event_loop.h#L288) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
+| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L291) | The virtual time of `src`, or the monotonic wall clock when it is null |
+| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L295) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
+| [`get_time_source_frame()`](src/rpp/event_loop.h#L305) | Snapshot the loop clock on the thread which builds a deadline |
 | [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L953) | Park on the loop timer queue until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L379) | Signal the loop to stop and finalize pending tasks |
 | [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L388) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
@@ -2799,17 +2799,19 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 
 ### AtomicTimeSource
 
-Lock-free time source for simulation time warping and time synchronization with external sources. Maintains a `combined_offset` (sync + warp) applied to system time. All mutations are atomic via `fetch_add`/`exchange`; reads use `memory_order_relaxed` for minimal overhead on the hot path (`time_now()`).
+Lock-free time source for simulation time warping and time synchronization with external sources. Maintains a `combined_offset` (sync + warp) applied to a base clock, Realtime by default. All mutations are atomic via `fetch_add`, `exchange` or `store`. Reads use `memory_order_relaxed` for minimal overhead on the hot path (`time_now()`).
 
 | Method | Description |
 |--------|-------------|
-| [`time_now()`](src/rpp/atomic_timepoint.h#L152) | Returns system time plus combined offset (sync + warp) |
+| [`time_now()`](src/rpp/atomic_timepoint.h#L152) | Returns the base clock time plus combined offset (sync + warp) |
 | [`total_offset()`](src/rpp/atomic_timepoint.h#L174) | Returns the combined sync + warp offset |
 | [`warp_offset()`](src/rpp/atomic_timepoint.h#L184) | Returns the current warp offset (diagnostic) |
 | [`sync_offset()`](src/rpp/atomic_timepoint.h#L194) | Returns the current sync offset (diagnostic) |
 | [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L202) | Atomically advances time by delta |
 | [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L211) | Atomically rewinds time by delta |
 | [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L220) | Sets sync offset, adjusting combined offset by the difference |
+| [`get_base_clock()`](src/rpp/atomic_timepoint.h#L244) | Returns the clock under the offsets, Realtime by default |
+| [`set_base_clock(rpp::ClockType clock)`](src/rpp/atomic_timepoint.h#L247) | Sets the clock under the offsets. Monotonic keeps waits and timers through a wall clock step |
 
 ### Example: AtomicTimeSource for Simulation Time
 
