@@ -1,4 +1,5 @@
 #include <rpp/async.h>
+#include <rpp/debugging.h> // rpp::add_log_handler
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
 #include <rpp/semaphore.h>
@@ -636,6 +637,40 @@ TestImpl(test_async)
         });
         AssertThat(done.wait(rpp::seconds(1)), rpp::semaphore::notified); // a hang guard, the handler releases it
         AssertThat(handled, "continue_with_exception_msg"s);
+    }
+
+    // the warning which contains `marker`, or an empty string when no warning arrives
+    template<class Task> static std::string continue_with_warning(Task failing, const char* marker)
+    {
+        struct warning_log { const char* marker; rpp::semaphore logged; std::string text; } warning {};
+        warning.marker = marker;
+        rpp::LogMsgHandler capture = [](void* context, LogSeverity severity, const char* message, int len) {
+            auto* log = static_cast<warning_log*>(context);
+            std::string text { message, size_t(len) };
+            if (severity != LogSeverityWarn || text.find(log->marker) == std::string::npos) return;
+            log->text = std::move(text);
+            log->logged.notify();
+        };
+        rpp::add_log_handler(&warning, capture);
+        future<void> failed = rpp::async(std::move(failing));
+        failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
+        (void)warning.logged.wait(rpp::seconds(1)); // a hang guard, the warning releases it
+        rpp::remove_log_handler(&warning, capture); // waits for a running handler, so `text` is safe to read
+        return warning.text;
+    }
+
+    // nobody awaits the step of continue_with(), so a failed task logs a warning and does not stop the program
+    TestCase(continue_with_logs_an_error_which_no_handler_takes)
+    {
+        auto failing = [] { throw std::domain_error{"continue_with_unhandled_msg"}; };
+        std::string text = continue_with_warning(failing, "continue_with_unhandled_msg");
+        AssertThat(text.find("continue_with()") != std::string::npos, true);
+    }
+
+    TestCase(continue_with_logs_an_error_of_an_unknown_type)
+    {
+        std::string text = continue_with_warning([] { throw 42; }, "of an unknown type");
+        AssertThat(text.find("continue_with()") != std::string::npos, true);
     }
 
     // the worker which publishes runs the next step inline, so no pool thread waits for a result
