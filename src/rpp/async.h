@@ -9,7 +9,7 @@
 #include "semaphore.h" // rpp::semaphore_once_flag
 #include "delegate.h" // rpp::delegate, which an event loop runs
 #include "traits.h" // rpp::task_return_t, rpp::first_arg_type
-#include "debugging.h" // __assertion_failure
+#include "debugging.h" // __assertion_failure, LogWarning
 #include "timepoint.h" // rpp::Duration, rpp::TimePoint
 #include <atomic>
 #include <exception> // std::exception_ptr, std::terminate
@@ -176,6 +176,16 @@ namespace rpp
                 else return handler(ex);
             }
             catch (...) { return handle<R>(e, rest...); }
+        }
+
+        /// Passes `e` to the first handler which matches, and logs a warning when no handler takes it
+        /// @note LogError() asserts in a debug build, which stops the program
+        template<class... Handlers>
+        void handle_or_log(const std::exception_ptr& e, Handlers&... handlers) noexcept
+        {
+            try { handle<void>(e, handlers...); }
+            catch (const std::exception& ex) { LogWarning("continue_with() ignores an unhandled exception: %s", ex.what()); }
+            catch (...) { LogWarning("continue_with() ignores an unhandled exception of an unknown type"); }
         }
     }
 
@@ -483,10 +493,11 @@ namespace rpp
         }
 
         /// Runs `task` with the result as then() does, and returns no future. This future is invalid afterwards
+        /// @note An error which no handler takes goes to LogWarning(), because a failed task must not stop the program
         template<typename Task, typename... Handlers> requires (!IsEventLoop<Task>)
         void continue_with(Task task, Handlers... handlers) noexcept
         {
-            // nobody holds the future of this step, so it drops an error which no handler takes
+            // nobody holds the future of this step, so the step logs an error which no handler takes
             chain<void>(ignoring_result(std::move(task), std::move(handlers)...)).detach();
         }
 
@@ -578,14 +589,14 @@ namespace rpp
             };
         }
 
-        // the step of continue_with(): passes the result to `task`, and drops what it returns
+        // the step of continue_with(): passes the result to `task`, drops what it returns, and logs an unhandled error
         template<typename Task, typename... Handlers>
         static auto ignoring_result(Task task, Handlers... handlers)
         {
             return [task=std::move(task), ...handlers=std::move(handlers)](future& f) mutable
             {
                 try { (void)f.forward_to(task); }
-                catch (...) { detail::handle<void>(std::current_exception(), handlers...); }
+                catch (...) { detail::handle_or_log(std::current_exception(), handlers...); }
             };
         }
 
