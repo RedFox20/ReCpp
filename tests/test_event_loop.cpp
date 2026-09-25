@@ -1182,9 +1182,11 @@ TestImpl(test_event_loop)
     // ProcessCPU starts near zero, far from the realtime epoch, so it shows which clock the loop reads
     TestCase(loop_clock_reads_the_base_clock_of_its_time_source)
     {
-        clock.set_base_clock(rpp::ClockType::ProcessCPU);
-        rpp::Duration error = loop->current_time() - rpp::TimePoint::now(rpp::ClockType::ProcessCPU) - clock.total_offset();
-        clock.set_base_clock(rpp::ClockType::Realtime); // the fixture clock outlives this case
+        rpp::AtomicTimeSource cpu_clock;
+        cpu_clock.set_base_clock(rpp::ClockType::ProcessCPU);
+        loop->set_time_source(&cpu_clock);
+        rpp::Duration error = loop->current_time() - rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
+        loop->set_time_source(nullptr); // the scope frees `cpu_clock` next
         AssertLess(error.abs().nsec, rpp::seconds(1).nsec);
     }
 

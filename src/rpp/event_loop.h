@@ -164,20 +164,18 @@ namespace rpp
         {
             rpp::int64 offset_ns = 0; // combined sync and warp offset at capture time
             rpp::uint32 generation = 0; // the clock which built this frame, so a swap cannot move it
-            rpp::ClockType base_clock = rpp::ClockType::Realtime; // the clock under the source offsets
             bool warpable = false; // a time source was attached at capture time
+            rpp::ClockType base_clock = rpp::ClockType::Monotonic; // the source clock, Monotonic without a source
 
             time_frame() noexcept = default;
             explicit time_frame(const rpp::AtomicTimeSource* src) noexcept
-                : offset_ns{src ? src->total_offset().nsec : 0}
-                , base_clock{src ? src->get_base_clock() : rpp::ClockType::Realtime}
-                , warpable{src != nullptr} {}
+                : offset_ns{src ? src->total_offset().nsec : 0}, warpable{src != nullptr}
+                , base_clock{src ? src->get_base_clock() : rpp::ClockType::Monotonic} {}
 
             /** @returns the time on this frame's clock: the one definition this loop uses. */
             rpp::TimePoint now() const noexcept
             {
-                return warpable ? rpp::TimePoint{ rpp::TimePoint::now(base_clock).duration.nsec + offset_ns }
-                                : rpp::TimePoint::monotonic_now();
+                return rpp::TimePoint{ rpp::TimePoint::now(base_clock).duration.nsec + offset_ns };
             }
         };
 
@@ -307,8 +305,8 @@ namespace rpp
         time_frame get_time_source_frame() const noexcept;
 
     private:
-        // reads the live source offset, base clock and generation while the reader guard is up
-        bool read_time_source(time_frame& frame) const noexcept;
+        // reads the live source and its generation into `frame` while the reader guard is up
+        void read_time_source(time_frame& frame) const noexcept;
 
         // waits for every reader to drop the old clock, so the owner may free it
         void drain_time_source_readers() const noexcept;
