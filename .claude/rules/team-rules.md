@@ -2,12 +2,15 @@
 
 # Team rules for coding agents
 
-This file is the same in every repo that carries it, as `.claude/rules/team-rules.md`, and in `~/.claude/`. A session
-that sees the `<team-rules` tag has these rules loaded.
+This file is the same in every repo that carries it, as `.claude/rules/team-rules.md`, and in `~/.claude/`.
+Claude Code loads `.claude/rules/` by path. `~/.claude/CLAUDE.md` reads its local copy only when the context has no
+`<team-rules` tag, so a repo copy and the local copy do not load together.
 
 ## Precedence
 
-The project `CLAUDE.md` wins over this file. Read it first. These rules fill the gaps it leaves.
+The project rules win over this file: `CLAUDE.md`, `AGENTS.md` and the other files in `.claude/rules/`. Read them
+first. These rules fill the gaps they leave, for example where a project asks for a test first, a writing standard or
+its own review agent.
 
 ## Communication
 
@@ -79,22 +82,22 @@ Review once before the commit, not after every edit.
 
 ## Subagents
 
-- Only spawn a minimal amount of subagents if necessary
+- Spawn the fewest subagents the task needs, and only when necessary
 - Never spawn a Fable subagent unless specifically asked
 - Default subagent thinking level should be Medium
-- For reviews use Sonnet with Medium thinking level
+- For reviews use the project review agent. Without one, use Sonnet with Medium thinking level
 - Keep review subagent alive and send message with new changes to review
 
 ## Pull requests
 
 - Name the PR branch for its change: `fix/`, `feat/`, `docs/` or `perf/` plus a short description, such as
   `fix/imx8mp-sdk-version-url`. Use it instead of a generated session branch name.
-- One PR per session. A session that changes more than one repository gets one PR per repository.
+- One PR per repository per session.
 
 ## PR replies and review threads
 
 Handle the review threads of a PR you open or push to, without being asked. Check them after each push, and fetch them
-again before you report. Start every reply with `Claude:`. Do not over explain.
+again before you report. Start every reply with `Claude:`. Do not overexplain.
 
 1. Check each finding against the code first. A bot review is a hypothesis.
 2. A finding you fixed: reply `Claude: fixed <sha>` with one sentence of evidence, then resolve the thread.
