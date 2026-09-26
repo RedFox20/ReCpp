@@ -8,6 +8,18 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B34. Copying an `rpp::delegate` moves the functor out of its source
+`delegate(const delegate&)` calls `functor_copy()`, which calls `dest.reset(*instance)` at
+`delegate.h:578`. `reset()` passes `std::move(function)` to `init_functor()` at `delegate.h:305`, so
+the copy move-constructs its functor from the source. After a copy from a const source, a source
+lambda which captures a 40 character `std::string` returns 0 from `s.size()`, 3 of 3 runs.
+
+Two threads which copy one const delegate race. clang-18 TSAN reported a heap-use-after-free in
+`copy()` in 4 of 5 runs, and then a SEGV in `~delegate()`. The copy cases in `test_delegate.cpp`
+capture only trivial state, so no case sees it. A true copy stops a delegate of a move-only
+functor from compiling, such as the `unique_ptr` capture at `async.h:81`. The owner decided that
+such a copy fails to compile. #119 tracks the move-only delegate type which that needs.
+
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
 `test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that
 `t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
@@ -279,6 +291,13 @@ run. B17 reported on the same commit instead, which is a different race in anoth
 
 C31 has the same shape in `rpp::future`. libc++ `__assoc_state::move()` rethrows a copy of
 `__exception_`, so the `std::future` state inside `cfuture` keeps the exception after `get()`.
+
+A caller can reach the same pair through `rpp::future` alone. It passes
+`std::make_exception_ptr(std::runtime_error{"x"})` to `promise::set_exception()`. The argument
+shares its libc++ message buffer with the published exception. The caller frees it while a
+`then()` handler reads `e.what()` on a pool thread. In 3 of 5 clang-18 TSAN runs, it reported the
+pair once. With the exception built before the race, 0 of 5 runs reported it.
+`test_sanitizers.cpp:23-24` already suppresses the destructor frames of this pair.
 
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
