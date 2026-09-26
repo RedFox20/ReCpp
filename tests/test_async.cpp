@@ -1,5 +1,4 @@
 #include <rpp/async.h>
-#include <rpp/debugging.h> // rpp::add_log_handler
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
 #include <rpp/semaphore.h>
@@ -14,6 +13,7 @@
 #include <string> // std::string
 #include <utility> // std::exchange, std::pair
 #include <vector>
+#include "warning_capture.h"
 #if _MSC_VER
 #  include <intrin.h> // _AddressOfReturnAddress
 #endif
@@ -642,21 +642,10 @@ TestImpl(test_async)
     // the warning which contains `marker`, or an empty string when no warning arrives
     template<class Task> static std::string continue_with_warning(Task failing, const char* marker)
     {
-        struct warning_log { const char* marker; rpp::semaphore logged; std::string text; } warning {};
-        warning.marker = marker;
-        rpp::LogMsgHandler capture = [](void* context, LogSeverity severity, const char* message, int len) {
-            auto* log = static_cast<warning_log*>(context);
-            std::string text { message, size_t(len) };
-            if (severity != LogSeverityWarn || text.find(log->marker) == std::string::npos) return;
-            log->text = std::move(text);
-            log->logged.notify();
-        };
-        rpp::add_log_handler(&warning, capture);
+        warning_capture warning { marker };
         future<void> failed = rpp::async(std::move(failing));
         failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
-        (void)warning.logged.wait(rpp::seconds(1)); // a hang guard, the warning releases it
-        rpp::remove_log_handler(&warning, capture); // waits for a running handler, so `text` is safe to read
-        return warning.text;
+        return warning.wait();
     }
 
     // nobody awaits the step of continue_with(), so a failed task logs a warning and does not stop the program

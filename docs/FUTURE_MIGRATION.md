@@ -108,8 +108,8 @@ pending step. A promise of the caller starts the step as a pool task, because th
 publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the step on the
 thread of an `rpp::event_loop` instead.
 
-In `continue_with()`, an error which no handler takes goes to `LogWarning()`, and the program
-continues. `cfuture` drops that error without a log.
+In `continue_with()` of both types, an error which no handler takes goes to `LogWarning()`, and
+the program continues.
 
 `get_all()` keeps its name and collects every future before it rethrows the first exception.
 The `cfuture` overload stops at the first one, so a later future which is not ready terminates
