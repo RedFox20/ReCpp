@@ -529,21 +529,23 @@ namespace rpp
          * @note The step moves a temporary `task` once, and each temporary handler once
          */
         template<typename Task, typename... Handlers> requires (!IsEventLoop<Task>)
-        RPP_CORO_WRAPPER auto then(Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
+        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
+        auto then(Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
         {
             return chain<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); });
         }
 
         /// Continues with `task` on the thread of `loop`, as the other then() does on the pool. `loop` must outlive the chain
         template<IsEventLoop Loop, typename Task, typename... Handlers>
-        RPP_CORO_WRAPPER auto then(Loop& loop, Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
+        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
+        auto then(Loop& loop RPP_LIFETIMEBOUND, Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
         {
             return chain<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); }, loop);
         }
 
         /// Follows this future with `next`, and parks no thread. @returns a future which receives the result of `next`
         template<typename U>
-        RPP_CORO_WRAPPER auto then(future<U>&& next) noexcept -> future<U>
+        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND auto then(future<U>&& next) noexcept -> future<U>
         {
             return forward_after(std::move(next), true);
         }
@@ -554,7 +556,7 @@ namespace rpp
          *     co_await rpp::async(operation1).then(operation2).then();
          * @endcode
          */
-        RPP_CORO_WRAPPER future<void> then() noexcept
+        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<void> then() noexcept
         {
             if constexpr (std::is_void_v<T>) return std::move(*this);
             else return chain<void>([] { return [](future& f) { (void)f.get(); }; });
