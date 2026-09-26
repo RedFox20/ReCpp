@@ -8,6 +8,13 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B35. A `noexcept` error handler does not compile
+`rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function.
+So `first_arg_type` fails on the call operator of a `noexcept` lambda, in `rpp::future::then()`
+and in `cfuture::then()`. A handler such as `[](const std::runtime_error&) noexcept { return 2; }`
+fails on g++ 14.4 with `'operator()' is not a member of`, and on clang-18 with `cannot be used
+prior to '::'`. The same handler without `noexcept` compiles, and so does a `noexcept` task.
+
 ### B34. Copying an `rpp::delegate` moves the functor out of its source
 `delegate(const delegate&)` calls `functor_copy()`, which calls `dest.reset(*instance)` at
 `delegate.h:578`. `reset()` passes `std::move(function)` to `init_functor()` at `delegate.h:305`, so
@@ -72,9 +79,10 @@ the send loop would pin the balancer instead of the load. Issue #70 took that sa
 ### B28. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
 gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
 
-1. The module fragment carries `<future>`, which carries `bits/exception_ptr.h`.
+1. The module exports a template which compares an `exception_ptr` with `==` or `!=`.
+   `<future>` does, in `_M_get_result()` at `future:749`.
 2. The importer includes a header which reaches `bits/exception_ptr.h` by text.
-3. The importer instantiates `std::future<T>::get()`.
+3. The importer instantiates that compare, as `std::future<T>::get()` does.
 
 The compiler reports `internal compiler error: Segmentation fault` at
 `bits/exception_ptr.h`. This predates the `rpp.future` split, and `import rpp.threading`
@@ -139,8 +147,17 @@ through `cfuture<T>`, so no importer of it reaches zero includes. It starts at
 `<typeinfo>` and `<new>`, and on gcc-14 it may add `<vector>`, `<string>` and
 `<functional>` and nothing else.
 
-**`exception_ptr.h` is the crash site, not the cause.** Condition 1 names `<future>`, and no
-other header stands in for it. Measured on the same compiler:
+**The defaulted `operator==` of `exception_ptr` is the cause, at `exception_ptr.h:169`.**
+`<future>` is only one caller:
+
+| Module fragment and exported template | Importer | gcc 14.2 and 14.4 | gcc 15.2 |
+|---|---|---|---|
+| `<exception>` only, returns `e != nullptr` | includes `<memory>` | ICE at `-O0` and `-O2` | compiles |
+| `<exception>` only, returns `bool(e)` | includes `<memory>` | compiles | compiles |
+| `rpp.threading`, `take()` tests `error == nullptr` | includes `<memory>`, calls `get()` | ICE at `-O0` and `-O2` | compiles |
+
+`async.h` tests every `exception_ptr` as a bool, so `rpp::future` stays clear of this. These
+shapes compile, because none of them instantiates the operator:
 
 | Shape | Result |
 |---|---|
@@ -149,8 +166,8 @@ other header stands in for it. Measured on the same compiler:
 | an `<exception>` module, importer includes `<memory>`, `exception_ptr` returned | compiles |
 | a `<memory>` module, importer includes `<memory>` | compiles |
 
-So a plain import of this group is safe. The three conditions must meet, and dropping
-`<future>` from the fragment drops the crash even when `exception_ptr` stays on both sides.
+So a plain import of this group is safe. Without `<future>` the fragment holds no compare, so
+the crash goes even when `exception_ptr` stays on both sides.
 
 **The compiler is gcc 14.2.0**, Ubuntu package `14.2.0-4ubuntu2~24.04.1`, from August 2024.
 
