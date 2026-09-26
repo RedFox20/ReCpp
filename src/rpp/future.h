@@ -62,6 +62,23 @@ namespace rpp
                  : s == std::future_status::deferred ? wait_result::deferred
                                                      : wait_result::timeout;
         }
+
+        /// Runs `body`, and logs an exception which escapes it
+        /// @note LogError() asserts in a debug build, which stops the program
+        template<typename Body>
+        void run_logging_errors(Body& body) noexcept
+        {
+            try { body(); }
+            catch (const std::exception& e) { LogWarning("continue_with() ignores an unhandled exception: %s", e.what()); }
+            catch (...) { LogWarning("continue_with() ignores an unhandled exception of an unknown type"); }
+        }
+
+        /// Runs `body` as a pool task which nobody awaits, so an exception which escapes `body` goes to LogWarning()
+        template<typename Body>
+        void continue_detached(Body body) noexcept
+        {
+            rpp::parallel_task_detached([body=std::move(body)]() mutable noexcept { run_logging_errors(body); });
+        }
     }
 
     /**
@@ -325,11 +342,12 @@ namespace rpp
          * 
          * @warning This future will be empty after calling `continue_with()`.
          *          `*this` will be moved into the background thread because of being detached.
+         * @note An error which no handler takes goes to LogWarning(), because a failed task must not stop the program
          */
         template<typename Task>
         void continue_with(Task task) noexcept
         {
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task)]() mutable {
                 (void)task(f.get());
             });
         }
@@ -338,7 +356,7 @@ namespace rpp
         void continue_with(Task task, ExceptHA exhA) noexcept
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -349,7 +367,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -362,7 +380,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -377,7 +395,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { (void)task(f.get()); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -735,11 +753,12 @@ namespace rpp
          * 
          * @warning This future will be empty after calling `continue_with()`.
          *          `*this` will be moved into the background thread because of being detached.
+         * @note An error which no handler takes goes to LogWarning(), because a failed task must not stop the program
          */
         template<typename Task>
         void continue_with(Task task) noexcept
         {
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task)]() mutable {
                 f.get();
                 (void)task();
             });
@@ -749,7 +768,7 @@ namespace rpp
         void continue_with(Task task, ExceptHA exhA) noexcept
         {
             using ExceptA = first_arg_type<ExceptHA>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA)]() mutable noexcept {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
             });
@@ -760,7 +779,7 @@ namespace rpp
         {
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -773,7 +792,7 @@ namespace rpp
             using ExceptA = first_arg_type<ExceptHA>;
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
@@ -788,7 +807,7 @@ namespace rpp
             using ExceptB = first_arg_type<ExceptHB>;
             using ExceptC = first_arg_type<ExceptHC>;
             using ExceptD = first_arg_type<ExceptHD>;
-            rpp::parallel_task_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
+            detail::continue_detached([f=std::move(*this), move_args(task, exhA, exhB, exhC, exhD)]() mutable {
                 try { f.get(); (void)task(); }
                 catch (ExceptA& a) { (void)exhA(a); }
                 catch (ExceptB& b) { (void)exhB(b); }
