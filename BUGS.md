@@ -16,9 +16,9 @@ lambda which captures a 40 character `std::string` returns 0 from `s.size()`, 3 
 
 Two threads which copy one const delegate race. clang-18 TSAN reported a heap-use-after-free in
 `copy()` in 4 of 5 runs, and then a SEGV in `~delegate()`. The copy cases in `test_delegate.cpp`
-capture only trivial state, so no case sees it. A true copy stops a delegate of a move-only
-functor from compiling, such as the `unique_ptr` capture at `async.h:81`. The owner decided that
-such a copy fails to compile. #119 tracks the move-only delegate type which that needs.
+capture only trivial state, so no case sees it. A move-only functor has no copy, such as the
+`unique_ptr` capture in `loop_step_node::start()`. #119 tracks the fix: a copy copies a copyable
+functor, and a move-only functor still moves.
 
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
 `test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that

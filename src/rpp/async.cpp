@@ -28,12 +28,17 @@ namespace rpp::detail
         --nested_steps;
     }
 
+    void continuation::run_pool_task() noexcept
+    {
+        run_step(this);
+    }
+
     void start_step(continuation* c, bool may_run_here) noexcept
     {
         if (may_run_here && nested_steps < MAX_NESTED_STEPS)
             run_step(c);
         else
-            rpp::parallel_task_detached([c] { run_step(c); });
+            rpp::parallel_task_detached(rpp::delegate<void()>{c, &continuation::run_pool_task});
     }
 
     void run_outside_pool_steps(continuation& c) noexcept

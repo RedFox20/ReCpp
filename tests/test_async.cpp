@@ -328,6 +328,9 @@ TestImpl(test_async)
         future<int> f = rpp::ready_future(42);
         AssertThat(f.await_ready(), true);
         AssertThat(f.get(), 42);
+
+        future<std::vector<int>> braced = rpp::ready_future<std::vector<int>>({1, 2}); // a braced list deduces no type
+        AssertThat(braced.get().size(), size_t{2});
     }
 
     TestCase(exceptional_future)
@@ -427,6 +430,44 @@ TestImpl(test_async)
         AssertThat(ended.exchange(false), true);
         AssertThat(rpp::ready_future(1).then([p=slow_probe{&ended}](int x) { return x; }).get(), 1);
         AssertThat(ended.load(), true);
+    }
+
+    // counts its copies and moves, so a case can pin how often a step builds its task
+    struct move_counter
+    {
+        int* copies;
+        int* moves;
+        move_counter(int* c, int* m) noexcept : copies{c}, moves{m} {}
+        move_counter(const move_counter& o) noexcept : copies{o.copies}, moves{o.moves} { ++*copies; }
+        move_counter(move_counter&& o) noexcept : copies{o.copies}, moves{o.moves} { ++*moves; }
+        int operator()() const noexcept { return 1; }
+        int operator()(int x) const noexcept { return x; }
+    };
+
+    // counts its copies and moves as move_counter does, as a handler of then()
+    struct handler_counter : move_counter
+    {
+        using move_counter::move_counter;
+        int operator()(const std::runtime_error& /*e*/) const { return -1; }
+    };
+
+    // a step builds its task in place, so a temporary task moves once, and a named task copies once and moves once
+    TestCase(a_step_moves_a_temporary_task_once)
+    {
+        int copies = 0;
+        int moves = 0;
+        AssertThat(rpp::async(move_counter{&copies, &moves}).get(), 1);
+        AssertThat(rpp::ready_future(2).then(move_counter{&copies, &moves}, handler_counter{&copies, &moves}).get(), 2);
+        rpp::ready_future(2).continue_with(move_counter{&copies, &moves});
+        AssertThat(rpp::ready_future(2).chain_async(move_counter{&copies, &moves}).get(), 1);
+        AssertThat(moves, 5);
+        AssertThat(copies, 0);
+
+        move_counter task { &copies, &moves };
+        AssertThat(rpp::async(task).get(), 1);
+        AssertThat(rpp::ready_future(2).then(task).get(), 2);
+        AssertThat(moves, 7);
+        AssertThat(copies, 2);
     }
 
     // the argument lives to the end of the comma expression on the Itanium ABI, so it must hold no reference
@@ -581,6 +622,45 @@ TestImpl(test_async)
         AssertThrows(p.set_value(2), std::logic_error);
         AssertThrows(p.set_exception(std::make_exception_ptr(std::runtime_error{"late"})), std::logic_error);
         AssertThat(f.get(), 1);
+    }
+
+    // a value whose constructor holds its publisher, so a second publisher arrives while the first one stores
+    struct held_value
+    {
+        int value;
+        held_value(int v, rpp::semaphore& entered, rpp::semaphore& release) : value{v}
+        {
+            entered.notify();
+            (void)release.wait(rpp::seconds(1)); // a hang guard, the case releases it
+        }
+    };
+
+    // std::promise throws on a second publish, so two racing publishers never both store a result
+    TestCase(a_second_publisher_throws_while_the_first_one_stores)
+    {
+        promise<held_value> p;
+        future<held_value> f = p.get_future();
+        rpp::semaphore entered;
+        rpp::semaphore release;
+        future<void> first = rpp::async([&] { p.set_value(1, entered, release); });
+        AssertThat(entered.wait(rpp::seconds(1)), rpp::semaphore::notified); // a hang guard, the first publisher releases it
+        AssertThrows(p.set_exception(std::make_exception_ptr(std::runtime_error{"second_publisher_msg"})), std::logic_error);
+        release.notify();
+        first.get();
+        AssertThat(f.get().value, 1);
+    }
+
+    // a result whose move throws, so its store fails after the step claimed the promise
+    struct throws_on_move
+    {
+        throws_on_move() = default;
+        throws_on_move(throws_on_move&& /*moved*/) { throw std::runtime_error{"throws_on_move_msg"}; }
+    };
+
+    // a store which throws frees the claim, so the step still publishes the exception
+    TestCase(a_result_which_throws_on_its_move_publishes_the_throw)
+    {
+        AssertThrows((void)rpp::async([] { return throws_on_move{}; }).get(), std::runtime_error);
     }
 
     // std::promise gives its future after set_value(), and a port from cpromise relies on that order
@@ -1028,14 +1108,25 @@ TestImpl(test_async)
     };
 
     // the posted delegate owns the step, so a loop which drops it ends the promise of the step at once
-    TestCase(a_loop_which_drops_the_step_ends_its_promise)
+    static void drop_the_step_after(future<int> input)
     {
         dropping_loop loop;
-        future<int> f = rpp::ready_future(1).then(loop, [](int x) { return x; });
+        future<int> f = input.then(loop, [](int x) { return x; });
         bool ended = f.await_ready();
         if (ended) AssertThrows((void)f.get(), std::logic_error);
         else f.detach(); // the case fails below, and the destructor does not terminate on it
         AssertThat(ended, true);
+    }
+
+    TestCase(a_loop_which_drops_the_step_ends_its_promise)
+    {
+        drop_the_step_after(rpp::ready_future(1));
+    }
+
+    // a dropped step detaches its input, so an error which nobody read fails no assertion
+    TestCase(a_loop_which_drops_the_step_after_an_error_ends_its_promise)
+    {
+        drop_the_step_after(rpp::exceptional_future<int>(std::runtime_error{"dropped_input_msg"}));
     }
 };
 
