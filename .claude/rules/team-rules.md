@@ -43,8 +43,8 @@ Brief, flat, few lines. A reader scans code more often than they read it.
 - Keep an expression on one or two lines. Extract a named local instead of writing a third
   line. The project formatter overrides this.
 - Prefer a flat function to a nested one. Guard at the top, then the work.
-- Write a comment only when the WHY is not obvious: a hidden constraint, an invariant, a
-  workaround for a named bug, or behavior that surprises the reader. Where the project
+- Write a comment only when the WHY is not obvious. That is a hidden constraint, an invariant,
+  a workaround for a named bug, or behavior that surprises the reader. Where the project
   requires a comment on every public symbol, that requirement wins.
 - Cap a comment or a docstring at 2 lines. Sacrifice grammar for brevity.
 - A comment never restates the symbol name, names the task or chat that produced it, lists
