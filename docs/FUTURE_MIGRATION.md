@@ -28,8 +28,9 @@ The third one is the quiet cost. `cfuture::wait_for(rpp::Duration)` converts a
 future for a zero timeout. Every such line pays for a state ReCpp does not own.
 
 The first one is the loud cost, and it is what makes this plan urgent. B28 needs three
-conditions at once, and the first is a module fragment which carries `<future>`. Remove
-that one and gcc-14 stops crashing. `future.h:15` is the only direct include of `<future>`
+conditions at once, and the first is an exported template which compares an `exception_ptr`
+with `==`. `<future>` holds the only one in the group fragment. Remove it and gcc-14 stops
+crashing. `future.h:15` is the only direct include of `<future>`
 in the three headers, so one split removes condition 1 for the whole group.
 
 ## 2. Why two types and not one rename

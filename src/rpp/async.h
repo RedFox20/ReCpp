@@ -19,7 +19,8 @@
 #include <type_traits>
 #include <utility> // std::move, std::forward, std::exchange
 #include <vector>
-// This header must never reach <future>, so a module which carries it stays clear of BUGS.md B28
+// An exported compare of an exception_ptr with == or != crashes a gcc-14 importer, and <future> has one.
+// So this header never reaches <future>, and it tests an exception_ptr as a bool. See BUGS.md B28
 
 namespace rpp
 {
@@ -427,6 +428,8 @@ namespace rpp
 
     /**
      * A chainable and awaitable result, which owns its shared state and never names a std future.
+     *
+     * Chain the steps on the thread pool:
      * @code
      *     rpp::async([=]{
      *         return downloadZipFile(url);
@@ -434,6 +437,27 @@ namespace rpp
      *         return extractContents(zipPath);
      *     }).continue_with([=](std::string extractedDir) {
      *         jobComplete(extractedDir);
+     *     });
+     * @endcode
+     *
+     * Or await each step in a coroutine. It publishes its result before its parameters end,
+     * so `get()` can return before the destructor of a parameter runs:
+     * @code
+     *     rpp::future<void> downloadAndExtract(std::string url)
+     *     {
+     *         std::string zipPath = co_await rpp::async([=]{ return downloadZipFile(url); });
+     *         std::string extractedDir = co_await rpp::async([=]{ return extractContents(zipPath); });
+     *         jobComplete(extractedDir);
+     *     }
+     * @endcode
+     *
+     * Or run a step on the thread of an event loop. The loop runs its steps one at a time,
+     * so the state they share needs no mutex:
+     * @code
+     *     rpp::async([=]{
+     *         return downloadZipFile(url);
+     *     }).continue_with(uiLoop, [=](std::string zipPath) {
+     *         showDownloadedFile(zipPath); // runs on the thread of uiLoop
      *     });
      * @endcode
      */
