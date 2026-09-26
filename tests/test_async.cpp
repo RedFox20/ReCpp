@@ -1,6 +1,8 @@
 #include <rpp/async.h>
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
+#include <rpp/minmax.h> // rpp::min, rpp::max
+#include <rpp/scope_guard.h> // rpp::make_scope_guard
 #include <rpp/semaphore.h>
 #include <rpp/threads.h> // rpp::get_thread_id
 #include <rpp/timepoint.h>
@@ -31,11 +33,7 @@ TestImpl(test_async)
     TestCase(simple_chaining)
     {
         promise<std::string> loadString;
-        future<std::string> futureString = loadString.get_future();
-        future<bool> chain = futureString.then([](std::string arg) -> bool
-        {
-            return !arg.empty() && arg == "future string";
-        });
+        future<bool> chain = loadString.get_future().then([](std::string arg) { return arg == "future string"; });
         loadString.set_value("future string"); // this line starts the continuation as a pool task
         AssertThat(chain.get(), true);
     }
@@ -43,11 +41,7 @@ TestImpl(test_async)
     TestCase(chain_mutate_void_to_string)
     {
         promise<void> loadSomething;
-        future<void> futureSomething = loadSomething.get_future();
-        future<std::string> chained = futureSomething.then([]() -> std::string
-        {
-            return "operation complete!"s;
-        });
+        future<std::string> chained = loadSomething.get_future().then([] { return "operation complete!"s; });
         loadSomething.set_value();
         AssertThat(chained.get(), "operation complete!"s);
     }
@@ -55,12 +49,8 @@ TestImpl(test_async)
     TestCase(chain_decay_string_to_void)
     {
         promise<std::string> loadString;
-        future<std::string> futureString = loadString.get_future();
         std::string received;
-        future<void> chained = futureString.then([&](std::string s)
-        {
-            received = s;
-        });
+        future<void> chained = loadString.get_future().then([&](std::string s) { received = s; });
         loadString.set_value("some string");
         chained.get();
         AssertThat(received, "some string"s);
@@ -135,10 +125,7 @@ TestImpl(test_async)
             handled = e.what();
             return 42;
         },
-        [](std::runtime_error e) {
-            (void)e;
-            return 21;
-        }).get();
+        [](std::runtime_error) { return 21; }).get();
 
         AssertThat(handled, "background_thread_exception_msg"s);
         AssertThat(result, 42);
@@ -154,10 +141,7 @@ TestImpl(test_async)
         int result = f.then([] {
             return 0;
         },
-        [](std::domain_error e) {
-            (void)e;
-            return 21;
-        },
+        [](std::domain_error) { return 21; },
         [&](std::runtime_error e) {
             handled = e.what();
             return 42;
@@ -182,14 +166,8 @@ TestImpl(test_async)
         int result = f.then([] {
             return 0;
         },
-        [](const SpecificError& e) {
-            (void)e;
-            return 1;
-        },
-        [](const std::range_error& e) {
-            (void)e;
-            return 2;
-        },
+        [](const SpecificError&) { return 1; },
+        [](const std::range_error&) { return 2; },
         [&](const std::runtime_error& e) {
             handled = e.what();
             return 3;
@@ -232,12 +210,9 @@ TestImpl(test_async)
         });
 
         std::string handled;
-        int result = f.then([](std::string s) {
-            (void)s;
+        int result = f.then([](std::string) -> int {
             throw std::runtime_error("future_continuation_exception_msg");
-            return 0;
-        }).then([](int x) {
-            (void)x;
+        }).then([](int) {
             return 5;
         }, [&](const std::exception& e) {
             handled = e.what();
@@ -335,18 +310,10 @@ TestImpl(test_async)
 
     TestCase(exceptional_future)
     {
-        bool exceptionWasThrown = false;
-        try
-        {
-            future<int> f = rpp::exceptional_future<int>(std::runtime_error{"aargh!"s});
-            (void)f.get();
-        }
-        catch (const std::exception& e)
-        {
-            exceptionWasThrown = true;
-            AssertThat(e.what(), "aargh!"s);
-        }
-        AssertThat(exceptionWasThrown, true);
+        std::string what;
+        try { (void)rpp::exceptional_future<int>(std::runtime_error{"aargh!"s}).get(); }
+        catch (const std::exception& e) { what = e.what(); }
+        AssertThat(what, "aargh!"s);
     }
 
     // an exception_ptr from catch (...) names the error, so get() rethrows that error and not the pointer
@@ -384,51 +351,33 @@ TestImpl(test_async)
         AssertThat(exceptions_left_after_get<int>(), 0);
     }
 
-    // records whether the last owner of the task destroyed it inside a catch block
-    struct catch_probe
-    {
-        bool* insideCatch;
-        explicit catch_probe(bool* inside) noexcept : insideCatch{inside} {}
-        catch_probe(catch_probe&& p) noexcept : insideCatch{std::exchange(p.insideCatch, nullptr)} {}
-        ~catch_probe() { if (insideCatch) *insideCatch = std::current_exception() != nullptr; }
-    };
-
     // the worker destroys the task and publishes after its catch block ends. See BUGS.md C32
     TestCase(async_publishes_after_its_catch_block)
     {
         bool insideCatch = true; // a destructor which never runs also fails the case
-        future<void> f = rpp::async([probe=catch_probe{&insideCatch}] { throw std::runtime_error{"catch_probe_msg"}; });
+        auto probe = rpp::make_scope_guard([&] { insideCatch = std::current_exception() != nullptr; });
+        future<void> f = rpp::async([probe=std::move(probe)] { throw std::runtime_error{"catch_probe_msg"}; });
         AssertThrows(f.get(), std::runtime_error);
         AssertThat(insideCatch, false);
     }
 
-    // its destructor ends late, so get() returns first when a step publishes before it destroys its task
-    struct slow_probe
+    // a guard which ends late, so get() returns first when a result publishes before the guard ends
+    static auto slow_probe(std::atomic_bool& ended)
     {
-        std::atomic_bool* ended;
-        explicit slow_probe(std::atomic_bool* e) noexcept : ended{e} {}
-        slow_probe(slow_probe&& p) noexcept : ended{std::exchange(p.ended, nullptr)} {}
-        ~slow_probe()
-        {
-            if (ended)
-            {
-                rpp::sleep_ms(5);
-                *ended = true;
-            }
-        }
-    };
+        return rpp::make_scope_guard([&ended] { rpp::sleep_ms(5); ended = true; });
+    }
 
     // a step destroys its task before it publishes, so get() never returns while the task lives. See BUGS.md C32
     TestCase(a_step_destroys_its_task_before_it_publishes)
     {
         std::atomic_bool ended = false;
-        AssertThat(rpp::async([p=slow_probe{&ended}] { return 1; }).get(), 1);
+        AssertThat(rpp::async([p=slow_probe(ended)] { return 1; }).get(), 1);
         AssertThat(ended.exchange(false), true);
-        rpp::async([p=slow_probe{&ended}] {}).get();
+        rpp::async([p=slow_probe(ended)] {}).get();
         AssertThat(ended.exchange(false), true);
-        AssertThrows(rpp::async([p=slow_probe{&ended}] { throw std::runtime_error{"probe_msg"}; }).get(), std::runtime_error);
+        AssertThrows(rpp::async([p=slow_probe(ended)] { throw std::runtime_error{"probe_msg"}; }).get(), std::runtime_error);
         AssertThat(ended.exchange(false), true);
-        AssertThat(rpp::ready_future(1).then([p=slow_probe{&ended}](int x) { return x; }).get(), 1);
+        AssertThat(rpp::ready_future(1).then([p=slow_probe(ended)](int x) { return x; }).get(), 1);
         AssertThat(ended.load(), true);
     }
 
@@ -444,7 +393,7 @@ TestImpl(test_async)
         int operator()(int x) const noexcept { return x; }
     };
 
-    // counts its copies and moves as move_counter does, as a handler of then()
+    // a move_counter which then() can take as an error handler
     struct handler_counter : move_counter
     {
         using move_counter::move_counter;
@@ -477,17 +426,13 @@ TestImpl(test_async)
         bool caught = false;
         promise<void> p;
         future<void> f = p.get_future();
-        rpp::semaphore consumed;
-        future<void> consumer = rpp::async([&] {
-            try { f.get(); } catch (const counted_error&) { caught = true; }
-            consumed.notify();
-        });
+        future<void> consumer = rpp::async([&] { try { f.get(); } catch (const counted_error&) { caught = true; } });
         std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
         int aliveAfterConsumer = -1;
-        rpp::semaphore::wait_result woke = rpp::semaphore::timeout;
-        (p.set_exception(std::exchange(error, nullptr)), woke = consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        wait_result woke = wait_result::timeout;
+        (p.set_exception(std::exchange(error, nullptr)), woke = consumer.wait_for(rpp::seconds(1)), aliveAfterConsumer = alive);
         consumer.get();
-        AssertThat(woke, rpp::semaphore::notified); // a hang guard, the consumer releases it
+        AssertThat(woke, wait_result::finished); // a hang guard, the consumer releases it
         AssertThat(caught, true);
         AssertThat(aliveAfterConsumer, 0);
     }
@@ -499,26 +444,16 @@ TestImpl(test_async)
         bool caught = false;
         future<void> f;
         future<void> consumer;
-        rpp::semaphore consumed;
         std::exception_ptr error = std::make_exception_ptr(counted_error{&alive});
         int aliveAfterConsumer = -1;
-        rpp::semaphore::wait_result woke = rpp::semaphore::timeout;
+        wait_result woke = wait_result::timeout;
         (f = rpp::exceptional_future<void>(std::exchange(error, nullptr)), consumer = rpp::async([&] {
             try { f.get(); } catch (const counted_error&) { caught = true; }
-            consumed.notify();
-        }), woke = consumed.wait(rpp::seconds(1)), aliveAfterConsumer = alive);
+        }), woke = consumer.wait_for(rpp::seconds(1)), aliveAfterConsumer = alive);
         consumer.get();
-        AssertThat(woke, rpp::semaphore::notified); // a hang guard, the consumer releases it
+        AssertThat(woke, wait_result::finished); // a hang guard, the consumer releases it
         AssertThat(caught, true);
         AssertThat(aliveAfterConsumer, 0);
-    }
-
-    TestCase(basic_async_task)
-    {
-        future<std::string> f = rpp::async([] {
-            return "future string"s;
-        });
-        AssertThat(f.get(), "future string"s);
     }
 
     TestCase(basic_async_task_chaining)
@@ -551,8 +486,7 @@ TestImpl(test_async)
         AssertThat(f1.valid(), false);
     }
 
-    // a ready future which nobody collected was not abandoned, so its destructor collects it
-    // and returns. If the destructor terminates on a ready result, the test run stops here
+    // a ready future which nobody collected was not abandoned, so its destructor collects it and returns
     TestCase(destructor_collects_a_ready_future)
     {
         { future<int> value = rpp::ready_future(42); }
@@ -566,7 +500,7 @@ TestImpl(test_async)
     TestCase(move_assignment_collects_a_ready_future)
     {
         future<int> f = rpp::ready_future(1);
-        f = rpp::ready_future(2); // the first result is ready, so the assignment collects it
+        f = rpp::ready_future(2);
         AssertThat(f.get(), 2);
     }
 
@@ -749,40 +683,49 @@ TestImpl(test_async)
         AssertThat(handled, "continue_with_exception_msg"s);
     }
 
-    // the warning which contains `marker`, or an empty string when no warning arrives
-    template<class Task> static std::string continue_with_warning(Task failing, const char* marker)
+    // @returns true when the failed task logs a warning which contains `marker` and names continue_with()
+    template<class Task> static bool continue_with_warns(Task failing, const char* marker)
     {
         warning_capture warning { marker };
         future<void> failed = rpp::async(std::move(failing));
         failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
-        return warning.wait();
+        return warning.wait("continue_with()");
     }
 
     // nobody awaits the step of continue_with(), so a failed task logs a warning and does not stop the program
     TestCase(continue_with_logs_an_error_which_no_handler_takes)
     {
         auto failing = [] { throw std::domain_error{"continue_with_unhandled_msg"}; };
-        std::string text = continue_with_warning(failing, "continue_with_unhandled_msg");
-        AssertThat(text.find("continue_with()") != std::string::npos, true);
+        AssertThat(continue_with_warns(failing, "continue_with_unhandled_msg"), true);
     }
 
     TestCase(continue_with_logs_an_error_of_an_unknown_type)
     {
-        std::string text = continue_with_warning([] { throw 42; }, "of an unknown type");
-        AssertThat(text.find("continue_with()") != std::string::npos, true);
+        AssertThat(continue_with_warns([] { throw 42; }, "of an unknown type"), true);
     }
+
+    // holds a task until the case attached the steps after it, and records the worker which ran the task
+    struct task_gate
+    {
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        rpp::uint64 worker = 0;
+        void hold()
+        {
+            opened = gate.wait(rpp::seconds(1)); // a hang guard, open() releases it
+            worker = rpp::get_thread_id();
+        }
+        void open() { gate.notify(); }
+    };
 
     // the worker which publishes runs the next step inline, so no pool thread waits for a result
     TestCase(a_chain_runs_on_the_worker_which_ran_the_first_task)
     {
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        rpp::uint64 first = 0;
+        task_gate first;
         rpp::uint64 second = 0;
         rpp::uint64 third = 0;
         future<int> f = rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until both steps attached
-            first = rpp::get_thread_id();
+            first.hold();
             return 1;
         }).then([&](int x) {
             second = rpp::get_thread_id();
@@ -791,49 +734,39 @@ TestImpl(test_async)
             third = rpp::get_thread_id();
             return x + 1;
         });
-        gate.notify();
+        first.open();
         AssertThat(f.get(), 3);
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
-        AssertThat(second, first);
-        AssertThat(third, first);
+        AssertThat(first.opened, rpp::semaphore::notified);
+        AssertThat(second, first.worker);
+        AssertThat(third, first.worker);
     }
 
     // chain_async() attaches the next task, so the worker which ran the first task also runs the second
     TestCase(chain_async_runs_the_next_task_on_the_worker_which_ran_the_first)
     {
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        rpp::uint64 first = 0;
+        task_gate first;
         rpp::uint64 second = 0;
         future<void> tasks;
-        tasks.chain_async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until the second task attached
-            first = rpp::get_thread_id();
-        }).chain_async([&] { second = rpp::get_thread_id(); });
-        gate.notify();
+        tasks.chain_async([&] { first.hold(); }).chain_async([&] { second = rpp::get_thread_id(); });
+        first.open();
         tasks.get();
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
-        AssertThat(second, first);
+        AssertThat(first.opened, rpp::semaphore::notified);
+        AssertThat(second, first.worker);
     }
 
     // then(future&&) forwards a result which is already out on the same worker, so no thread waits for either future
     TestCase(then_a_ready_future_runs_on_the_worker_which_ran_the_first_task)
     {
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        rpp::uint64 first = 0;
+        task_gate first;
         rpp::uint64 after = 0;
-        future<int> f = rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until the steps after it attached
-            first = rpp::get_thread_id();
-        }).then(rpp::ready_future(2)).then([&](int x) {
+        future<int> f = rpp::async([&] { first.hold(); }).then(rpp::ready_future(2)).then([&](int x) {
             after = rpp::get_thread_id();
             return x;
         });
-        gate.notify();
+        first.open();
         AssertThat(f.get(), 2);
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
-        AssertThat(after, first);
+        AssertThat(first.opened, rpp::semaphore::notified);
+        AssertThat(after, first.worker);
     }
 
     // the address of this frame, which moves down the stack while one step runs inside another
@@ -851,29 +784,25 @@ TestImpl(test_async)
     {
         constexpr int steps = 4000;
         std::map<rpp::uint64, std::pair<std::uintptr_t, std::uintptr_t>> spans; // the lowest and highest frame on each thread
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        future<int> f = rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until every step attached
-            return 0;
-        });
+        task_gate first;
+        future<int> f = rpp::async([&] { first.hold(); return 0; });
         for (int i = 0; i < steps; ++i)
         {
             f = f.then([&](int x) {
                 std::uintptr_t frame = frame_address();
                 auto span = spans.try_emplace(rpp::get_thread_id(), frame, frame).first;
-                if (frame < span->second.first) span->second.first = frame;
-                if (frame > span->second.second) span->second.second = frame;
+                span->second.first = rpp::min(span->second.first, frame);
+                span->second.second = rpp::max(span->second.second, frame);
                 return x + 1;
             });
         }
-        gate.notify();
+        first.open();
         AssertThat(f.get(), steps);
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(first.opened, rpp::semaphore::notified);
 
         std::uintptr_t deepest = 0;
         for (const auto& [thread, span] : spans)
-            if (span.second - span.first > deepest) deepest = span.second - span.first;
+            deepest = rpp::max(deepest, span.second - span.first);
         AssertLess(deepest, std::uintptr_t{256 * 1024});
         AssertThat(spans.size(), size_t{1}); // the pool task runs a postponed step itself, so the chain stays on its worker
     }
@@ -958,20 +887,9 @@ TestImpl(test_async)
         AssertThrows((void)await_an_invalid_future().get(), std::logic_error);
     }
 
-    // sets the flag late, so a result which publishes before the runtime destroys the frame reaches get() first
-    struct set_on_exit
-    {
-        std::atomic_bool* flag;
-        ~set_on_exit()
-        {
-            rpp::sleep_ms(5);
-            *flag = true;
-        }
-    };
-
     static future<int> coro_with_a_local(std::atomic_bool* localDestroyed)
     {
-        set_on_exit local { localDestroyed };
+        auto local = slow_probe(*localDestroyed);
         int value = co_await rpp::async([] { return 21; });
         co_return value * 2;
     }
@@ -993,30 +911,15 @@ TestImpl(test_async)
     // the worker which publishes resumes the coroutine, so no pool thread waits for the result
     TestCase(a_coroutine_resumes_on_the_worker_which_published)
     {
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        rpp::uint64 worker = 0;
-        future<rpp::uint64> resumed = thread_after_await(rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until the coroutine suspended
-            worker = rpp::get_thread_id();
-            return 1;
-        }));
-        gate.notify();
+        task_gate first;
+        future<rpp::uint64> resumed = thread_after_await(rpp::async([&] { first.hold(); return 1; }));
+        first.open();
         rpp::uint64 resumedOn = resumed.get();
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
-        AssertThat(resumedOn, worker);
+        AssertThat(first.opened, rpp::semaphore::notified);
+        AssertThat(resumedOn, first.worker);
     }
 
-    // notifies `ended` when the coroutine frame destroys its copy. A moved-from copy notifies nothing
-    struct notify_on_exit
-    {
-        rpp::semaphore* ended;
-        explicit notify_on_exit(rpp::semaphore* s) noexcept : ended{s} {}
-        notify_on_exit(notify_on_exit&& other) noexcept : ended{std::exchange(other.ended, nullptr)} {}
-        ~notify_on_exit() { if (ended) ended->notify(); }
-    };
-
-    static future<int> await_with_a_parameter(future<int> f, notify_on_exit /*onExit*/)
+    template<class OnExit> static future<int> await_with_a_parameter(future<int> f, OnExit /*onExit*/)
     {
         co_return co_await f;
     }
@@ -1024,26 +927,21 @@ TestImpl(test_async)
     // the frame still holds its parameters when the result publishes, so the next step runs as a pool task outside it
     TestCase(the_step_after_a_coroutine_never_runs_inside_its_frame)
     {
-        rpp::semaphore gate;
+        task_gate first;
         rpp::semaphore parameterEnded;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
         rpp::semaphore::wait_result ended = rpp::semaphore::timeout;
-        rpp::uint64 worker = 0;
         rpp::uint64 ranOn = 0;
-        future<int> f = await_with_a_parameter(rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until the step after the coroutine attached
-            worker = rpp::get_thread_id();
-            return 1;
-        }), notify_on_exit{&parameterEnded}).then([&](int x) {
+        auto onExit = rpp::make_scope_guard([&] { parameterEnded.notify(); });
+        future<int> f = await_with_a_parameter(rpp::async([&] { first.hold(); return 1; }), std::move(onExit)).then([&](int x) {
             ranOn = rpp::get_thread_id();
             ended = parameterEnded.wait(rpp::seconds(1)); // a hang guard, the frame releases it after the result published
             return x;
         });
-        gate.notify();
+        first.open();
         AssertThat(f.get(), 1);
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(first.opened, rpp::semaphore::notified);
         AssertThat(ended, rpp::semaphore::notified);
-        AssertNotEqual(ranOn, worker);
+        AssertNotEqual(ranOn, first.worker);
     }
 
     // runs `loop` on this thread until `f` holds its result, or until the hang guard ends
@@ -1150,12 +1048,8 @@ TestImpl(test_async)
     {
         constexpr int steps = 64; // longer than the depth cap, so one body runs at the cap
         std::atomic_int failures = 0; // the step after the dropped one hung, or ran inside the body
-        rpp::semaphore gate;
-        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
-        future<int> f = rpp::async([&] {
-            opened = gate.wait(rpp::seconds(1)); // holds the task until every step attached
-            return 0;
-        });
+        task_gate first;
+        future<int> f = rpp::async([&] { first.hold(); return 0; });
         for (int i = 0; i < steps; ++i)
         {
             f = f.then([&](int x) {
@@ -1164,9 +1058,9 @@ TestImpl(test_async)
                 return x + 1;
             });
         }
-        gate.notify();
+        first.open();
         AssertThat(f.get(), steps);
-        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(first.opened, rpp::semaphore::notified);
         AssertThat(failures.load(), 0);
     }
 };
