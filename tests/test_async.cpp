@@ -846,7 +846,7 @@ TestImpl(test_async)
     #endif
     }
 
-    // each step publishes inside the step before it, so a long chain must move to a new pool task before the stack grows deep
+    // each step publishes inside the step before it, so a long chain must unwind its stack before the stack grows deep
     TestCase(a_long_chain_keeps_the_stack_of_each_thread_short)
     {
         constexpr int steps = 4000;
@@ -875,6 +875,7 @@ TestImpl(test_async)
         for (const auto& [thread, span] : spans)
             if (span.second - span.first > deepest) deepest = span.second - span.first;
         AssertLess(deepest, std::uintptr_t{256 * 1024});
+        AssertThat(spans.size(), size_t{1}); // the pool task runs a postponed step itself, so the chain stays on its worker
     }
 
     // a promise of the caller may publish under a lock, so its next step starts as a pool task and never inline
@@ -1127,6 +1128,46 @@ TestImpl(test_async)
     TestCase(a_loop_which_drops_the_step_after_an_error_ends_its_promise)
     {
         drop_the_step_after(rpp::exceptional_future<int>(std::runtime_error{"dropped_input_msg"}));
+    }
+
+    // posts a step to a loop which drops it. @returns the thread which ran the step after it, or 0 when none ran in time
+    static rpp::uint64 thread_after_a_dropped_step()
+    {
+        dropping_loop loop;
+        promise<int> p;
+        future<int> dropped = p.get_future().then(loop, [](int y) { return y; });
+        auto recover = [](std::logic_error&) { return get_thread_id(); }; // the dropped step leaves a std::logic_error
+        future<rpp::uint64> after = dropped.then([](int) -> rpp::uint64 { return 0; }, recover);
+        p.set_value(1);
+        // a hang guard, which the worker that runs the step after the dropped one releases
+        if (after.wait_for(rpp::seconds(1)) == wait_result::finished) return after.get();
+        after.detach();
+        return 0;
+    }
+
+    // a dropped step ends inside the body which posted it, so the step after it starts as a pool task, at every depth
+    TestCase(a_body_can_wait_for_the_step_after_a_dropped_loop_step)
+    {
+        constexpr int steps = 64; // longer than the depth cap, so one body runs at the cap
+        std::atomic_int failures = 0; // the step after the dropped one hung, or ran inside the body
+        rpp::semaphore gate;
+        rpp::semaphore::wait_result opened = rpp::semaphore::timeout;
+        future<int> f = rpp::async([&] {
+            opened = gate.wait(rpp::seconds(1)); // holds the task until every step attached
+            return 0;
+        });
+        for (int i = 0; i < steps; ++i)
+        {
+            f = f.then([&](int x) {
+                rpp::uint64 ranOn = thread_after_a_dropped_step();
+                if (ranOn == 0 || ranOn == rpp::get_thread_id()) ++failures;
+                return x + 1;
+            });
+        }
+        gate.notify();
+        AssertThat(f.get(), steps);
+        AssertThat(opened, rpp::semaphore::notified); // a hang guard, the test releases it
+        AssertThat(failures.load(), 0);
     }
 };
 

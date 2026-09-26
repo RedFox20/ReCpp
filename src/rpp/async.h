@@ -51,7 +51,8 @@ namespace rpp
             /// Takes ownership of the step, and runs it now or later on the thread which it belongs to
             virtual void start(bool may_run_here) noexcept { start_step(this, may_run_here); }
 
-            /// Runs the step as a pool task, then deletes it. A delegate which binds this method allocates nothing
+            /// Runs the step as a pool task, then each step the depth cap postponed on this thread, and deletes each one
+            /// A delegate which binds this method allocates nothing
             RPPAPI void run_pool_task() noexcept;
         };
 
@@ -276,7 +277,7 @@ namespace rpp
                     std::logic_error broken { "rpp::promise released its state with no result" };
                     state->error = std::make_exception_ptr(broken);
                 }
-                state->finish(library);
+                state->finish(false); // this runs inside the code which drops the promise, so no step may start inline here
             }
             state->release();
             state = nullptr;
