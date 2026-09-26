@@ -399,6 +399,36 @@ TestImpl(test_async)
         AssertThat(insideCatch, false);
     }
 
+    // its destructor ends late, so get() returns first when a step publishes before it destroys its task
+    struct slow_probe
+    {
+        std::atomic_bool* ended;
+        explicit slow_probe(std::atomic_bool* e) noexcept : ended{e} {}
+        slow_probe(slow_probe&& p) noexcept : ended{std::exchange(p.ended, nullptr)} {}
+        ~slow_probe()
+        {
+            if (ended)
+            {
+                rpp::sleep_ms(5);
+                *ended = true;
+            }
+        }
+    };
+
+    // a step destroys its task before it publishes, so get() never returns while the task lives. See BUGS.md C32
+    TestCase(a_step_destroys_its_task_before_it_publishes)
+    {
+        std::atomic_bool ended = false;
+        AssertThat(rpp::async([p=slow_probe{&ended}] { return 1; }).get(), 1);
+        AssertThat(ended.exchange(false), true);
+        rpp::async([p=slow_probe{&ended}] {}).get();
+        AssertThat(ended.exchange(false), true);
+        AssertThrows(rpp::async([p=slow_probe{&ended}] { throw std::runtime_error{"probe_msg"}; }).get(), std::runtime_error);
+        AssertThat(ended.exchange(false), true);
+        AssertThat(rpp::ready_future(1).then([p=slow_probe{&ended}](int x) { return x; }).get(), 1);
+        AssertThat(ended.load(), true);
+    }
+
     // the argument lives to the end of the comma expression on the Itanium ABI, so it must hold no reference
     TestCase(set_exception_keeps_no_reference)
     {
