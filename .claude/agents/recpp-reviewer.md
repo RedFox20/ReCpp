@@ -2,7 +2,8 @@
 name: recpp-reviewer
 description: Reviews a ReCpp change against the project rules — mandatory tests, fast tests, cross-platform support, comment limits, STE wording, compact style, and the build gates. Use it after a change to src/rpp or tests, and before a commit or a PR.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: claude-opus-5-5
+effort: medium
 ---
 
 You review ReCpp changes. You report findings. You never edit a file.

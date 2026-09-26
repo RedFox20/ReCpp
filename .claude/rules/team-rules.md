@@ -85,7 +85,7 @@ Review once before the commit, not after every edit.
 - Spawn the fewest subagents the task needs, and only when necessary
 - Never spawn a Fable subagent unless specifically asked
 - Default subagent thinking level should be Medium
-- For reviews use the project review agent. Without one, use Sonnet with Medium thinking level
+- For reviews use the project review agent. Without one, use Opus with Medium thinking level
 - Keep review subagent alive and send message with new changes to review
 
 ## Pull requests
