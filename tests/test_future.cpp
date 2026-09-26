@@ -245,11 +245,11 @@ TestImpl(test_future)
         warning_capture warning { "cfuture_unhandled_msg" };
         cfuture<int> failed = rpp::async_task([]() -> int { throw std::domain_error{"cfuture_unhandled_msg"}; });
         failed.continue_with([](int) {}, [](const std::invalid_argument&) {}); // this handler takes another type
-        AssertThat(warning.wait().find("continue_with()") != std::string::npos, true);
+        AssertThat(warning.wait("continue_with()"), true);
 
         warning_capture bare { "cfuture_bare_msg" };
         rpp::async_task([]() -> int { throw std::domain_error{"cfuture_bare_msg"}; }).continue_with([](int) {});
-        AssertThat(bare.wait().find("continue_with()") != std::string::npos, true);
+        AssertThat(bare.wait("continue_with()"), true);
     }
 
     // a handler of cfuture<void> which takes another type must not stop the program
@@ -258,11 +258,11 @@ TestImpl(test_future)
         warning_capture warning { "of an unknown type" };
         cfuture<void> failed = rpp::async_task([] { throw 42; });
         failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
-        AssertThat(warning.wait().find("continue_with()") != std::string::npos, true);
+        AssertThat(warning.wait("continue_with()"), true);
 
         warning_capture bare { "cfuture_void_bare_msg" };
         rpp::async_task([] { throw std::domain_error{"cfuture_void_bare_msg"}; }).continue_with([] {});
-        AssertThat(bare.wait().find("continue_with()") != std::string::npos, true);
+        AssertThat(bare.wait("continue_with()"), true);
     }
 
     TestCase(chain_async_futures_void)
@@ -395,8 +395,7 @@ TestImpl(test_future)
         AssertThat(f1.valid(), false);
     }
 
-    // a ready future which nobody collected was not abandoned, so its destructor collects it
-    // and returns. If the destructor terminates on a ready result, the test run stops here
+    // a ready future which nobody collected was not abandoned, so its destructor collects it and returns
     TestCase(destructor_collects_a_ready_future)
     {
         { cfuture<int> value = make_ready_future(42); }

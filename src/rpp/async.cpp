@@ -15,11 +15,6 @@ namespace rpp::detail
     // the steps this thread runs inside each other. A thread outside the pool runs none
     static thread_local int nested_steps = 0;
 
-    bool in_pool_step() noexcept
-    {
-        return nested_steps > 0;
-    }
-
     static void run_step(continuation* c) noexcept
     {
         ++nested_steps;
@@ -45,12 +40,5 @@ namespace rpp::detail
             deferred = c;
         else
             rpp::parallel_task_detached(rpp::delegate<void()>{c, &continuation::run_pool_task});
-    }
-
-    void run_outside_pool_steps(continuation& c) noexcept
-    {
-        int depth = std::exchange(nested_steps, 0);
-        c.run();
-        nested_steps = depth;
     }
 }

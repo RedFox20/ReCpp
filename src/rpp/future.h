@@ -207,7 +207,7 @@ namespace rpp
             if (this->valid())
             {
                 // await_ready() counts a deferred task as ready, and get() would run that task here
-                if (super::wait_for(std::chrono::microseconds{0}) == std::future_status::ready)
+                if (this->wait_for(rpp::Duration::zero()) == wait_result::finished)
                 {
                     try { (void)this->get(); }
                     catch (const std::exception& e) { __assertion_failure("cfuture<T> threw exception in destructor: %s", e.what()); }
@@ -628,7 +628,7 @@ namespace rpp
             if (this->valid())
             {
                 // await_ready() counts a deferred task as ready, and get() would run that task here
-                if (super::wait_for(std::chrono::microseconds{0}) == std::future_status::ready)
+                if (this->wait_for(rpp::Duration::zero()) == wait_result::finished)
                 {
                     try { (void)this->get(); }
                     catch (std::exception& e) { __assertion_failure("cfuture<void> threw exception in destructor: %s", e.what()); }
