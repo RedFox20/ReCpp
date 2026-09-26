@@ -349,10 +349,12 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #    define RPP_CORO_RETURN_TYPE [[clang::coro_return_type]]
 #    define RPP_CORO_WRAPPER [[clang::coro_wrapper]]
 #    define RPP_CORO_LIFETIMEBOUND [[clang::coro_lifetimebound]]
+#    define RPP_CORO_DISABLE_LIFETIMEBOUND [[clang::coro_disable_lifetimebound]] // the CRT borrows no argument
 #  else
 #    define RPP_CORO_RETURN_TYPE
 #    define RPP_CORO_WRAPPER
 #    define RPP_CORO_LIFETIMEBOUND
+#    define RPP_CORO_DISABLE_LIFETIMEBOUND
 #  endif
 #endif // RPP_CORO_RETURN_TYPE
 

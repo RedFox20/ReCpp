@@ -8,7 +8,7 @@ name no std type. The module exports those two. `rpp::cfuture<T>` and `rpp::cpro
 stay in the header, and they keep every behavior they have today.
 
 **No existing consumer changes.** A project which includes `rpp/future.h` keeps `cfuture`
-and compiles as before. A project which imports `rpp.future` gets the new type.
+and compiles as before. A project which imports `rpp.threading` gets the new type.
 
 **A consumer does move.** `cfuture` takes a `[[deprecated]]` attribute in the last
 changeset, so every remaining site names itself in the compiler output. See section 6.1.
@@ -53,6 +53,10 @@ Each row is a std behavior which no longer exists, not one which moved.
 | `std::promise<T>` as the producer | `rpp::promise<T>` replaces it, and `set_value_at_thread_exit` goes |
 | `std::async` and `std::launch` interop | `rpp::async` is the only launcher |
 | the implicit `<future>` include | the point of the whole change |
+| `std::future_error` | a missing state or a broken promise throws `std::logic_error`, the base of `std::future_error` |
+| `wait_result::deferred` | `rpp::async` always starts the task on the pool, so no wait reports a deferred state |
+| `run_tasks()` | its launcher returns a `cfuture<void>`, so it stays in `future.h` |
+| the silent release in a move assignment | a move assignment over an unready future terminates, as the destructor does |
 
 **`share()` never arrives, and nothing asks for it.** A grep over `src` and `tests` finds no
 `.share()` call and no `std::shared_future`. A shared future needs a refcounted state and a
@@ -75,8 +79,12 @@ rpp::cfuture<int> a = rpp::async_task([]{ return 7; }); // the header, unchanged
 rpp::future<int>  b = rpp::async([]{ return 7; });      // the module
 ```
 
-`then()`, `continue_with()` and `chain_async()` all call the launcher inside, so each one
-returns the matching type without a caller naming it. A port is one word per call site.
+`then()`, `continue_with()` and `chain_async()` return the matching type, so a caller never
+names it. A port is one word per call site.
+
+The two factories take new names for the same reason. `rpp::ready_future()` and
+`rpp::exceptional_future()` return the new type. `make_ready_future()` and
+`make_exceptional_future()` keep returning `cfuture`.
 
 ## 4. What it keeps
 
@@ -85,12 +93,30 @@ The names below read the same on both types, so a mechanical port compiles.
 - `get()`, `wait()`, `valid()`
 - `wait_for(rpp::Duration)` and `wait_until(rpp::TimePoint)`, both returning `rpp::wait_result`
 - `await_ready()`, `collect_ready()`, `collect_wait()`
-- `then()`, `continue_with()`, `detach()`, `chain_async()`, each with the four exception handler arities
+- `then()`, `continue_with()`, `detach()` and `chain_async()`. `then()` and `continue_with()` take
+  any number of exception handlers, where `cfuture` stops at four
 - the destructor which drains a ready result and terminates on an unawaited one
 - `co_await`, through the same operator set
 
+`detach()` keeps its name and drops its cost. It releases the state at once, so no pool thread
+blocks on an abandoned result.
+
+`then()`, `continue_with()` and `co_await` keep their names and park no thread. The step
+attaches to the shared state, and the pool thread which publishes the result runs it inline.
+So a chain of `rpp::async` steps runs on one worker. `cfuture` parks one pool thread for each
+pending step. A promise of the caller starts the step as a pool task, because the caller can
+publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the step on the
+thread of an `rpp::event_loop` instead.
+
+In `continue_with()` of both types, an error which no handler takes goes to `LogWarning()`, and
+the program continues.
+
+`get_all()` keeps its name and collects every future before it rethrows the first exception.
+The `cfuture` overload stops at the first one, so a later future which is not ready terminates
+in its destructor.
+
 `rpp::task<T>` does not overlap this. A task resumes on the loop thread and spawns nothing.
-A future blocks a thread and carries `.then()`. See `task.h`.
+A future carries `.then()`, and its `get()` blocks the caller. See `task.h`.
 
 ## 5. The ReCpp surface which moves
 
@@ -104,7 +130,7 @@ Eight are source and twelve are tests.
 | `coroutines.h` | 11 | keeps the `rpp::future` awaiter, and the std awaiters move out |
 | `task.h`, `thread_pool.h` | 8 | doc comments only |
 | `future_types.h` | 1 | a second forward declaration |
-| `rpp-future.cppm` | generated | the export list names the new type and drops `cfuture` |
+| `rpp-future.cppm` | generated | the export list drops `cfuture`, because `rpp.threading` exports the new type |
 
 ### 5.1 Three headers, and no shared awaiter
 
@@ -119,7 +145,7 @@ rpp/std_awaiter.h     std_future_awaiter, and operator co_await for std::future
 
 `future.h:15` is the only direct `#include <future>` among the three headers today, so this
 split alone takes it out of the group fragment. `event_loop.h` and `coroutines.h` then
-include `rpp/async.h`, and `rpp-future.cppm` carries `rpp/async.h`. The group fragment holds
+include `rpp/async.h`, whose names `rpp.threading` already exports. The group fragment holds
 no `<future>` after that, which is what removes B28 condition 1.
 
 ### 5.2 The std interop, measured
@@ -212,17 +238,16 @@ because they test the deprecated type on purpose.
 
 Each one lands on its own and leaves the tree green.
 
-1. **`rpp::future`, `rpp::promise` and `rpp::async` land in `rpp/async.h`**, with their own
-   tests. The module exports nothing new, so no consumer sees them. This is the largest
-   changeset, because the shared state, the exception path and the destructor are all new
-   code.
+1. **Landed. `rpp::future`, `rpp::promise` and `rpp::async` live in `rpp/async.h`**, with
+   `tests/test_async.cpp`. The header never reaches `<future>`, so `rpp.threading` carries it
+   and exports the new names. The shared state waits on `rpp::semaphore_once_flag`.
 2. **`event_loop` and `coroutines` move to the new type, and the std awaiters leave.**
    `event_loop` swaps `cfuture` for `rpp::future` and drops its unused `std::future`
    constructor. `std_future_awaiter` moves to `rpp/std_awaiter.h`, which no module carries.
    A header consumer keeps every name it has today.
-3. **The module exports the new names and stops exporting `cfuture`.** A consumer target
-   in `tests/module_consumer/` builds the new type on gcc-14, which measures whether B28
-   condition 1 is really gone.
+3. **`rpp.future` stops exporting `cfuture`.** `rpp.threading` already exports the new names.
+   A consumer target in `tests/module_consumer/` builds the new type on gcc-14, which measures
+   whether B28 condition 1 is really gone.
 4. **A downstream project ports its own files**, one at a time, with the header still
    available for the files it has not reached.
 5. **`cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**, unconditionally.
@@ -253,13 +278,14 @@ in place of the std includes a modules build still writes. That one also needs g
 
 ## 9. Acceptance criteria
 
-1. `rpp::future<T>` passes the `test_future.cpp` case set, ported name for name.
+1. `rpp::future<T>` passes the `test_future.cpp` case set, ported name for name. Changeset 1
+   meets it. `deferred_future_never_reports_finished` has no port, because no `rpp::future` defers.
 2. `rpp/async.h` includes no `<future>`, which `tools/check_includes.py` reports. No header
    holds both implementations, and `event_loop.h` names no std future at all.
 3. A module consumer target builds `rpp::future` on gcc-14 with `<memory>` live, and it
    compiles. That is the B28 measurement.
-4. `rpp.future` exports `rpp::future`, `rpp::promise` and `rpp::async`, and it exports no
-   `cfuture`, no `async_task` and no `std_future_awaiter`.
+4. `rpp.threading` exports `rpp::future`, `rpp::promise` and `rpp::async`. `rpp.future`
+   exports no `cfuture`, no `async_task` and no `std_future_awaiter`.
 5. The header path still builds `cfuture` and passes every case it passes today. The two
    `std::future` coroutine cases still pass through `rpp/std_awaiter.h`.
 6. A consumer build warns once at every `cfuture` site and at no line of `future.h` itself.

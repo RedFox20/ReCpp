@@ -305,7 +305,8 @@ namespace rpp
                 auto until = rpp::TimePoint::monotonic_now() + timeout;
                 while (value <= 0)
                 {
-                    if (cv.wait_until(lock, until) == std::cv_status::timeout)
+                    // wait_until() treats a deadline past 15 s as a clock mismatch, so wait for the time left
+                    if (cv.wait_for(lock, until - rpp::TimePoint::monotonic_now()) == std::cv_status::timeout)
                     {
                         // recheck value after timeout: a concurrent notify() may have
                         // incremented value between the CV timeout and lock reacquisition

@@ -1,6 +1,8 @@
 #include <rpp/future.h>
 #include <rpp/tests.h>
+#include <stdexcept> // std::domain_error, std::invalid_argument
 #include <string> // std::string
+#include "warning_capture.h"
 using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
@@ -237,6 +239,32 @@ TestImpl(test_future)
         AssertThat(result, 42);
     }
 
+    // nobody awaits the task of continue_with(), so a failed task logs a warning and does not stop the program
+    TestCase(continue_with_logs_an_error_which_no_handler_takes)
+    {
+        warning_capture warning { "cfuture_unhandled_msg" };
+        cfuture<int> failed = rpp::async_task([]() -> int { throw std::domain_error{"cfuture_unhandled_msg"}; });
+        failed.continue_with([](int) {}, [](const std::invalid_argument&) {}); // this handler takes another type
+        AssertThat(warning.wait().find("continue_with()") != std::string::npos, true);
+
+        warning_capture bare { "cfuture_bare_msg" };
+        rpp::async_task([]() -> int { throw std::domain_error{"cfuture_bare_msg"}; }).continue_with([](int) {});
+        AssertThat(bare.wait().find("continue_with()") != std::string::npos, true);
+    }
+
+    // a handler of cfuture<void> which takes another type must not stop the program
+    TestCase(continue_with_on_a_void_future_logs_an_error_of_an_unknown_type)
+    {
+        warning_capture warning { "of an unknown type" };
+        cfuture<void> failed = rpp::async_task([] { throw 42; });
+        failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
+        AssertThat(warning.wait().find("continue_with()") != std::string::npos, true);
+
+        warning_capture bare { "cfuture_void_bare_msg" };
+        rpp::async_task([] { throw std::domain_error{"cfuture_void_bare_msg"}; }).continue_with([] {});
+        AssertThat(bare.wait().find("continue_with()") != std::string::npos, true);
+    }
+
     TestCase(chain_async_futures_void)
     {
         bool task1Called = false;
@@ -365,6 +393,18 @@ TestImpl(test_future)
         cfuture<void> f1 = async_task([] { });
         f1.get();
         AssertThat(f1.valid(), false);
+    }
+
+    // a ready future which nobody collected was not abandoned, so its destructor collects it
+    // and returns. If the destructor terminates on a ready result, the test run stops here
+    TestCase(destructor_collects_a_ready_future)
+    {
+        { cfuture<int> value = make_ready_future(42); }
+        { cfuture<void> nothing = make_ready_future(); }
+        {
+            cfuture<int> waited = async_task([] { return 7; });
+            waited.wait(); // the result is ready, and get() never runs
+        }
     }
 
     // a deferred future runs on get(), so no wait finishes it. Reporting finished would send
