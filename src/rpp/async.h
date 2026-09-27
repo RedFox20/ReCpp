@@ -762,8 +762,8 @@ namespace rpp
     RPP_CORO_WRAPPER future<T> ready_future(T value)
     {
         promise<T> p;
+        p.set_value(std::move(value)); // publishes first, so a throwing move leaves no future to terminate on
         future<T> f = p.get_future();
-        p.set_value(std::move(value));
         return f;
     }
 
