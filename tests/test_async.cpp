@@ -58,10 +58,7 @@ TestImpl(test_async)
 
     TestCase(cross_thread_exception_propagation)
     {
-        future<void> asyncThrowingTask = rpp::async([] {
-            throw std::runtime_error("background_thread_exception_msg");
-        });
-
+        future<void> asyncThrowingTask = rpp::async([] { throw std::runtime_error("background_thread_exception_msg"); });
         std::string result;
         try { asyncThrowingTask.get(); }
         catch (const std::runtime_error& e) { result = e.what(); }
@@ -70,21 +67,11 @@ TestImpl(test_async)
 
     TestCase(composable_future_type)
     {
-        future<std::string> f = rpp::async([] {
-            return "future string"s;
-        });
-
         int totalCalls = 0;
         std::string first;
         int second = 0;
-        f.then([&](std::string s) {
-            ++totalCalls;
-            first = s;
-            return 42;
-        }).then([&](int x) {
-            ++totalCalls;
-            second = x;
-        }).get();
+        future<std::string> f = rpp::async([] { return "future string"s; });
+        f.then([&](std::string s) { ++totalCalls; first = s; return 42; }).then([&](int x) { ++totalCalls; second = x; }).get();
         AssertThat(totalCalls, 2);
         AssertThat(first, "future string"s);
         AssertThat(second, 42);
@@ -92,20 +79,11 @@ TestImpl(test_async)
 
     TestCase(except_handler)
     {
-        future<void> f = rpp::async([] {
-            throw std::runtime_error("background_thread_exception_msg");
-        });
-
+        future<void> f = rpp::async([] { throw std::runtime_error("background_thread_exception_msg"); });
         bool taskCalled = false;
         std::string handled;
-        int result = f.then([&] {
-            taskCalled = true;
-            return 0;
-        }, [&](const std::exception& e) {
-            handled = e.what();
-            return 42;
-        }).get();
-
+        int result = f.then([&] { taskCalled = true; return 0; },
+                            [&](const std::exception& e) { handled = e.what(); return 42; }).get();
         AssertThat(taskCalled, false);
         AssertThat(handled, "background_thread_exception_msg"s);
         AssertThat(result, 42);
@@ -113,40 +91,20 @@ TestImpl(test_async)
 
     TestCase(except_handlers_catch_first)
     {
-        future<void> f = rpp::async([] {
-            throw std::domain_error("background_thread_exception_msg");
-        });
-
+        future<void> f = rpp::async([] { throw std::domain_error("background_thread_exception_msg"); });
         std::string handled;
-        int result = f.then([] {
-            return 0;
-        },
-        [&](std::domain_error e) {
-            handled = e.what();
-            return 42;
-        },
-        [](std::runtime_error) { return 21; }).get();
-
+        int result = f.then([] { return 0; }, [&](std::domain_error e) { handled = e.what(); return 42; },
+                            [](std::runtime_error) { return 21; }).get();
         AssertThat(handled, "background_thread_exception_msg"s);
         AssertThat(result, 42);
     }
 
     TestCase(except_handlers_catch_second)
     {
-        future<void> f = rpp::async([] {
-            throw std::runtime_error("background_thread_exception_msg");
-        });
-
+        future<void> f = rpp::async([] { throw std::runtime_error("background_thread_exception_msg"); });
         std::string handled;
-        int result = f.then([] {
-            return 0;
-        },
-        [](std::domain_error) { return 21; },
-        [&](std::runtime_error e) {
-            handled = e.what();
-            return 42;
-        }).get();
-
+        int result = f.then([] { return 0; }, [](std::domain_error) { return 21; },
+                            [&](std::runtime_error e) { handled = e.what(); return 42; }).get();
         AssertThat(handled, "background_thread_exception_msg"s);
         AssertThat(result, 42);
     }
@@ -158,21 +116,10 @@ TestImpl(test_async)
 
     TestCase(except_handlers_catch_third)
     {
-        future<void> f = rpp::async([] {
-            throw std::runtime_error("background_thread_exception_msg");
-        });
-
+        future<void> f = rpp::async([] { throw std::runtime_error("background_thread_exception_msg"); });
         std::string handled;
-        int result = f.then([] {
-            return 0;
-        },
-        [](const SpecificError&) { return 1; },
-        [](const std::range_error&) { return 2; },
-        [&](const std::runtime_error& e) {
-            handled = e.what();
-            return 3;
-        }).get();
-
+        int result = f.then([] { return 0; }, [](const SpecificError&) { return 1; }, [](const std::range_error&) { return 2; },
+                            [&](const std::runtime_error& e) { handled = e.what(); return 3; }).get();
         AssertThat(handled, "background_thread_exception_msg"s);
         AssertThat(result, 3);
     }
@@ -180,10 +127,7 @@ TestImpl(test_async)
     // the handlers read like a chain of catch blocks, so the first match wins and not the most specific one
     TestCase(except_handlers_the_first_match_wins)
     {
-        future<void> f = rpp::async([] {
-            throw SpecificError("specific_error_msg");
-        });
-
+        future<void> f = rpp::exceptional_future<void>(SpecificError{"specific_error_msg"});
         int result = f.then([] { return 0; },
                             [](const std::range_error&) { return 1; },
                             [](const SpecificError&) { return 2; }).get();
@@ -193,10 +137,7 @@ TestImpl(test_async)
     // a catch block never catches what a sibling catch block throws, so neither does a later handler
     TestCase(a_handler_which_throws_skips_the_later_handlers)
     {
-        future<void> f = rpp::async([] {
-            throw std::domain_error("background_thread_exception_msg");
-        });
-
+        future<void> f = rpp::exceptional_future<void>(std::domain_error{"domain_msg"});
         future<int> chained = f.then([] { return 0; },
                                      [](const std::domain_error&) -> int { throw std::runtime_error("handler_msg"); },
                                      [](const std::runtime_error&) { return 2; });
@@ -205,89 +146,47 @@ TestImpl(test_async)
 
     TestCase(except_handler_chaining)
     {
-        future<std::string> f = rpp::async([] {
-            return "future string"s;
-        });
-
         std::string handled;
-        int result = f.then([](std::string) -> int {
+        future<int> failed = rpp::async([] { return "future string"s; }).then([](std::string) -> int {
             throw std::runtime_error("future_continuation_exception_msg");
-        }).then([](int) {
-            return 5;
-        }, [&](const std::exception& e) {
-            handled = e.what();
-            return 42;
-        }).get();
-
+        });
+        int result = failed.then([](int) { return 5; }, [&](const std::exception& e) { handled = e.what(); return 42; }).get();
         AssertThat(handled, "future_continuation_exception_msg"s);
         AssertThat(result, 42);
     }
 
     TestCase(chain_async_futures_void)
     {
-        bool task1Called = false;
-        bool task2Called = false;
-        bool task3Called = false;
-
+        std::string ran; // each task appends its number, so the order shows too
         future<void> tasks;
-        tasks.chain_async(
-            [&]{ task1Called = true; }
-        ).chain_async(
-            [&]{ task2Called = true; throw std::runtime_error("task2 failed"); }
-        ).chain_async(
-            [&]{ task3Called = true; }
-        );
+        tasks.chain_async([&] { ran += '1'; }).chain_async([&] { ran += '2'; throw std::runtime_error("task2 failed"); });
+        tasks.chain_async([&] { ran += '3'; });
         tasks.get(); // waits for task3, which ran after task1 and task2
-
-        AssertThat(task1Called, true);
-        AssertThat(task2Called, true);
-        AssertThat(task3Called, true);
+        AssertThat(ran, "123"s);
     }
 
     TestCase(chain_async_futures_T)
     {
-        bool task1Called = false;
-        bool task2Called = false;
-        bool task3Called = false;
-
+        std::string ran;
         future<std::string> tasks;
-        tasks.chain_async(
-            [&]() -> std::string { task1Called = true; return "task1"; }
-        ).chain_async(
-            [&]() -> std::string { task2Called = true; throw std::runtime_error("task2 failed"); }
-        ).chain_async(
-            [&]() -> std::string { task3Called = true; return "task3"; }
-        );
-        std::string result = tasks.get(); // waits for task3, which ran after task1 and task2
-
-        AssertThat(task1Called, true);
-        AssertThat(task2Called, true);
-        AssertThat(task3Called, true);
-        AssertThat(result, "task3"s);
+        tasks.chain_async([&] { ran += '1'; return "task1"s; });
+        tasks.chain_async([&]() -> std::string { ran += '2'; throw std::runtime_error("task2 failed"); });
+        tasks.chain_async([&] { ran += '3'; return "task3"s; });
+        AssertThat(tasks.get(), "task3"s); // waits for task3, which ran after task1 and task2
+        AssertThat(ran, "123"s);
     }
 
     TestCase(chain_async_futures_continue_completed)
     {
-        bool task1Called = false;
-        bool task2Called = false;
-        bool task3Called = false;
-
+        std::string ran;
         future<void> tasks;
-        tasks.chain_async(
-            [&]{ task1Called = true; }
-        ).chain_async(
-            [&]{ task2Called = true; }
-        );
+        tasks.chain_async([&] { ran += '1'; }).chain_async([&] { ran += '2'; });
         tasks.wait(); // waits for task2, which ran after task1
+        AssertThat(ran, "12"s);
 
-        AssertThat(task1Called, true);
-        AssertThat(task2Called, true);
-
-        tasks.chain_async(
-            [&]{ task3Called = true; }
-        );
+        tasks.chain_async([&] { ran += '3'; });
         tasks.get();
-        AssertThat(task3Called, true);
+        AssertThat(ran, "123"s);
     }
 
     TestCase(chain_async_takes_a_future)
@@ -458,23 +357,14 @@ TestImpl(test_async)
 
     TestCase(basic_async_task_chaining)
     {
-        future<std::string> f = rpp::async([] {
-            return "future string"s;
-        });
-
         std::string received;
-        f.then([&](std::string s) {
-            received = s;
-        }).get();
-
+        rpp::async([] { return "future string"s; }).then([&](std::string s) { received = s; }).get();
         AssertThat(received, "future string"s);
     }
 
     TestCase(invalidates_after_get)
     {
-        future<std::string> f1 = rpp::async([] {
-            return "future string"s;
-        });
+        future<std::string> f1 = rpp::async([] { return "future string"s; });
         AssertThat(f1.get(), "future string"s);
         AssertThat(f1.valid(), false);
     }
@@ -730,16 +620,9 @@ TestImpl(test_async)
         task_gate first;
         rpp::uint64 second = 0;
         rpp::uint64 third = 0;
-        future<int> f = rpp::async([&] {
-            first.hold();
-            return 1;
-        }).then([&](int x) {
-            second = rpp::get_thread_id();
-            return x + 1;
-        }).then([&](int x) {
-            third = rpp::get_thread_id();
-            return x + 1;
-        });
+        future<int> f = rpp::async([&] { first.hold(); return 1; });
+        f = f.then([&](int x) { second = rpp::get_thread_id(); return x + 1; });
+        f = f.then([&](int x) { third = rpp::get_thread_id(); return x + 1; });
         first.open();
         AssertThat(f.get(), 3);
         AssertThat(first.opened, rpp::semaphore::notified);
@@ -994,7 +877,7 @@ TestImpl(test_async)
         rpp::uint64 loopThread = 0;
         rpp::uint64 ranOn = 0;
         bool ran = rpp::async([&] {
-            rpp::event_loop loop; // runs inside a pool step, where a promise of the library may run the next step inline
+            rpp::event_loop loop; // runs inside a pool step, where a step promise may run the next step inline
             loopThread = rpp::get_thread_id();
             future<int> f = rpp::async([] { return 1; }).then(loop, [](int x) { return x; }).then([&](int x) {
                 ranOn = rpp::get_thread_id();

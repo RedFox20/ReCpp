@@ -12,7 +12,7 @@ struct warning_capture
     rpp::semaphore logged;
     std::string text;
 
-    explicit warning_capture(const char* marker) noexcept : marker{marker} { rpp::add_log_handler(this, &capture); }
+    explicit warning_capture(const char* wanted) noexcept : marker{wanted} { rpp::add_log_handler(this, &capture); }
     ~warning_capture() noexcept { rpp::remove_log_handler(this, &capture); }
 
     /// @returns true when the warning arrives and also contains `part`
