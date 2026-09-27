@@ -390,8 +390,9 @@ namespace rpp
         using R = task_return_t<Task>;
         detail::step_promise<R> p;
         future<R> f = p.get_future();
-        auto make = [&] { return [task=std::move(task)](detail::no_input&) mutable -> R { return task(); }; };
-        detail::make_step(detail::no_input{}, std::move(p), make)->start(false);
+        detail::make_step(detail::no_input{}, std::move(p), [&] {
+            return [task=std::move(task)](detail::no_input&) mutable -> R { return task(); };
+        })->start(false);
         return f;
     }
 
@@ -725,8 +726,9 @@ namespace rpp
                 if (!error)
                 {
                     detail::future_state<U>* ns = n.state; // a result of `n` which is already out publishes on this pool step
-                    auto make = [] { return [](future<U>& next) -> U { return next.get(); }; };
-                    detail::start_after(ns, detail::make_step(std::move(n), std::move(p), make), true);
+                    detail::start_after(ns, detail::make_step(std::move(n), std::move(p), [] {
+                        return [](future<U>& next) -> U { return next.get(); };
+                    }), true);
                 }
                 else
                 {
