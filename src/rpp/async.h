@@ -36,11 +36,6 @@ namespace rpp
         /// Stands in for the value of a future<void>, which has none
         struct no_value {};
 
-        struct continuation;
-
-        /// Takes ownership of `c`. It runs here when `may_run_here`, which only a pool step sets, else as a new pool task
-        RPPAPI void start_step(continuation* c, bool may_run_here) noexcept;
-
         /// A step which runs once, after the result it follows arrives
         struct continuation
         {
@@ -50,7 +45,10 @@ namespace rpp
             virtual void run() noexcept = 0;
 
             /// Takes ownership of the step, and runs it now or later on the thread which it belongs to
-            virtual void start(bool may_run_here) noexcept { start_step(this, may_run_here); }
+            virtual void start(bool may_run_here) noexcept { start_on_pool(may_run_here); }
+
+            /// Runs the step here when `may_run_here`, which only a pool step sets, else as a new pool task
+            RPPAPI void start_on_pool(bool may_run_here) noexcept;
 
             /// Runs the step as a pool task, then each step the depth cap postponed on this thread, and deletes each one
             /// A delegate which binds this method allocates nothing
@@ -123,13 +121,13 @@ namespace rpp
                 return next.compare_exchange_strong(none, c, std::memory_order_acq_rel, std::memory_order_acquire);
             }
 
-            /// Wakes a waiter, then starts the step which follows. A promise of the library runs it inline on its own pool step
-            void finish(bool library_promise) noexcept
+            /// Wakes a waiter, then starts the step which follows, inline on this pool step when `inline_next`
+            void finish(bool inline_next) noexcept
             {
                 if ((status.fetch_or(READY, std::memory_order_acq_rel) & WAITER) != 0)
                     done.notify_all();
                 if (void* c = next.exchange(this, std::memory_order_acq_rel))
-                    static_cast<continuation*>(c)->start(library_promise);
+                    static_cast<continuation*>(c)->start(inline_next);
             }
 
             /// Moves the result out and leaves no copy of the error, then drops the reference of the future. See BUGS.md C31
@@ -156,40 +154,6 @@ namespace rpp
             if (!s || !s->attach(c))
                 c->start(may_run_here);
         }
-
-        template<class T, class Task>
-        using step_result = std::conditional_t<std::is_void_v<T>, std::invoke_result<Task&>, std::invoke_result<Task&, T>>;
-
-        /// The decayed result of a step. It has no type when `Task` cannot take the result
-        template<class T, class Task>
-        using next_t = std::decay_t<typename step_result<T, Task>::type>;
-
-        /// Rethrows `e`, because no handler takes it
-        template<class R>
-        R handle(const std::exception_ptr& e) { std::rethrow_exception(e); }
-
-        /// Passes `e` to the first handler whose argument type matches, as a chain of catch blocks does
-        template<class R, class Handler, class... Rest>
-        R handle(const std::exception_ptr& e, Handler& handler, Rest&... rest)
-        {
-            try { std::rethrow_exception(e); }
-            catch (first_arg_type<Handler>& ex)
-            {
-                if constexpr (std::is_void_v<R>) (void)handler(ex);
-                else return handler(ex);
-            }
-            catch (...) { return handle<R>(e, rest...); }
-        }
-
-        /// Passes `e` to the first handler which matches, and logs a warning when no handler takes it
-        /// @note LogError() asserts in a debug build, which stops the program
-        template<class... Handlers>
-        void handle_or_log(const std::exception_ptr& e, Handlers&... handlers) noexcept
-        {
-            try { handle<void>(e, handlers...); }
-            catch (const std::exception& ex) { LogWarning("continue_with() ignores an unhandled exception: %s", ex.what()); }
-            catch (...) { LogWarning("continue_with() ignores an unhandled exception of an unknown type"); }
-        }
     }
 
 
@@ -200,11 +164,12 @@ namespace rpp
     protected:
         detail::future_state<T>* state = new detail::future_state<T>{};
         bool retrieved = false; // get_future() gives exactly one future
-        bool library = false; // a promise of the library may run the next step inline on its pool step
+        bool inline_next = false; // a caller may publish under a lock, so only a pool step runs the next step inline
 
     public:
         promise() = default;
-        promise(promise&& p) noexcept : state{std::exchange(p.state, nullptr)}, retrieved{p.retrieved}, library{p.library} {}
+        promise(promise&& p) noexcept
+            : state{std::exchange(p.state, nullptr)}, retrieved{p.retrieved}, inline_next{p.inline_next} {}
 
         /// Abandons the state this promise holds, as the destructor does, then takes the state of `p`
         promise& operator=(promise&& p) noexcept
@@ -214,7 +179,7 @@ namespace rpp
                 abandon();
                 state = std::exchange(p.state, nullptr);
                 retrieved = p.retrieved;
-                library = p.library;
+                inline_next = p.inline_next;
             }
             return *this;
         }
@@ -235,10 +200,8 @@ namespace rpp
         template<class... Args>
         void set_value(Args&&... args)
         {
-            detail::future_state<T>& s = claim();
-            try { s.value.emplace(std::forward<Args>(args)...); }
-            catch (...) { s.unclaim(); throw; }
-            s.finish(library);
+            store(std::forward<Args>(args)...);
+            publish();
         }
 
         /// Stores the exception which get() rethrows, and wakes the waiter. Throws std::logic_error as set_value() does
@@ -246,7 +209,7 @@ namespace rpp
         {
             detail::future_state<T>& s = claim();
             s.error = std::exchange(e, nullptr); // libc++ 18 copies an exception_ptr on a move, see BUGS.md C32
-            s.finish(library);
+            s.finish(inline_next);
         }
 
     protected:
@@ -257,6 +220,18 @@ namespace rpp
             return *state;
         }
 
+        /// Claims the state and stores the value, which nobody sees until publish()
+        template<class... Args>
+        void store(Args&&... args)
+        {
+            detail::future_state<T>& s = claim();
+            try { s.value.emplace(std::forward<Args>(args)...); }
+            catch (...) { s.unclaim(); throw; }
+        }
+
+        /// Wakes the waiter of the stored value, and starts the step which follows
+        void publish() noexcept { state->finish(inline_next); }
+
         void abandon() noexcept
         {
             if (!state) return;
@@ -264,7 +239,7 @@ namespace rpp
             {
                 if (retrieved && !state->value && !state->error)
                     state->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
-                state->finish(library);
+                state->finish(inline_next);
             }
             state->release();
             state = nullptr;
@@ -274,11 +249,13 @@ namespace rpp
 
     namespace detail
     {
-        /// A promise of the library. With `inline_next`, it runs the next step inline when it publishes on a pool step
+        /// The promise of a step. On a pool step, it runs the next step inline when it publishes
         template<class T>
         struct step_promise : promise<T>
         {
-            explicit step_promise(bool inline_next = true) { this->library = inline_next; }
+            explicit step_promise(bool pool_step = true) { this->inline_next = pool_step; }
+            using promise<T>::store;
+            using promise<T>::publish;
         };
 
         /// Holds the body of a step, built in place from what `make()` returns, until reset() destroys it
@@ -327,23 +304,13 @@ namespace rpp
                 std::exception_ptr error; // publishes after the catch ends, so this thread keeps no reference, see BUGS.md C32
                 try
                 {
-                    if constexpr (std::is_void_v<R>)
-                    {
-                        slot.body(input);
-                        slot.reset(); // the owner of the step frees it late, so the body ends before the publish
-                        output.set_value();
-                    }
-                    else
-                    {
-                        R result = slot.body(input);
-                        slot.reset();
-                        output.set_value(std::move(result));
-                    }
+                    if constexpr (std::is_void_v<R>) { slot.body(input); output.store(); }
+                    else output.store(slot.body(input));
                 }
                 catch (...) { error = std::current_exception(); }
-                slot.reset();
-                if (error)
-                    output.set_exception(std::exchange(error, nullptr));
+                slot.reset(); // the owner of the step frees it late, so the body ends before the publish
+                if (error) output.set_exception(std::exchange(error, nullptr));
+                else output.publish();
             }
         };
 
@@ -377,30 +344,9 @@ namespace rpp
         {
             return new loop_step_node<Loop, In, R, std::invoke_result_t<const Make&>>{loop, std::move(in), std::move(out), make};
         }
-    }
 
-
-    /**
-     * Runs `task` on the rpp::thread_pool. The step moves a temporary `task` once.
-     * @returns a future which receives the return value of `task`, or the exception it throws
-     */
-    template<typename Task>
-    RPP_CORO_WRAPPER auto async(Task task) noexcept -> future<task_return_t<Task>>
-    {
-        using R = task_return_t<Task>;
-        detail::step_promise<R> p;
-        future<R> f = p.get_future();
-        detail::make_step(detail::no_input{}, std::move(p), [&] {
-            return [task=std::move(task)](detail::no_input&) mutable -> R { return task(); };
-        })->start(false);
-        return f;
-    }
-
-
-    namespace detail
-    {
         /// Coroutine hooks of future<T>. ~promise() publishes after the locals end, but before the parameters do.
-        /// So this is no promise of the library, and the next step starts as a pool task outside the frame
+        /// So it keeps `inline_next` false, and the next step starts as a pool task outside the frame
         template<class T>
         struct coro_promise_base : promise<T>
         {
@@ -424,6 +370,40 @@ namespace rpp
         {
             void return_void() noexcept { this->state->value.emplace(); }
         };
+
+        template<class T, class Task>
+        using step_result = std::conditional_t<std::is_void_v<T>, std::invoke_result<Task&>, std::invoke_result<Task&, T>>;
+
+        /// The decayed result of a step. It has no type when `Task` cannot take the result
+        template<class T, class Task>
+        using next_t = std::decay_t<typename step_result<T, Task>::type>;
+
+        /// Rethrows `e`, because no handler takes it
+        template<class R>
+        R handle(const std::exception_ptr& e) { std::rethrow_exception(e); }
+
+        /// Passes `e` to the first handler whose argument type matches, as a chain of catch blocks does
+        template<class R, class Handler, class... Rest>
+        R handle(const std::exception_ptr& e, Handler& handler, Rest&... rest)
+        {
+            try { std::rethrow_exception(e); }
+            catch (first_arg_type<Handler>& ex)
+            {
+                if constexpr (std::is_void_v<R>) (void)handler(ex);
+                else return handler(ex);
+            }
+            catch (...) { return handle<R>(e, rest...); }
+        }
+
+        /// Passes `e` to the first handler which matches, and logs a warning when no handler takes it
+        /// @note LogError() asserts in a debug build, which stops the program
+        template<class... Handlers>
+        void handle_or_log(const std::exception_ptr& e, Handlers&... handlers) noexcept
+        {
+            try { handle<void>(e, handlers...); }
+            catch (const std::exception& ex) { LogWarning("continue_with() ignores an unhandled exception: %s", ex.what()); }
+            catch (...) { LogWarning("continue_with() ignores an unhandled exception of an unknown type"); }
+        }
     }
 
 
@@ -557,7 +537,7 @@ namespace rpp
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
         auto then(Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
         {
-            return chain<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); });
+            return add_step<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); });
         }
 
         /// Continues with `task` on the thread of `loop`, as the other then() does on the pool. `loop` must outlive the chain
@@ -565,14 +545,14 @@ namespace rpp
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
         auto then(Loop& loop RPP_LIFETIMEBOUND, Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
         {
-            return chain<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); }, loop);
+            return add_step<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); }, loop);
         }
 
         /// Follows this future with `next`, and parks no thread. @returns a future which receives the result of `next`
         template<typename U>
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND auto then(future<U>&& next) noexcept -> future<U>
         {
-            return forward_after(std::move(next), true);
+            return forward_after(std::move(next), /*stop_on_error*/true);
         }
 
         /**
@@ -584,7 +564,7 @@ namespace rpp
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<void> then() noexcept
         {
             if constexpr (std::is_void_v<T>) return std::move(*this);
-            else return chain<void>([] { return [](future& f) { (void)f.get(); }; });
+            else return add_step<void>([] { return [](future& f) { (void)f.get(); }; });
         }
 
         /// Runs `task` with the result as then() does, and returns no future. This future is invalid afterwards
@@ -592,14 +572,14 @@ namespace rpp
         template<typename Task, typename... Handlers> requires (!IsEventLoop<Task>)
         void continue_with(Task task, Handlers... handlers) noexcept
         {
-            chain<void>([&] { return ignoring_result(std::move(task), std::move(handlers)...); }).detach();
+            add_step<void>([&] { return ignoring_result(std::move(task), std::move(handlers)...); }).detach();
         }
 
         /// Runs `task` with the result on the thread of `loop`, and returns no future. `loop` must outlive the chain
         template<IsEventLoop Loop, typename Task, typename... Handlers>
         void continue_with(Loop& loop, Task task, Handlers... handlers) noexcept
         {
-            chain<void>([&] { return ignoring_result(std::move(task), std::move(handlers)...); }, loop).detach();
+            add_step<void>([&] { return ignoring_result(std::move(task), std::move(handlers)...); }, loop).detach();
         }
 
         /// Abandons the result, so the destructor does not terminate on it. Nobody sees the exception of the result
@@ -622,14 +602,15 @@ namespace rpp
         template<typename Task>
         future& chain_async(Task task) noexcept
         {
-            *this = chain<T>([&] { return after_any_result(std::move(task)); });
+            // a failed task does not stop the chain, so nobody sees its error
+            *this = add_step<T>([&] { return [task=std::move(task)](future& f) mutable -> T { f.detach(); return task(); }; });
             return *this;
         }
 
         /// Chains `next` after this future. An invalid future becomes `next`. @returns this future
         future& chain_async(future&& next) noexcept
         {
-            if (valid()) *this = forward_after(std::move(next), false);
+            if (valid()) *this = forward_after(std::move(next), /*stop_on_error*/false);
             else *this = std::move(next);
             return *this;
         }
@@ -688,21 +669,10 @@ namespace rpp
             };
         }
 
-        // the step of chain_async(): runs `task` after this result, whether the result holds a value or an error
-        template<typename Task>
-        static auto after_any_result(Task&& task)
-        {
-            return [task=std::forward<Task>(task)](future& f) mutable -> T
-            {
-                f.detach(); // a failed task does not stop the chain, so nobody sees its error
-                return task();
-            };
-        }
-
-        // runs the body which `make()` builds on this future after its result arrives. @returns a future of what it returns
+        // after this result arrives, runs the body which `make()` builds. @returns a future of what the body returns
         // the body owns every value which `make` captures by reference, so the future borrows no argument
         template<class R, class Make, class... Loop>
-        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<R> chain(Make make, Loop&... loop) noexcept
+        RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<R> add_step(Make make, Loop&... loop) noexcept
         {
             detail::step_promise<R> p { sizeof...(Loop) == 0 }; // a loop step starts the next step as a pool task
             future<R> next = p.get_future();
@@ -727,7 +697,7 @@ namespace rpp
                 {
                     detail::future_state<U>* ns = n.state; // a result of `n` which is already out publishes on this pool step
                     detail::start_after(ns, detail::make_step(std::move(n), std::move(p), [] {
-                        return [](future<U>& next) -> U { return next.get(); };
+                        return [](future<U>& in) -> U { return in.get(); };
                     }), true);
                 }
                 else
@@ -748,14 +718,32 @@ namespace rpp
                 try { (void)get(); }
                 catch (const std::exception& e) { __assertion_failure("rpp::future<T> dropped an exception: %s", e.what()); }
                 catch (...) { __assertion_failure("rpp::future<T> dropped an exception of an unknown type"); }
-                return; // collected, so only an unready future reaches the terminate below
             }
-            // fail fast: std::future blocks here in silence, and that hides the missing await
-            __assertion_failure("nobody awaited this rpp::future<T> before it ended");
-            std::terminate();
+            else
+            {
+                // fail fast: std::future blocks here in silence, and that hides the missing await
+                __assertion_failure("nobody awaited this rpp::future<T> before it ended");
+                std::terminate();
+            }
         }
     };
 
+
+    /**
+     * Runs `task` on the rpp::thread_pool. The step moves a temporary `task` once.
+     * @returns a future which receives the return value of `task`, or the exception it throws
+     */
+    template<typename Task>
+    RPP_CORO_WRAPPER auto async(Task task) noexcept -> future<task_return_t<Task>>
+    {
+        using R = task_return_t<Task>;
+        detail::step_promise<R> p;
+        future<R> f = p.get_future();
+        detail::make_step(detail::no_input{}, std::move(p), [&] {
+            return [task=std::move(task)](detail::no_input&) mutable -> R { return task(); };
+        })->start(false);
+        return f;
+    }
 
     /// @returns a future which already holds `value`
     template<typename T>
