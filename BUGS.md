@@ -306,6 +306,13 @@ Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
 run. B17 reported on the same commit instead, which is a different race in another test.
 
+A second sighting came on 78c9827, in `ubuntu-cpp23-tsan-clang18` and
+`test_future::cross_thread_exception_propagation`. The detached libc++ `std::async` worker frees
+the exception object in `__cxa_end_catch`. The main thread read `e.what()` of that object at
+`test_future.cpp:91`, and all 658 cases passed. The catch block of the main thread holds a
+reference to the exception, so the free comes after the read. libc++abi is not built with TSAN,
+so TSAN does not see the refcount which orders them.
+
 C31 has the same shape in `rpp::future`. libc++ `__assoc_state::move()` rethrows a copy of
 `__exception_`, so the `std::future` state inside `cfuture` keeps the exception after `get()`.
 
