@@ -279,8 +279,11 @@ in place of the std includes a modules build still writes. That one also needs g
 
 ## 9. Acceptance criteria
 
-1. `rpp::future<T>` passes the `test_future.cpp` case set, ported name for name. Changeset 1
-   meets it. `deferred_future_never_reports_finished` has no port, because no `rpp::future` defers.
+1. `rpp::future<T>` passes the `test_future.cpp` case set. Changeset 1 meets it, with three
+   exceptions. `deferred_future_never_reports_finished` has no port, because no `rpp::future`
+   defers. `invalidates_after_get` covers `basic_async_task`.
+   `continue_with_logs_an_error_of_an_unknown_type` covers
+   `continue_with_on_a_void_future_logs_an_error_of_an_unknown_type`.
 2. `rpp/async.h` includes no `<future>`, which `tools/check_includes.py` reports. No header
    holds both implementations, and `event_loop.h` names no std future at all.
 3. A module consumer target builds `rpp::future` on gcc-14 with `<memory>` live, and it
