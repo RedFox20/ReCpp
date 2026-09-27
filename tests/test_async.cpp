@@ -597,6 +597,12 @@ TestImpl(test_async)
         AssertThrows((void)rpp::async([] { return throws_on_move{}; }).get(), std::runtime_error);
     }
 
+    // ready_future() publishes before it gives its future, so a move which throws leaves no future to terminate on
+    TestCase(ready_future_rethrows_a_move_which_throws)
+    {
+        AssertThrows((void)rpp::ready_future(throws_on_move{}), std::runtime_error);
+    }
+
     // std::promise gives its future after set_value(), and a port from cpromise relies on that order
     TestCase(a_promise_gives_its_future_after_it_published)
     {
