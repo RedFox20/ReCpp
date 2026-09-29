@@ -5,6 +5,9 @@
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <fstream> // use fstream as a baseline file utility to test against
+#if !_MSC_VER
+    #include <fcntl.h> // fcntl, FD_CLOEXEC
+#endif
 using namespace rpp;
 
 TestImpl(test_file_io)
@@ -763,5 +766,69 @@ TestImpl(test_file_io)
         std::string expectedContent(testData.data() + FILE_SIZE - TRUNCATE_SIZE, TRUNCATE_SIZE);
         AssertThat(content, expectedContent);
     }
+
+    // flock() and LockFileEx() lock per open handle, so a second handle in this process conflicts like another process
+    TestCase(file_lock_second_lock_fails_while_first_lives)
+    {
+        file_lock first = file_lock::try_lock(TestFile);
+        AssertTrue(first.is_locked());
+        AssertTrue(file_exists(TestFile));
+    #if !_MSC_VER
+        const int fd_flags = fcntl(int(first.handle), F_GETFD);
+        AssertNotEqual(fd_flags, -1);
+        AssertTrue((fd_flags & FD_CLOEXEC) != 0); // an exec() child must not inherit the lock
+    #endif
+
+        file_lock second = file_lock::try_lock(TestFile);
+        AssertFalse(second.is_locked());
+        AssertTrue(first.is_locked());
+    }
+
+    TestCase(file_lock_relocks_after_first_is_destroyed)
+    {
+        {
+            file_lock first = file_lock::try_lock(TestFile);
+            AssertTrue(first.is_locked());
+        }
+        AssertTrue(file_exists(TestFile));
+        file_lock second = file_lock::try_lock(TestFile);
+        AssertTrue(second.is_locked());
+
+        second.unlock();
+        AssertFalse(second.is_locked());
+        AssertTrue(file_lock::try_lock(TestFile).is_locked());
+    }
+
+    TestCase(file_lock_move_keeps_the_lock)
+    {
+        file_lock first = file_lock::try_lock(TestFile);
+        file_lock moved = std::move(first);
+        AssertFalse(first.is_locked()); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+        AssertTrue(moved.is_locked());
+        AssertFalse(file_lock::try_lock(TestFile).is_locked());
+
+        moved = file_lock{};
+        AssertTrue(file_lock::try_lock(TestFile).is_locked());
+    }
+
+    TestCase(file_lock_fails_in_a_missing_folder)
+    {
+        file_lock lock = file_lock::try_lock(path_combine(TestDir, "missing", "app.lock"));
+        AssertFalse(lock.is_locked());
+    }
+#if RPP_ENABLE_UNICODE
+    TestCase(file_lock_utf16_path_locks_the_same_file_as_utf8)
+    {
+        prepare_unicode_file_paths();
+        file_lock first = file_lock::try_lock(TestUnicodeFile);
+        AssertTrue(first.is_locked());
+        AssertTrue(file_exists(TestUnicodeFile));
+        AssertFalse(file_lock::try_lock(TestUnicodeFile).is_locked());
+        AssertFalse(file_lock::try_lock(TestFile).is_locked());
+
+        first.unlock();
+        AssertTrue(file_lock::try_lock(TestFile).is_locked());
+    }
+#endif
 
 };

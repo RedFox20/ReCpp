@@ -13,6 +13,9 @@
 #if RPP_ANDROID
     #include <jni.h>
 #endif
+#if !_MSC_VER
+    #include <sys/file.h> // flock
+#endif
 
 namespace rpp /* ReCpp */
 {
@@ -581,6 +584,68 @@ namespace rpp /* ReCpp */
             *outModified = s.st_mtime;
             return (int)s.st_size;
         #endif
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    file_lock& file_lock::operator=(file_lock&& other) noexcept
+    {
+        if (this != &other)
+        {
+            unlock();
+            handle = other.handle;
+            other.handle = -1;
+        }
+        return *this;
+    }
+
+    template<StringViewType T>
+    static file_lock TryLockFile(T filename) noexcept
+    {
+        file_lock lock;
+    #if _MSC_VER
+        // the lock handle is not inheritable, so a child process never keeps the lock alive
+        wchar_conv conv { filename };
+        if (!conv) return lock;
+        HANDLE h = CreateFileW(conv.wstr, GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE,
+                               nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (h == INVALID_HANDLE_VALUE) return lock;
+        OVERLAPPED whole_file = {};
+        if (LockFileEx(h, LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY, 0, MAXDWORD, MAXDWORD, &whole_file))
+            lock.handle = reinterpret_cast<intptr_t>(h);
+        else
+            CloseHandle(h);
+    #else
+        // O_CLOEXEC keeps the lock out of a child process, which would hold it after this process ends
+        multibyte_conv conv { filename };
+        if (!conv) return lock;
+        int fd = ::open(conv.cstr, O_RDWR|O_CREAT|O_CLOEXEC, 0644);
+        if (fd == -1) return lock;
+        if (flock(fd, LOCK_EX|LOCK_NB) == 0)
+            lock.handle = fd;
+        else
+            ::close(fd);
+    #endif
+        return lock;
+    }
+
+    file_lock file_lock::try_lock(strview filename) noexcept { return TryLockFile(filename); }
+#if RPP_ENABLE_UNICODE
+    file_lock file_lock::try_lock(ustrview filename) noexcept { return TryLockFile(filename); }
+#endif // RPP_ENABLE_UNICODE
+
+    void file_lock::unlock() noexcept
+    {
+        if (handle == -1) return;
+    #if _MSC_VER
+        HANDLE h = reinterpret_cast<HANDLE>(handle);
+        OVERLAPPED whole_file = {};
+        UnlockFileEx(h, 0, MAXDWORD, MAXDWORD, &whole_file);
+        CloseHandle(h);
+    #else
+        ::close(int(handle)); // closing the only descriptor releases the flock()
+    #endif
+        handle = -1;
     }
 
     ////////////////////////////////////////////////////////////////////////////////

@@ -1,4 +1,4 @@
-<team-rules version="1">
+<team-rules version="2">
 
 # Team rules for coding agents
 
@@ -104,5 +104,7 @@ again before you report. Start every reply with `Claude:`. Do not overexplain.
 3. A wrong finding, or one whose fix has a worse side effect: reply `Claude: wontfix <reason>`.
    Resolve it, unless the repository rule keeps a declined thread open for the owner.
 4. A finding only the owner can decide: reply `Claude: needsinput <question>`, and leave it open.
+5. A comment that states a general rule: add the rule to the repo rule file and to the project review agent in the
+   same PR.
 
 </team-rules>

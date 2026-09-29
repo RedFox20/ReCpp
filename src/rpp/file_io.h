@@ -13,6 +13,7 @@
 #include "strview.h"
 #include "sprint.h"
 #include "paths.h" // included for backwards compatibility
+#include <cstdint> // intptr_t
 #include <ctime> // time_t
 #include <vector>
 
@@ -445,6 +446,46 @@ namespace rpp /* ReCpp */
          * @return Size of the file
          */
         int size_and_time_modified(time_t* outModified) const noexcept;
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief Exclusive OS lock on a local file, which the OS releases when the process ends.
+     *        Linux, Android and macOS use flock(), Windows uses LockFileEx().
+     * @note A fork() child without exec() shares the POSIX lock, so it holds the lock until it ends too.
+     * @code
+     *     rpp::file_lock lock = rpp::file_lock::try_lock("app.lock");
+     *     if (!lock) LogError("another process holds app.lock");
+     * @endcode
+     */
+    struct RPPAPI file_lock
+    {
+        intptr_t handle = -1; // POSIX fd or Windows HANDLE, -1 if not locked
+
+        file_lock() noexcept = default;
+        file_lock(file_lock&& other) noexcept : handle{other.handle} { other.handle = -1; }
+        file_lock& operator=(file_lock&& other) noexcept;
+        ~file_lock() noexcept { unlock(); }
+
+        file_lock(const file_lock&) = delete;
+        file_lock& operator=(const file_lock&) = delete;
+
+        /**
+         * @brief Creates the file if needed and locks it, but never blocks. The lock file stays on disk.
+         * @returns A held lock, or an empty lock if another open handle holds it or the open failed
+         */
+        static file_lock try_lock(strview filename) noexcept;
+    #if RPP_ENABLE_UNICODE
+        static file_lock try_lock(ustrview filename) noexcept;
+    #endif // RPP_ENABLE_UNICODE
+
+        /** @returns TRUE if this object holds the lock */
+        bool is_locked() const noexcept { return handle != -1; }
+        explicit operator bool() const noexcept { return handle != -1; }
+
+        /** @brief Releases the lock and closes the file. Does nothing if not locked */
+        void unlock() noexcept;
     };
 
 
