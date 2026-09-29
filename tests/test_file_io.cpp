@@ -774,7 +774,9 @@ TestImpl(test_file_io)
         AssertTrue(first.is_locked());
         AssertTrue(file_exists(TestFile));
     #if !_MSC_VER
-        AssertTrue(fcntl(int(first.handle), F_GETFD) & FD_CLOEXEC); // a child process must not inherit the lock
+        const int fd_flags = fcntl(int(first.handle), F_GETFD);
+        AssertNotEqual(fd_flags, -1);
+        AssertTrue((fd_flags & FD_CLOEXEC) != 0); // an exec() child must not inherit the lock
     #endif
 
         file_lock second = file_lock::try_lock(TestFile);

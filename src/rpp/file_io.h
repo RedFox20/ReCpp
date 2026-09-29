@@ -453,6 +453,7 @@ namespace rpp /* ReCpp */
     /**
      * @brief Exclusive OS lock on a local file, which the OS releases when the process ends.
      *        Linux, Android and macOS use flock(), Windows uses LockFileEx().
+     * @note A fork() child without exec() shares the POSIX lock, so it holds the lock until it ends too.
      * @code
      *     rpp::file_lock lock = rpp::file_lock::try_lock("app.lock");
      *     if (!lock) LogError("another process holds app.lock");

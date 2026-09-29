@@ -1006,8 +1006,8 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 |-------|-------------|
 | [`load_buffer`](src/rpp/file_io.h#L31) | RAII buffer for loading file contents into memory |
 | [`file`](src/rpp/file_io.h#L94) | Random-access file with read, write, seek, and truncate |
-| [`file_lock`](src/rpp/file_io.h#L461) | Exclusive OS file lock, which the OS releases when the process ends |
-| [`buffer_parser`](src/rpp/file_io.h#L502) | Generic file-backed parser (line, bracket, keyval variants) |
+| [`file_lock`](src/rpp/file_io.h#L462) | Exclusive OS file lock, which the OS releases when the process ends |
+| [`buffer_parser`](src/rpp/file_io.h#L503) | Generic file-backed parser (line, bracket, keyval variants) |
 
 ### file::mode Enum
 
@@ -1074,9 +1074,9 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 
 | Method | Description |
 |--------|-------------|
-| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L477) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed |
-| [`is_locked()`](src/rpp/file_io.h#L480) | True if this object holds the lock |
-| [`unlock()`](src/rpp/file_io.h#L484) | Release the lock and close the file. The destructor calls it |
+| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L478) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed. A `fork()` child without `exec()` shares the lock |
+| [`is_locked()`](src/rpp/file_io.h#L481) / [`operator bool()`](src/rpp/file_io.h#L482) | True if this object holds the lock |
+| [`unlock()`](src/rpp/file_io.h#L485) | Release the lock and close the file. The destructor calls it |
 
 ```cpp
 // one instance per home folder: stop if another process holds the lock
