@@ -289,6 +289,36 @@ TestImpl(test_strview)
         AssertTrue("--help" != rpp::strview{""});
     }
 
+    // a char* such as an argv entry must match the whole C string, and &buf[0] skips the array overload
+    TestCase(mutable_c_string_must_match_its_full_length)
+    {
+        char longer[] = "--homework";
+        char shorter[] = "--ho";
+        char equal[] = "--home";
+        const rpp::strview home = "--home";
+        AssertFalse(home == &longer[0]);
+        AssertTrue(home != &longer[0]);
+        AssertFalse(home == &shorter[0]);
+        AssertTrue(home != &shorter[0]);
+        AssertTrue(home == &equal[0]);
+        AssertFalse(home != &equal[0]);
+    }
+#if RPP_ENABLE_UNICODE
+    TestCase(mutable_utf16_c_string_must_match_its_full_length)
+    {
+        char16_t longer[] = u"--homework";
+        char16_t shorter[] = u"--ho";
+        char16_t equal[] = u"--home";
+        const rpp::ustrview home = u"--home";
+        AssertFalse(home == &longer[0]);
+        AssertTrue(home != &longer[0]);
+        AssertFalse(home == &shorter[0]);
+        AssertTrue(home != &shorter[0]);
+        AssertTrue(home == &equal[0]);
+        AssertFalse(home != &equal[0]);
+    }
+#endif
+
     TestCase(string_compare_less)
     {
         AssertLess(rpp::strview{"aaaa"}, "bbbbbbbb");

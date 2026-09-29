@@ -586,8 +586,8 @@ namespace rpp
         FINLINE bool operator!=(const string_view_t& s) const noexcept { return !equals(s.data(), (int)s.size()); }
         FINLINE bool operator==(const strview& s) const noexcept { return  equals(s.str, s.len); }
         FINLINE bool operator!=(const strview& s) const noexcept { return !equals(s.str, s.len); }
-        FINLINE bool operator==(char* s) const noexcept { return  strequals(s, str, len); }
-        FINLINE bool operator!=(char* s) const noexcept { return !strequals(s, str, len); }
+        FINLINE bool operator==(char* s) const noexcept { return  equals(s, utf8len(s)); }
+        FINLINE bool operator!=(char* s) const noexcept { return !equals(s, utf8len(s)); }
         FINLINE bool operator==(char ch) const noexcept { return len == 1 && *str == ch; }
         FINLINE bool operator!=(char ch) const noexcept { return len != 1 || *str != ch; }
 
@@ -1130,8 +1130,8 @@ namespace rpp
         FINLINE bool operator!=(const string_view_t& s) const noexcept { return !equals(s.data(), (int)s.size()); }
         FINLINE bool operator==(const ustrview& s) const noexcept { return  equals(s.str, s.len); }
         FINLINE bool operator!=(const ustrview& s) const noexcept { return !equals(s.str, s.len); }
-        FINLINE bool operator==(char16_t* s) const noexcept { return  strequals(s, str, len); }
-        FINLINE bool operator!=(char16_t* s) const noexcept { return !strequals(s, str, len); }
+        FINLINE bool operator==(char16_t* s) const noexcept { return  equals(s, utf16len(s)); }
+        FINLINE bool operator!=(char16_t* s) const noexcept { return !equals(s, utf16len(s)); }
         FINLINE bool operator==(char16_t ch) const noexcept { return len == 1 && *str == ch; }
         FINLINE bool operator!=(char16_t ch) const noexcept { return len != 1 || *str != ch; }
 
