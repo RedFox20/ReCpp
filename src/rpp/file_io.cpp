@@ -599,7 +599,8 @@ namespace rpp /* ReCpp */
         return *this;
     }
 
-    file_lock file_lock::try_lock(strview filename) noexcept
+    template<StringViewType T>
+    static file_lock TryLockFile(T filename) noexcept
     {
         file_lock lock;
     #if _MSC_VER
@@ -627,6 +628,11 @@ namespace rpp /* ReCpp */
     #endif
         return lock;
     }
+
+    file_lock file_lock::try_lock(strview filename) noexcept { return TryLockFile(filename); }
+#if RPP_ENABLE_UNICODE
+    file_lock file_lock::try_lock(ustrview filename) noexcept { return TryLockFile(filename); }
+#endif // RPP_ENABLE_UNICODE
 
     void file_lock::unlock() noexcept
     {

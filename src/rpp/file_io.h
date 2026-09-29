@@ -476,6 +476,9 @@ namespace rpp /* ReCpp */
          * @returns A held lock, or an empty lock if another open handle holds it or the open failed
          */
         static file_lock try_lock(strview filename) noexcept;
+    #if RPP_ENABLE_UNICODE
+        static file_lock try_lock(ustrview filename) noexcept;
+    #endif // RPP_ENABLE_UNICODE
 
         /** @returns TRUE if this object holds the lock */
         bool is_locked() const noexcept { return handle != -1; }

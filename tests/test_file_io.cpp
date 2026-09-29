@@ -816,5 +816,19 @@ TestImpl(test_file_io)
         file_lock lock = file_lock::try_lock(path_combine(TestDir, "missing", "app.lock"));
         AssertFalse(lock.is_locked());
     }
+#if RPP_ENABLE_UNICODE
+    TestCase(file_lock_utf16_path_locks_the_same_file_as_utf8)
+    {
+        prepare_unicode_file_paths();
+        file_lock first = file_lock::try_lock(TestUnicodeFile);
+        AssertTrue(first.is_locked());
+        AssertTrue(file_exists(TestUnicodeFile));
+        AssertFalse(file_lock::try_lock(TestUnicodeFile).is_locked());
+        AssertFalse(file_lock::try_lock(TestFile).is_locked());
+
+        first.unlock();
+        AssertTrue(file_lock::try_lock(TestFile).is_locked());
+    }
+#endif
 
 };
