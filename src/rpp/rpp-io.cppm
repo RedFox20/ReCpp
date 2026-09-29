@@ -15,6 +15,7 @@ export module rpp.io;
 export namespace rpp {
     using rpp::load_buffer;
     using rpp::file;
+    using rpp::file_lock;
     using rpp::buffer_parser;
     using rpp::buffer_line_parser;
     using rpp::buffer_bracket_parser;

@@ -1004,70 +1004,85 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 
 | Class | Description |
 |-------|-------------|
-| [`load_buffer`](src/rpp/file_io.h#L30) | RAII buffer for loading file contents into memory |
-| [`file`](src/rpp/file_io.h#L93) | Random-access file with read, write, seek, and truncate |
-| [`buffer_parser`](src/rpp/file_io.h#L465) | Generic file-backed parser (line, bracket, keyval variants) |
+| [`load_buffer`](src/rpp/file_io.h#L31) | RAII buffer for loading file contents into memory |
+| [`file`](src/rpp/file_io.h#L94) | Random-access file with read, write, seek, and truncate |
+| [`file_lock`](src/rpp/file_io.h#L461) | Exclusive OS file lock, which the OS releases when the process ends |
+| [`buffer_parser`](src/rpp/file_io.h#L502) | Generic file-backed parser (line, bracket, keyval variants) |
 
 ### file::mode Enum
 
 | Value | Description |
 |-------|-------------|
-| [`READONLY`](src/rpp/file_io.h#L96) | Open for reading only |
-| [`READWRITE`](src/rpp/file_io.h#L97) | Open for reading and writing |
-| [`CREATENEW`](src/rpp/file_io.h#L98) | Create a new file (truncates existing) |
-| [`APPEND`](src/rpp/file_io.h#L99) | Open for appending |
+| [`READONLY`](src/rpp/file_io.h#L97) | Open for reading only |
+| [`READWRITE`](src/rpp/file_io.h#L98) | Open for reading and writing |
+| [`CREATENEW`](src/rpp/file_io.h#L99) | Create a new file (truncates existing) |
+| [`APPEND`](src/rpp/file_io.h#L100) | Open for appending |
 
 ### load_buffer Methods
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](src/rpp/file_io.h#L50) | Size of the loaded data |
-| [`data()`](src/rpp/file_io.h#L52) | Pointer to the data |
-| [`c_str()`](src/rpp/file_io.h#L53) | Null-terminated C string |
-| [`view()`](src/rpp/file_io.h#L56) | Get a `strview` over the buffer |
-| [`steal_ptr()`](src/rpp/file_io.h#L47) | Release ownership of the buffer |
-| [`operator bool()`](src/rpp/file_io.h#L54) | True if buffer contains data |
+| [`size()`](src/rpp/file_io.h#L51) | Size of the loaded data |
+| [`data()`](src/rpp/file_io.h#L53) | Pointer to the data |
+| [`c_str()`](src/rpp/file_io.h#L54) | Null-terminated C string |
+| [`view()`](src/rpp/file_io.h#L57) | Get a `strview` over the buffer |
+| [`steal_ptr()`](src/rpp/file_io.h#L48) | Release ownership of the buffer |
+| [`operator bool()`](src/rpp/file_io.h#L55) | True if buffer contains data |
 
 ### file Methods
 
 | Method | Description |
 |--------|-------------|
-| [`open(strview filename, mode openMode)`](src/rpp/file_io.h#L141) | Open a file using an UTF-8 filepath (internally converted to ustring) |
-| [`open(ustrview filename, mode openMode)`](src/rpp/file_io.h#L143) | Open a file using an UTF-16 filepath |
-| [`close()`](src/rpp/file_io.h#L145) | Close the file |
-| [`good()`](src/rpp/file_io.h#L150) / [`is_open()`](src/rpp/file_io.h#L152) | True if file is open and valid |
-| [`bad()`](src/rpp/file_io.h#L162) | True if file is not open |
-| [`size()`](src/rpp/file_io.h#L167) / [`sizel()`](src/rpp/file_io.h#L172) | File size (32-bit / 64-bit) |
-| [`read(void* buffer, int bytesToRead)`](src/rpp/file_io.h#L182) | Read bytes into buffer |
-| [`read_all()`](src/rpp/file_io.h#L197) | Read entire file as `load_buffer` |
-| [`read_text()`](src/rpp/file_io.h#L202) | Read entire file as `std::string` |
-| [`write(const void* buffer, int bytesToWrite)`](src/rpp/file_io.h#L248) | Write bytes from buffer |
-| [`writef(const char* format, ...)`](src/rpp/file_io.h#L280) | Printf-style write |
-| [`writeln(strview str)`](src/rpp/file_io.h#L285) | Write line with newline |
-| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L409) | Seek to filepos |
-| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L410) | Seek to 64-bit filepos |
-| [`tell()`](src/rpp/file_io.h#L415) | Tell file position |
-| [`tell64()`](src/rpp/file_io.h#L420) | Tell 64-bit file position |
-| [`flush()`](src/rpp/file_io.h#L352) | Flush buffered writes |
-| [`truncate(int64 size)`](src/rpp/file_io.h#L337) | Truncate file to size |
-| [`truncate_front(int64 bytes)`](src/rpp/file_io.h#L323) | Remove bytes from front |
-| [`truncate_end(int64 bytes)`](src/rpp/file_io.h#L331) | Remove bytes from end |
-| [`preallocate(int64 size)`](src/rpp/file_io.h#L346) | Preallocate file space |
-| [`save_as(const char* newPath)`](src/rpp/file_io.h#L208) | Copy contents to a new file |
-| [`time_created()`](src/rpp/file_io.h#L430) | File creation time |
-| [`time_accessed()`](src/rpp/file_io.h#L435) | Last access time |
-| [`time_modified()`](src/rpp/file_io.h#L440) | Last modification time |
+| [`open(strview filename, mode openMode)`](src/rpp/file_io.h#L142) | Open a file using an UTF-8 filepath (internally converted to ustring) |
+| [`open(ustrview filename, mode openMode)`](src/rpp/file_io.h#L144) | Open a file using an UTF-16 filepath |
+| [`close()`](src/rpp/file_io.h#L146) | Close the file |
+| [`good()`](src/rpp/file_io.h#L151) / [`is_open()`](src/rpp/file_io.h#L153) | True if file is open and valid |
+| [`bad()`](src/rpp/file_io.h#L163) | True if file is not open |
+| [`size()`](src/rpp/file_io.h#L168) / [`sizel()`](src/rpp/file_io.h#L173) | File size (32-bit / 64-bit) |
+| [`read(void* buffer, int bytesToRead)`](src/rpp/file_io.h#L183) | Read bytes into buffer |
+| [`read_all()`](src/rpp/file_io.h#L198) | Read entire file as `load_buffer` |
+| [`read_text()`](src/rpp/file_io.h#L203) | Read entire file as `std::string` |
+| [`write(const void* buffer, int bytesToWrite)`](src/rpp/file_io.h#L249) | Write bytes from buffer |
+| [`writef(const char* format, ...)`](src/rpp/file_io.h#L281) | Printf-style write |
+| [`writeln(strview str)`](src/rpp/file_io.h#L286) | Write line with newline |
+| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L410) | Seek to filepos |
+| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L411) | Seek to 64-bit filepos |
+| [`tell()`](src/rpp/file_io.h#L416) | Tell file position |
+| [`tell64()`](src/rpp/file_io.h#L421) | Tell 64-bit file position |
+| [`flush()`](src/rpp/file_io.h#L353) | Flush buffered writes |
+| [`truncate(int64 size)`](src/rpp/file_io.h#L338) | Truncate file to size |
+| [`truncate_front(int64 bytes)`](src/rpp/file_io.h#L324) | Remove bytes from front |
+| [`truncate_end(int64 bytes)`](src/rpp/file_io.h#L332) | Remove bytes from end |
+| [`preallocate(int64 size)`](src/rpp/file_io.h#L347) | Preallocate file space |
+| [`save_as(const char* newPath)`](src/rpp/file_io.h#L209) | Copy contents to a new file |
+| [`time_created()`](src/rpp/file_io.h#L431) | File creation time |
+| [`time_accessed()`](src/rpp/file_io.h#L436) | Last access time |
+| [`time_modified()`](src/rpp/file_io.h#L441) | Last modification time |
 
 ### file Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`file::read_all(strview filename)`](src/rpp/file_io.h#L214) | Read entire file into `load_buffer` |
-| [`file::read_all(ustrview filename)`](src/rpp/file_io.h#L219) | Read entire file into `load_buffer` |
-| [`file::read_all_text(strview filename)`](src/rpp/file_io.h#L229) | Read entire file as `std::string` |
-| [`file::read_all_text(ustrview filename)`](src/rpp/file_io.h#L234) | Read entire file as `std::string` |
-| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L365) | Create/overwrite file with data |
-| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L379) | Create/overwrite file with data |
+| [`file::read_all(strview filename)`](src/rpp/file_io.h#L215) | Read entire file into `load_buffer` |
+| [`file::read_all(ustrview filename)`](src/rpp/file_io.h#L220) | Read entire file into `load_buffer` |
+| [`file::read_all_text(strview filename)`](src/rpp/file_io.h#L230) | Read entire file as `std::string` |
+| [`file::read_all_text(ustrview filename)`](src/rpp/file_io.h#L235) | Read entire file as `std::string` |
+| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L366) | Create/overwrite file with data |
+| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L380) | Create/overwrite file with data |
+
+### file_lock Methods
+
+| Method | Description |
+|--------|-------------|
+| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L477) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed |
+| [`is_locked()`](src/rpp/file_io.h#L480) | True if this object holds the lock |
+| [`unlock()`](src/rpp/file_io.h#L484) | Release the lock and close the file. The destructor calls it |
+
+```cpp
+// one instance per home folder: stop if another process holds the lock
+rpp::file_lock lock = rpp::file_lock::try_lock(rpp::path_combine(home, "app.lock"));
+if (!lock) { LogError("another process uses %s", home); return 1; }
+```
 
 ### Example using file_io for reading and writing files:
 
