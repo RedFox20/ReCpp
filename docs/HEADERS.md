@@ -11,6 +11,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `file_io.h` | Cross-platform file read and write, RAII file handles |
 | `paths.h` | Path manipulation, directory listing, filesystem helpers |
 | `delegate.h` | Fast function delegates and multicast events |
+| `async.h` | Composable futures which own their shared state, with no `<future>` include |
 | `future.h` | Composable futures with continuations and coroutines |
 | `future_types.h` | Supporting types for futures |
 | `coroutines.h` | C++20 coroutine awaiters and co_await operators |

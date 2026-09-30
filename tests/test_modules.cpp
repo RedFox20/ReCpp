@@ -541,6 +541,25 @@ TestImpl(test_modules)
         AssertThat(t.done(), true);
         AssertThat(t.await_ready(), true);
     }
+
+    // a coroutine which returns the module future proves that its promise_type reaches the importer
+    static rpp::future<int> module_future() { co_return 7; }
+
+    TestCase(async_module_carries_the_whole_surface)
+    {
+        rpp::future<int> launched = rpp::async([] { return 40; });
+        rpp::future<int> chained = launched.then([](int x) { return x + 2; });
+        AssertThat(chained.get(), 42);
+        AssertThat(module_future().get(), 7);
+
+        rpp::promise<void> p;
+        std::vector<rpp::future<void>> all;
+        all.push_back(p.get_future());
+        all.push_back(rpp::ready_future());
+        p.set_value();
+        rpp::get_all(all);
+        AssertThrows((void)rpp::exceptional_future<int>(std::runtime_error{"module"}).get(), std::runtime_error);
+    }
 };
 
 #endif // RPP_BUILD_WITH_MODULES

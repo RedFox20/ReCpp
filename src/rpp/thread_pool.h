@@ -9,6 +9,7 @@
 #include "config.h"
 #include "threads.h"
 #include "semaphore.h"
+#include "future_types.h" // rpp::wait_result
 #include "delegate.h"
 #include "strview.h"
 #include "mutex.h"
@@ -109,13 +110,6 @@ namespace rpp
 
 
     //////////////////////////////////////////////////////////////////////////////////////////
-
-    enum class wait_result : int
-    {
-        finished, // task finished successfully
-        timeout,  // waiting on task timed out
-        deferred, // the task runs on get(), so no wait can finish it
-    };
 
     class pool_worker;
 

@@ -309,6 +309,15 @@ TestImpl(test_semaphore)
         notifier.join();
     }
 
+    // condition_variable::wait_until() treats a deadline past 15 s as a clock mismatch
+    TestCase(a_wait_past_15_seconds_returns_on_notify)
+    {
+        rpp::semaphore sem;
+        std::thread notifier([&] { rpp::sleep_ms(5); sem.notify(); });
+        AssertEqual(sem.wait(rpp::seconds(20)), rpp::semaphore::notified); // the notify releases it, the timeout is past the cap
+        notifier.join();
+    }
+
     TestCase(wait_zero_timeout_returns_immediately)
     {
         rpp::semaphore sem;
