@@ -37,7 +37,13 @@
 #  include <sys/mman.h>
 #  include <fcntl.h>
 #endif
-
+#if __EMSCRIPTEN__
+#  include <emscripten/em_js.h>
+// a browser has no `process`, so only node reports a platform here
+EM_JS(int, rpp_test_host_is_win32, (), {
+    return typeof process !== 'undefined' && process.platform === 'win32';
+});
+#endif
 
 namespace rpp
 {
@@ -98,8 +104,8 @@ namespace rpp
                 shared_mem = new shared();
                 shared_mem->initialized = 1;
                 return shared_mem->stored_object;
-            #elif RPP_BARE_METAL
-                // no shared memory on bare-metal, just use a normal static variable
+            #elif RPP_BARE_METAL || __EMSCRIPTEN__
+                // no shared memory on bare-metal or in the browser, just use a normal static variable
                 static shared local_shared;
                 shared_mem = &local_shared;
             #else
@@ -151,7 +157,7 @@ namespace rpp
                 handle = INVALID_HANDLE_VALUE;
             #elif RPP_ANDROID
                 delete shared_mem;
-            #elif RPP_BARE_METAL
+            #elif RPP_BARE_METAL || __EMSCRIPTEN__
                 // nothing to unmap on bare-metal
             #else // _WIN32
                 munmap(shared_mem, sizeof(shared));
@@ -787,6 +793,16 @@ namespace rpp
         static const bool ci = std::getenv("CIRCLECI") != nullptr
                             || std::getenv("CI") != nullptr;
         return ci;
+    }
+
+    bool test::has_coarse_timer() noexcept
+    {
+    #if __EMSCRIPTEN__ // native Windows raises the tick with timeBeginPeriod(1), node never does
+        static const bool coarse = rpp_test_host_is_win32() != 0;
+        return coarse;
+    #else
+        return false;
+    #endif
     }
 
     void test::spin_sleep_for(double seconds, bool full_spin) noexcept

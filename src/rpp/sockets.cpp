@@ -53,7 +53,9 @@
         #include <sys/fcntl.h>      // fcntl()
     #endif
     #include <poll.h> // poll()
-    #include <linux/sockios.h>      // SIOCOUTQ (get send queue size)
+    #if __has_include(<linux/sockios.h>) // Emscripten has none
+        #include <linux/sockios.h>  // SIOCOUTQ (get send queue size)
+    #endif
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
     // on Android this requires API level 24
     #if RPP_ANDROID && __ANDROID_API__ < 24

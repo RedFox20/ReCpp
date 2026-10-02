@@ -373,7 +373,7 @@ namespace rpp
             struct VTable {
                 void* entries[16]; // size is pseudo, mainly for gdb
             };
-        #if defined(__arm__) || defined(__aarch64__)
+        #if defined(__arm__) || defined(__aarch64__) || defined(__wasm__) // wasm: table index 1 is a valid function
             // ARM C++ ABI variant: virtual flag is in adj field (adj & 1),
             // ptr is the raw vtable byte offset (NOT +1 like Itanium)
             struct VCallThunk {

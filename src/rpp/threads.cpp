@@ -6,12 +6,15 @@
 # include <vector>
 # include "file_io.h" // rpp::file::read_all_text, reading the cgroup CPU quota
 # include "minmax.h"  // rpp::max
-# if __APPLE__ || __linux__
+# if __APPLE__ || __linux__ || __EMSCRIPTEN__
 #  include <pthread.h>
 #  include <unistd.h> // getpid()
 # endif
 # if __linux__
 #  include <sched.h> // sched_getaffinity
+# endif
+# if __EMSCRIPTEN__
+#  include <emscripten/threading.h> // emscripten_set_thread_name
 # endif
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,6 +85,11 @@ namespace rpp
             memcpy(threadName, name.data(), n);
             #if __APPLE__
                 int r = pthread_setname_np(threadName);
+            #elif __EMSCRIPTEN__ // no pthread_setname_np, the name only reaches the browser dev tools
+                #if __EMSCRIPTEN_PTHREADS__ // the single-thread libc has no emscripten_set_thread_name
+                    emscripten_set_thread_name(pthread_self(), threadName);
+                #endif
+                int r = 0;
             #else
                 int r = pthread_setname_np(pthread_self(), threadName);
             #endif
@@ -114,6 +122,8 @@ namespace rpp
                 }
                 CloseHandle(thread_handle);
             }
+        #elif __EMSCRIPTEN__
+            // no pthread_getname_np: the name stays empty
         #else
             char name[64];
             if (pthread_getname_np(static_cast<pthread_t>(thread_id), name, sizeof(name)) == 0)

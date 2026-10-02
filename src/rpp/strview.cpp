@@ -12,6 +12,7 @@
 #include <cstring> // memcpy
 #include <locale> // toupper
 #include <cfloat> // DBL_MAX
+#include <cstdint> // UINT64_MAX
 #include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
 
@@ -1014,7 +1015,9 @@ namespace rpp
         double i = maxDecimals == 0 ? round(f) : // NOLINT(readability-avoid-nested-conditional-operator)
                            f < -0.0 ? ceil(f)  : // NOLINT(readability-avoid-nested-conditional-operator)
                                       floor(f) ; // NOLINT(readability-avoid-nested-conditional-operator)
-        uint64 absIntegral = (int64)abs(i);
+        // a cast of a double >= 2^64 is undefined: x86 gives 2^63 and ARM and wasm saturate
+        double absI = abs(i);
+        uint64 absIntegral = absI >= 18446744073709551616.0 ? UINT64_MAX : uint64(absI);
 
         char* end = buffer;
         if (f < -0.0) {

@@ -773,7 +773,11 @@ namespace rpp
                     /*TAI*/            CLOCK_REALTIME,
                 #endif
                     CLOCK_MONOTONIC,
+                #if __EMSCRIPTEN__ // its clock_gettime() fails every id above CLOCK_THREAD_CPUTIME_ID
+                    /*MonotonicRaw*/ CLOCK_MONOTONIC,
+                #else
                     CLOCK_MONOTONIC_RAW,
+                #endif
                 #if __linux__ || RPP_ANDROID
                     /*MonotonicCoarse*/ CLOCK_MONOTONIC_COARSE,
                     /*Boottime*/        CLOCK_BOOTTIME,

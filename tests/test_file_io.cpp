@@ -228,6 +228,31 @@ TestImpl(test_file_io)
         Assert(!folder_exists(TestDir));
     }
 
+    // no parent on the path exists, so create_folder() starts at the root slash
+    TestCase(create_folder_with_no_existing_parent)
+    {
+    #if _MSC_VER || __EMSCRIPTEN__ // only here can a user write to the root folder
+        const std::string root_dir = "/_rpp_test_root_dir";
+        if (folder_exists(root_dir))
+            delete_folder(root_dir, delete_mode::recursive);
+        AssertTrue(create_folder(root_dir + "/sub"));
+        AssertTrue(folder_exists(root_dir + "/sub"));
+        AssertTrue(delete_folder(root_dir, delete_mode::recursive));
+    #endif
+    }
+
+    TestCase(preallocate_extends_the_file)
+    {
+        file f { TestFile, file::CREATENEW };
+        AssertTrue(f.good());
+    #if _MSC_VER
+        AssertFalse(f.preallocate(4096)); // not implemented on Windows
+    #else
+        AssertTrue(f.preallocate(4096));
+        AssertThat(f.size(), 4096);
+    #endif
+    }
+
 #if RPP_ENABLE_UNICODE
     TestCase(create_delete_folder_utf16)
     {
@@ -628,6 +653,7 @@ TestImpl(test_file_io)
         AssertThat(last(home_dir()), '/');
     }
 
+#if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // test_obfuscated_string scans this file for plaintext, so it must name a real executable
     TestCase(module_path_names_the_running_executable)
     {
@@ -637,6 +663,7 @@ TestImpl(test_file_io)
         AssertGreater(file_size(exe), 0);
         AssertThat(module_dir(), folder_path(strview{exe}));
     }
+#endif
 
     // validate that UTF16 file paths work correctly
     TestCase(can_handle_utf8_file_paths)
@@ -767,6 +794,7 @@ TestImpl(test_file_io)
         AssertThat(content, expectedContent);
     }
 
+#if !__EMSCRIPTEN__ // flock() is a no-op stub there, so a second lock always succeeds
     // flock() and LockFileEx() lock per open handle, so a second handle in this process conflicts like another process
     TestCase(file_lock_second_lock_fails_while_first_lives)
     {
@@ -783,6 +811,7 @@ TestImpl(test_file_io)
         AssertFalse(second.is_locked());
         AssertTrue(first.is_locked());
     }
+#endif
 
     TestCase(file_lock_relocks_after_first_is_destroyed)
     {
@@ -805,7 +834,9 @@ TestImpl(test_file_io)
         file_lock moved = std::move(first);
         AssertFalse(first.is_locked()); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
         AssertTrue(moved.is_locked());
+    #if !__EMSCRIPTEN__ // flock() is a no-op stub there
         AssertFalse(file_lock::try_lock(TestFile).is_locked());
+    #endif
 
         moved = file_lock{};
         AssertTrue(file_lock::try_lock(TestFile).is_locked());

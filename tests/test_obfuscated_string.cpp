@@ -20,6 +20,7 @@ TestImpl(test_obfuscated_string)
         return image.find(plaintext) != std::string_view::npos;
     }
 
+#if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // reads the running executable, so the needle must never appear as a literal in this file
     static bool binary_holds(const std::string& needle)
     {
@@ -39,6 +40,7 @@ TestImpl(test_obfuscated_string)
         AssertEqual((int)secret.size(), 26);
         AssertFalse(binary_holds(secret));
     }
+#endif
 
     TestCase(round_trips_through_the_scrambled_bytes)
     {
