@@ -105,9 +105,10 @@ namespace rpp
                 shared_mem->initialized = 1;
                 return shared_mem->stored_object;
             #elif RPP_BARE_METAL || __EMSCRIPTEN__
-                // no shared memory on bare-metal or in the browser, just use a normal static variable
-                static shared local_shared;
-                shared_mem = &local_shared;
+                // no shared memory on bare-metal or in the browser, so a zeroed static buffer stands in for the mapping
+                // raw storage has no static destructor, so only unmap() destroys T
+                alignas(shared) static char local_shared[sizeof(shared)];
+                shared_mem = reinterpret_cast<shared*>(local_shared);
             #else
                 std::string name = "/rpp_tests_state_"s + rpp::to_string(getpid());
                 #if RPP_ANDROID
