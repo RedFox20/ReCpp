@@ -168,6 +168,7 @@ TestImpl(test_threadpool)
         return (int)ids.size();
     }
 
+#if !__EMSCRIPTEN__ // no pthread_getname_np
     TestCase(basic_thread_utils)
     {
         rpp::set_this_thread_name("TestThread");
@@ -178,6 +179,7 @@ TestImpl(test_threadpool)
         print_info("Current thread name: '%s' (expected: 'AnotherName')\n", rpp::get_this_thread_name().c_str());
         AssertThat(rpp::get_this_thread_name(), "AnotherName");
     }
+#endif
 
     // A container caps CPU with a cgroup quota or an affinity mask, and hardware_concurrency()
     // sees neither. Runs on every platform, because the cap is simply absent on most.
@@ -361,8 +363,8 @@ TestImpl(test_threadpool)
         }
         else
         {
-            // no point running this under ASAN/TSAN/UBSAN, it will most likely always fail
-            #if !RPP_SANITIZERS
+            // no point running this under ASAN/TSAN/UBSAN or wasm workers, it will most likely always fail
+            #if !RPP_SANITIZERS && !__EMSCRIPTEN__
                 // num_physical_cores() reports the host cores, not the cores a container gets,
                 // so the pool oversubscribes and parallel_for loses to serial. See issue #60.
                 if (!is_ci_machine())

@@ -11,6 +11,7 @@
 using namespace rpp;
 using namespace std::string_literals;
 
+#if !__EMSCRIPTEN__ // Emscripten sockets emulate TCP over WebSocket, and listen() needs the node 'ws' package
 TestImpl(test_sockets)
 {
     //////////////////////////////////////////////////////////////////
@@ -1296,3 +1297,4 @@ TestImpl(test_sockets)
 
     //////////////////////////////////////////////////////////////////
 };
+#endif // !__EMSCRIPTEN__

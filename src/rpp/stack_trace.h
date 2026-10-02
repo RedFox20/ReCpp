@@ -5,6 +5,7 @@
  */
 #include "config.h"
 #include "strview.h"
+#include <new> // std::nothrow_t
 #include <stdexcept>
 #include <string>
 #include <vector>

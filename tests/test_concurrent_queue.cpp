@@ -347,6 +347,7 @@ TestImpl(test_concurrent_queue)
     // wait infinitely until an item is pushed
     TestCase(wait_pop_with_timeout)
     {
+        if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         concurrent_queue<std::string> queue;
 
         PopResult r;
@@ -380,6 +381,7 @@ TestImpl(test_concurrent_queue)
     // introduce a slow producer thread so we can test our timeouts
     TestCase(wait_pop_with_timeout_slow_producer)
     {
+        if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
             queue.barrier_push_after_delay_ms("item1", 10);
@@ -428,6 +430,7 @@ TestImpl(test_concurrent_queue)
     // wait until an absolute time limit
     TestCase(wait_pop_until)
     {
+        if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         concurrent_queue<std::string> queue;
 
         PopResult r;
@@ -460,6 +463,7 @@ TestImpl(test_concurrent_queue)
     // ensure that `wait_pop_until` gives up if timeout is reached
     TestCase(wait_pop_until_stops_on_timeout)
     {
+        if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
             queue.barrier_push_after_delay_ms("item1", 5);
@@ -656,6 +660,7 @@ TestImpl(test_concurrent_queue)
     // with sufficient frequency
     TestCase(wait_pop_interval)
     {
+        if (has_coarse_timer()) return; // the coarse tick overshoots these intervals
         producer_queue queue;
         rpp::cfuture<> slow_producer = rpp::async_task([&] {
             queue.barrier_push_after_delay_ms("item1", 10);

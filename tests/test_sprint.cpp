@@ -274,12 +274,7 @@ TestImpl(test_sprint)
         sb.separator = ";";
         sb.write(x, y);
         //println("big_doubles:", sb.view());
-    #if YOCTO_LINUX || RPP_ANDROID
-        // ARMv8 rounds stuff differently
-        AssertThat(sb.view(), "9223372036854775807;-9223372036854775807");
-    #else
-        AssertThat(sb.view(), "9223372036854775808;-9223372036854775808");
-    #endif
+        AssertThat(sb.view(), "18446744073709551615;-18446744073709551615");
     }
 
     TestCase(float_edge_cases)
@@ -292,12 +287,7 @@ TestImpl(test_sprint)
         sb.separator = ";";
         sb.write(x, y, z, w);
         //println("float_edge_case:", sb.view());
-    #if YOCTO_LINUX || RPP_ANDROID
-        // ARMv8 rounds stuff differently
-        AssertThat(sb.view(), "9223372036854775807;-9223372036854775807;0.0;-0.0");
-    #else
-        AssertThat(sb.view(), "9223372036854775808;-9223372036854775808;0.0;-0.0");
-    #endif
+        AssertThat(sb.view(), "18446744073709551615;-18446744073709551615;0.0;-0.0");
     }
 
     TestCase(write_real_precision)

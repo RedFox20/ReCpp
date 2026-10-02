@@ -416,7 +416,12 @@ namespace rpp /* ReCpp */
     #else
         constexpr int64 SMALL_BLOCK_SIZE = 512LL * 1024LL;
     #endif
-        uint8_t buf[SMALL_BLOCK_SIZE];
+        // on the heap: an Emscripten thread stack is only 64 KB
+        auto* buf = static_cast<uint8_t*>(malloc(size_t(SMALL_BLOCK_SIZE)));
+        if (!buf) {
+            LogError("file::truncate_front_sb failed: no memory for the copy buffer");
+            return;
+        }
         int64 readPos = len - newLength;
         int64 writePos = 0;
         while (readPos < len)
@@ -432,6 +437,7 @@ namespace rpp /* ReCpp */
             readPos += bytesRead;
             writePos += bytesRead;
         }
+        free(buf);
 
         // Only truncate if we successfully copied the full newLength bytes
         if (writePos == newLength)
@@ -474,7 +480,11 @@ namespace rpp /* ReCpp */
         int fd = fileno((FILE*)Handle);
         if (fd < 0)
             return false; // invalid file descriptor
+    #if __EMSCRIPTEN__ // posix_fallocate only, the same as fallocate mode 0
+        if (posix_fallocate(fd, 0, preallocSize) != 0)
+    #else
         if (fallocate(fd, 0, 0, preallocSize) != 0)
+    #endif
             return false; // preallocation failed
         seekl(seekPos, seekMode);
         return true; // preallocation succeeded
