@@ -1345,8 +1345,10 @@ TestImpl(test_sockets)
         socket arp = socket::make_arp(lo);
         if (arp.bad())
         {
-            AssertEqual(arp.last_errno(), EPERM); // a packet socket needs CAP_NET_RAW
-            print_info("no CAP_NET_RAW, so the case checks only EPERM\n");
+            // EPERM without CAP_NET_RAW, EAFNOSUPPORT from a kernel without packet sockets
+            print_info("make_arp failed: %s, so the case checks only the error\n", arp.last_err().c_str());
+            const bool documented_error = arp.last_errno() == EPERM || arp.last_errno() == EAFNOSUPPORT;
+            AssertTrue(documented_error);
             return;
         }
 

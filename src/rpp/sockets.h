@@ -125,7 +125,7 @@ namespace rpp
         // manually initialize address from an IPv4 integer address
         raw_address(address_family af, uint32_t ipv4) noexcept;
 
-        // an IPv4 address from its octets in the written order, such as raw_address{192, 168, 1, 10}
+        /// @brief An IPv4 address from its octets in the written order, such as raw_address{192, 168, 1, 10}
         raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept;
 
         // manually initialize an IPv6 address
