@@ -1354,7 +1354,8 @@ TestImpl(test_sockets)
 
         AssertTrue(arp.send_arp_request(raw_address{192, 0, 2, 7})); // RFC 5737, no host answers it
         uint8_t frame[28] = {};
-        AssertEqual(arp.recv_timeout(frame, sizeof(frame), 1000), (int)sizeof(frame)); // a hang guard, lo loops back at once
+        // a hang guard: lo queues the frame back to this socket inside sendto(), so the wait ends at once
+        AssertEqual(arp.recv_timeout(frame, sizeof(frame), 50), (int)sizeof(frame));
         const uint8_t request[28] = { 0,1, 8,0, 6,4, 0,1, // Ethernet, IPv4, the address sizes, a request
                                       0,0,0,0,0,0, 127,0,0,1, // the sender: the zero MAC of lo, and its address
                                       0,0,0,0,0,0, 192,0,2,7 }; // the target: no MAC yet, and the address it asks for
