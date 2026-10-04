@@ -1433,6 +1433,7 @@ namespace rpp
         /**
          * STATIC
          * Opens a Linux packet socket for the ARP frames of `iface`. recv() gives the ARP payload of each frame.
+         * It supports only interfaces with Ethernet addresses, such as eth0 and lo.
          * The open is one if_nametoindex() and one bind(). Keep it open, because the close waits for an RCU grace period.
          * @param iface Its name selects the interface, and its IPv4 address is the sender of each request
          * @param opt Socket options to set, use SO_NonBlock if a send must never block
