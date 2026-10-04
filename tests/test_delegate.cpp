@@ -774,7 +774,6 @@ namespace rpp
             AssertEqual(copied(data), "copy_lambda");
         }
 
-        // a copy and an lvalue reset keep the captures of the source
         TestCase(copy_keeps_the_captures_of_the_source)
         {
             auto state = std::make_shared<int>(42);
@@ -782,16 +781,16 @@ namespace rpp
 
             rpp::delegate<int()> original { lambda };
             rpp::delegate<int()> copied { original };
-            AssertThat(original(), 42); // copy construct keeps the source
+            AssertThat(original(), 42);
             copied = original;
-            AssertThat(original(), 42); // copy assign keeps the source
+            AssertThat(original(), 42);
             AssertThat(copied(), 42);
 
             original = lambda;
-            AssertThat(lambda(), 42); // assign from an lvalue copies it
+            AssertThat(lambda(), 42);
             original.reset(lambda);
-            AssertThat(lambda(), 42); // reset from an lvalue copies it
-            AssertThat(state.use_count(), 4); // state, lambda, original, copied
+            AssertThat(lambda(), 42);
+            AssertThat(state.use_count(), 4); // the owners are state, lambda, original and copied
         }
 
         ////////////////////////////////////////////////////
