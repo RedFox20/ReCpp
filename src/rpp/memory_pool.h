@@ -2,8 +2,8 @@
 #include "config.h"
 #include "collections.h"
 #include <vector>
-#include <cstdlib>
 #include <cstring>
+#include <new> // std::align_val_t, placement new
 
 namespace rpp
 {
@@ -79,27 +79,25 @@ namespace rpp
         char* Buffer;
         char* Ptr;
 
-        static int pad16(const char* p) noexcept { return int((16 - size_t(p) % 16) % 16); }
-
     public:
         explicit linear_static_pool(int staticBlockSize) noexcept
             : Remaining{staticBlockSize}
-            , Buffer{(char*)malloc(size_t(staticBlockSize) + 15)} // room to align Ptr: wasm32 and 32-bit ARM malloc align to 8
+            // 16-aligned, because malloc on wasm32 and 32-bit ARM aligns to 8 only
+            , Buffer{static_cast<char*>(::operator new(size_t(staticBlockSize), std::align_val_t{16}, std::nothrow))}
             , Ptr{Buffer}
         {
             if (staticBlockSize > 0 && Buffer)
             {
-                RPP_BUILTIN_MEMSET(Buffer, 0, size_t(staticBlockSize) + 15); // make static analyzers happy
+                RPP_BUILTIN_MEMSET(Buffer, 0, staticBlockSize); // make static analyzers happy
             }
             else
             {
                 Remaining = 0;
             }
-            Ptr += pad16(Buffer); // always align Ptr to 16 bytes, so capacity() stays 0 for an empty pool
         }
         ~linear_static_pool() noexcept
         {
-            if (Buffer) free(Buffer);
+            if (Buffer) ::operator delete(Buffer, std::align_val_t{16});
         }
 
         linear_static_pool(linear_static_pool&& pool) noexcept
@@ -122,7 +120,7 @@ namespace rpp
         linear_static_pool(const linear_static_pool&) = delete;
         linear_static_pool& operator=(const linear_static_pool&) = delete;
 
-        int capacity()  const noexcept { return int(Ptr - Buffer) - pad16(Buffer) + Remaining; }
+        int capacity()  const noexcept { return int(Ptr - Buffer) + Remaining; }
         int available() const noexcept { return Remaining; }
 
         NODISCARD void* allocate(int size, int align = 8) noexcept

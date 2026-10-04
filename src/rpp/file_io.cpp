@@ -4,6 +4,8 @@
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
+#include <memory> // std::unique_ptr
+#include <new> // std::nothrow
 
 #include "paths.inl"
 
@@ -417,8 +419,9 @@ namespace rpp /* ReCpp */
         constexpr int64 SMALL_BLOCK_SIZE = 512LL * 1024LL;
     #endif
         // on the heap: an Emscripten thread stack is only 64 KB
-        auto* buf = static_cast<uint8_t*>(malloc(size_t(SMALL_BLOCK_SIZE)));
-        if (!buf) {
+        std::unique_ptr<uint8_t[]> buf { new (std::nothrow) uint8_t[SMALL_BLOCK_SIZE] };
+        if (!buf)
+        {
             LogError("file::truncate_front_sb failed: no memory for the copy buffer");
             return;
         }
@@ -427,17 +430,16 @@ namespace rpp /* ReCpp */
         while (readPos < len)
         {
             seekl(readPos, SEEK_SET);
-            int bytesRead = read(buf, static_cast<int>(SMALL_BLOCK_SIZE));
+            int bytesRead = read(buf.get(), static_cast<int>(SMALL_BLOCK_SIZE));
             if (bytesRead <= 0) break; // EOF or error
 
             seekl(writePos, SEEK_SET);
-            if (write(buf, bytesRead) != bytesRead)
+            if (write(buf.get(), bytesRead) != bytesRead)
                 break; // disk error?
 
             readPos += bytesRead;
             writePos += bytesRead;
         }
-        free(buf);
 
         // Only truncate if we successfully copied the full newLength bytes
         if (writePos == newLength)

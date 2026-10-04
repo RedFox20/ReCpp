@@ -4384,16 +4384,16 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 | Class | Description |
 |-------|-------------|
 | [`linear_static_pool`](src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
-| [`linear_dynamic_pool`](src/rpp/memory_pool.h#L157) | Growing bump allocator with configurable block growth |
+| [`linear_dynamic_pool`](src/rpp/memory_pool.h#L155) | Growing bump allocator with configurable block growth |
 | [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | Internal CRTP mixin giving each pool `construct<T>()`, `destruct<T>()` and the array and range forms. `rpp.containers` does not export it |
 
 ### Common Methods
 
 | Method | Description |
 |--------|-------------|
-| [`capacity()`](src/rpp/memory_pool.h#L125) | Total capacity |
-| [`available()`](src/rpp/memory_pool.h#L126) | Remaining capacity |
-| [`allocate(int size, int align)`](src/rpp/memory_pool.h#L128) | Allocate raw memory |
+| [`capacity()`](src/rpp/memory_pool.h#L123) | Total capacity |
+| [`available()`](src/rpp/memory_pool.h#L124) | Remaining capacity |
+| [`allocate(int size, int align)`](src/rpp/memory_pool.h#L126) | Allocate raw memory |
 | [`allocate<T>()`](src/rpp/memory_pool.h#L18) | Allocate typed memory |
 | [`construct<T>(Args&&... args)`](src/rpp/memory_pool.h#L24) | Allocate and construct |
 | [`allocate_range<T>(int count)`](src/rpp/memory_pool.h#L54) | Allocate array |

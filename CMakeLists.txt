@@ -313,7 +313,8 @@ if (BUILD_TESTS)
     endif()
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
     if (EMSCRIPTEN) # RppTests.js loads the .wasm from its own dir, and install(TARGETS) skips it
-        target_link_options(RppTests PRIVATE -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME -sALLOW_MEMORY_GROWTH -sPTHREAD_POOL_SIZE=8)
+        target_link_options(RppTests PRIVATE -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME
+                                             -sALLOW_MEMORY_GROWTH -sPTHREAD_POOL_SIZE=8)
         install(FILES $<TARGET_FILE_DIR:RppTests>/RppTests.wasm DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
     endif()
 endif()
