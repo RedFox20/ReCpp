@@ -4107,24 +4107,24 @@ Cross-platform stack tracing and traced exceptions.
 
 | Item | Description |
 |------|-------------|
-| [`CallstackEntry`](src/rpp/stack_trace.h#L18) | Single callstack frame with addr, line, name, file, module |
-| [`traced_exception`](src/rpp/stack_trace.h#L160) | `runtime_error` with embedded stack trace |
-| [`ThreadCallstack`](src/rpp/stack_trace.h#L73) | Callstack + thread_id pair |
+| [`CallstackEntry`](src/rpp/stack_trace.h#L19) | Single callstack frame with addr, line, name, file, module |
+| [`traced_exception`](src/rpp/stack_trace.h#L161) | `runtime_error` with embedded stack trace |
+| [`ThreadCallstack`](src/rpp/stack_trace.h#L74) | Callstack + thread_id pair |
 
 ### Functions
 
 | Function | Description |
 |----------|-------------|
-| [`stack_trace(maxDepth)`](src/rpp/stack_trace.h#L134) | Get formatted stack trace string |
-| [`stack_trace(message, maxDepth)`](src/rpp/stack_trace.h#L128) | Stack trace with error message |
-| [`print_trace(maxDepth)`](src/rpp/stack_trace.h#L143) | Print stack trace to stderr |
-| [`print_trace(message, maxDepth)`](src/rpp/stack_trace.h#L147) | Print stack trace to stderr with message |
-| [`error_with_trace(message)`](src/rpp/stack_trace.h#L153) | Create `runtime_error` with stack trace |
-| [`get_address_info(addr)`](src/rpp/stack_trace.h#L46) | Look up address info → `CallstackEntry` |
-| [`get_callstack(maxDepth)`](src/rpp/stack_trace.h#L60) | Walk the stack, return addresses |
-| [`get_all_callstacks(maxDepth)`](src/rpp/stack_trace.h#L85) | Get callstacks from all threads |
-| [`register_segfault_tracer()`](src/rpp/stack_trace.h#L171) | Install SIGSEGV handler that throws `traced_exception` |
-| [`format_trace(message, callstack, depth)`](src/rpp/stack_trace.h#L94) | Formats a pre-walked callstack with optional error message prefix |
+| [`stack_trace(maxDepth)`](src/rpp/stack_trace.h#L135) | Get formatted stack trace string |
+| [`stack_trace(message, maxDepth)`](src/rpp/stack_trace.h#L129) | Stack trace with error message |
+| [`print_trace(maxDepth)`](src/rpp/stack_trace.h#L144) | Print stack trace to stderr |
+| [`print_trace(message, maxDepth)`](src/rpp/stack_trace.h#L148) | Print stack trace to stderr with message |
+| [`error_with_trace(message)`](src/rpp/stack_trace.h#L154) | Create `runtime_error` with stack trace |
+| [`get_address_info(addr)`](src/rpp/stack_trace.h#L47) | Look up address info → `CallstackEntry` |
+| [`get_callstack(maxDepth)`](src/rpp/stack_trace.h#L61) | Walk the stack, return addresses |
+| [`get_all_callstacks(maxDepth)`](src/rpp/stack_trace.h#L86) | Get callstacks from all threads |
+| [`register_segfault_tracer()`](src/rpp/stack_trace.h#L172) | Install SIGSEGV handler that throws `traced_exception` |
+| [`format_trace(message, callstack, depth)`](src/rpp/stack_trace.h#L95) | Formats a pre-walked callstack with optional error message prefix |
 
 ### Example: Stack Traces & Traced Exceptions
 
@@ -4384,16 +4384,16 @@ Linear bump-allocator memory pools for arena-style allocation (no per-object dea
 | Class | Description |
 |-------|-------------|
 | [`linear_static_pool`](src/rpp/memory_pool.h#L76) | Fixed-size bump allocator |
-| [`linear_dynamic_pool`](src/rpp/memory_pool.h#L158) | Growing bump allocator with configurable block growth |
+| [`linear_dynamic_pool`](src/rpp/memory_pool.h#L155) | Growing bump allocator with configurable block growth |
 | [`pool_types_constructor<Pool>`](src/rpp/memory_pool.h#L16) | Internal CRTP mixin giving each pool `construct<T>()`, `destruct<T>()` and the array and range forms. `rpp.containers` does not export it |
 
 ### Common Methods
 
 | Method | Description |
 |--------|-------------|
-| [`capacity()`](src/rpp/memory_pool.h#L126) | Total capacity |
-| [`available()`](src/rpp/memory_pool.h#L127) | Remaining capacity |
-| [`allocate(int size, int align)`](src/rpp/memory_pool.h#L129) | Allocate raw memory |
+| [`capacity()`](src/rpp/memory_pool.h#L123) | Total capacity |
+| [`available()`](src/rpp/memory_pool.h#L124) | Remaining capacity |
+| [`allocate(int size, int align)`](src/rpp/memory_pool.h#L126) | Allocate raw memory |
 | [`allocate<T>()`](src/rpp/memory_pool.h#L18) | Allocate typed memory |
 | [`construct<T>(Args&&... args)`](src/rpp/memory_pool.h#L24) | Allocate and construct |
 | [`allocate_range<T>(int count)`](src/rpp/memory_pool.h#L54) | Allocate array |
@@ -4676,11 +4676,12 @@ adds `#include <rpp/tests.macros.h>` for them, because a module cannot export a 
 
 | Method | Description |
 |--------|-------------|
-| [`test::run_tests(strview testNamePatterns)`](src/rpp/tests.h#L282) | Run tests matching patterns |
-| [`test::run_tests(int argc, char* argv[])`](src/rpp/tests.h#L293) | Run tests from command line args |
-| [`test::run_tests()`](src/rpp/tests.h#L298) | Run all registered tests |
+| [`test::run_tests(strview testNamePatterns)`](src/rpp/tests.h#L288) | Run tests matching patterns |
+| [`test::run_tests(int argc, char* argv[])`](src/rpp/tests.h#L299) | Run tests from command line args |
+| [`test::run_tests()`](src/rpp/tests.h#L304) | Run all registered tests |
 | [`test::is_ci_machine()`](src/rpp/tests.h#L207) | Returns TRUE if the tests run on a CI machine, which shares its CPU time |
-| [`test::best_of_3(measure)`](src/rpp/tests.h#L246) | Takes the smallest of three measurements, so one scheduling spike cannot break a tight timing bound |
+| [`test::has_coarse_timer()`](src/rpp/tests.h#L213) | Returns TRUE if the tests run as wasm in node on Windows, where a timed wait overshoots by a coarse OS tick |
+| [`test::best_of_3(measure)`](src/rpp/tests.h#L252) | Takes the smallest of three measurements, so one scheduling spike cannot break a tight timing bound |
 | [`register_test(name, factory, autorun)`](src/rpp/tests.h#L48) | Registers a unit test with given name, factory and autorun flag |
 
 ### Example: Defining a Test Class with TestCase

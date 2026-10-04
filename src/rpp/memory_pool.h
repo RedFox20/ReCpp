@@ -2,8 +2,8 @@
 #include "config.h"
 #include "collections.h"
 #include <vector>
-#include <cstdlib>
 #include <cstring>
+#include <new> // std::align_val_t, placement new
 
 namespace rpp
 {
@@ -82,16 +82,13 @@ namespace rpp
     public:
         explicit linear_static_pool(int staticBlockSize) noexcept
             : Remaining{staticBlockSize}
-            , Buffer{(char*)malloc(staticBlockSize)}
+            // 16-aligned, because malloc on wasm32 and 32-bit ARM aligns to 8 only
+            , Buffer{static_cast<char*>(::operator new(size_t(staticBlockSize), std::align_val_t{16}, std::nothrow))}
             , Ptr{Buffer}
         {
             if (staticBlockSize > 0 && Buffer)
             {
                 RPP_BUILTIN_MEMSET(Buffer, 0, staticBlockSize); // make static analyzers happy
-                if (int rem = size_t(Buffer) % 16) { // always align Ptr to 16 bytes
-                    Remaining -= (16 - rem);
-                    Ptr       += (16 - rem);
-                }
             }
             else
             {
@@ -100,7 +97,7 @@ namespace rpp
         }
         ~linear_static_pool() noexcept
         {
-            if (Buffer) free(Buffer);
+            if (Buffer) ::operator delete(Buffer, std::align_val_t{16});
         }
 
         linear_static_pool(linear_static_pool&& pool) noexcept

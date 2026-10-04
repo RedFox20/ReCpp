@@ -4,6 +4,8 @@
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
+#include <memory> // std::unique_ptr
+#include <new> // std::nothrow
 
 #include "paths.inl"
 
@@ -416,17 +418,24 @@ namespace rpp /* ReCpp */
     #else
         constexpr int64 SMALL_BLOCK_SIZE = 512LL * 1024LL;
     #endif
-        uint8_t buf[SMALL_BLOCK_SIZE];
+        // on the heap: an Emscripten thread stack is only 64 KB
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive with the NDK r29 libc++ unique_ptr<T[]>
+        std::unique_ptr<uint8_t[]> buf { new (std::nothrow) uint8_t[SMALL_BLOCK_SIZE] };
+        if (!buf)
+        {
+            LogError("file::truncate_front_sb failed: no memory for the copy buffer");
+            return;
+        }
         int64 readPos = len - newLength;
         int64 writePos = 0;
         while (readPos < len)
         {
             seekl(readPos, SEEK_SET);
-            int bytesRead = read(buf, static_cast<int>(SMALL_BLOCK_SIZE));
+            int bytesRead = read(buf.get(), static_cast<int>(SMALL_BLOCK_SIZE));
             if (bytesRead <= 0) break; // EOF or error
 
             seekl(writePos, SEEK_SET);
-            if (write(buf, bytesRead) != bytesRead)
+            if (write(buf.get(), bytesRead) != bytesRead)
                 break; // disk error?
 
             readPos += bytesRead;
@@ -474,7 +483,11 @@ namespace rpp /* ReCpp */
         int fd = fileno((FILE*)Handle);
         if (fd < 0)
             return false; // invalid file descriptor
+    #if __EMSCRIPTEN__ // posix_fallocate only, the same as fallocate mode 0
+        if (posix_fallocate(fd, 0, preallocSize) != 0)
+    #else
         if (fallocate(fd, 0, 0, preallocSize) != 0)
+    #endif
             return false; // preallocation failed
         seekl(seekPos, seekMode);
         return true; // preallocation succeeded

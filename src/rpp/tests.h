@@ -207,6 +207,12 @@ namespace rpp
         static bool is_ci_machine() noexcept;
 
         /**
+         * @brief Node on Windows ends a timed wait on a coarse OS tick, so a tight timing bound cannot hold there
+         * @return TRUE if the tests run as wasm in node on Windows
+         */
+        static bool has_coarse_timer() noexcept;
+
+        /**
          * Spin sleep is more accurate than std::this_thread::sleep_for
          * which can be seriously bad on windows (+- 15ms)
          * @note Does not rely on timer.h implementation

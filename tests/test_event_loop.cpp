@@ -1902,6 +1902,7 @@ TestImpl(test_event_loop)
         AssertThat(resume_tid.load(), main_tid);
     }
 
+#if !__EMSCRIPTEN__ // Emscripten sockets emulate TCP over WebSocket, and listen() needs the node 'ws' package
     // ─── socket waits: the loop thread polls the descriptor ─────
     TestCase(wait_readable_from_another_thread_registers_through_the_queue)
     {
@@ -2023,6 +2024,7 @@ TestImpl(test_event_loop)
         AssertLess(wall.elapsed_millis(), 100.0);
         AssertNotEqual(sock.last_err_type(), rpp::socket::SE_NONE);
     }
+#endif // !__EMSCRIPTEN__
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 

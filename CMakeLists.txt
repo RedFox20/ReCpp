@@ -218,6 +218,9 @@ elseif(YOCTO_LINUX)
 elseif(OCLEA)
     set(LIBDL_LIB "dl")
     set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+elseif(EMSCRIPTEN)
+    # no libdw or libdl in the browser
+    add_compile_options(-pthread) # libReCpp needs wasm atomics, or wasm-ld rejects it with shared memory
 elseif(LINUX AND BUILD_WITH_LIBDW)
     find_package(DWARF) # sets DWARF_LIBRARY and DWARF_INCLUDE_DIR
     set(LIBDW_LIB ${DWARF_LIBRARY})
@@ -309,6 +312,11 @@ if (BUILD_TESTS)
                                     PROPERTIES COMPILE_OPTIONS "/Zc:preprocessor-")
     endif()
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+    if (EMSCRIPTEN) # RppTests.js loads the .wasm from its own dir, and install(TARGETS) skips it
+        target_link_options(RppTests PRIVATE -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME
+                                             -sALLOW_MEMORY_GROWTH -sPTHREAD_POOL_SIZE=8)
+        install(FILES $<TARGET_FILE_DIR:RppTests>/RppTests.wasm DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+    endif()
 endif()
 
 ###################################################

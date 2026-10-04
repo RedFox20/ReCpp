@@ -167,8 +167,8 @@ TestImpl(memory_pool)
         print_info("#1 Virtual Size: %llu KB\n", info.virtual_size / 1000);
         print_info("#1 Physical Mem: %llu KB\n", info.physical_mem / 1000);
 
-    #if RPP_ANDROID
-        // /proc/self/status may not exist (e.g. QEMU user-mode), skip if unavailable
+    #if RPP_ANDROID || __EMSCRIPTEN__
+        // /proc/self/status may not exist (QEMU user-mode, Emscripten), skip if unavailable
         if (info.virtual_size == 0 && info.physical_mem == 0)
         {
             print_info("proc_mem_usage not available (QEMU?), skipping\n");

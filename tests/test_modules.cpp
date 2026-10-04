@@ -166,8 +166,10 @@ TestImpl(test_modules)
 
     TestCase(proc_utils_module_carries_the_whole_surface)
     {
-        rpp::proc_mem_info mem = rpp::proc_current_mem_used();
+        [[maybe_unused]] rpp::proc_mem_info mem = rpp::proc_current_mem_used();
+    #if !__EMSCRIPTEN__ // no /proc/self/status
         AssertGreater(mem.virtual_size, 0u);
+    #endif
         rpp::cpu_usage_info cpu = rpp::proc_total_cpu_usage();
         AssertGreaterOrEqual(cpu.cpu_time_us, 0);
     }
@@ -244,7 +246,9 @@ TestImpl(test_modules)
     {
         static_assert(rpp::CALLSTACK_MAX_DEPTH == 256u);
         std::vector<uint64_t> frames = rpp::get_callstack(8);
+    #if !__EMSCRIPTEN__ // wasm cannot walk its own stack
         AssertGreater(frames.size(), 0u);
+    #endif
         AssertGreater(rpp::format_trace("probe", frames.data(), frames.size()).size(), 0u);
     }
 
@@ -255,7 +259,9 @@ TestImpl(test_modules)
         AssertGreater(rpp::num_physical_cores(), 0);
         AssertGreater(rpp::get_thread_id(), 0u);
         rpp::set_this_thread_name("module_probe");
+    #if !__EMSCRIPTEN__ // no pthread_getname_np
         AssertThat(rpp::get_this_thread_name(), std::string{"module_probe"});
+    #endif
 #endif
         rpp::yield();
     }
@@ -414,9 +420,11 @@ TestImpl(test_modules)
 
         // the platform value differs per system, so the round trip is what the module owes
         AssertThat(rpp::to_addrfamily(rpp::addrfamily_int(rpp::AF_IPv4)) == rpp::AF_IPv4, true);
+    #if !__EMSCRIPTEN__ // an Emscripten bind() listens through the node 'ws' package
         rpp::socket s = rpp::make_udp_randomport();
         AssertThat(s.good(), true);
         AssertGreater(s.port(), 0);
+    #endif
     }
 
     TestCase(binary_stream_module_carries_the_whole_surface)

@@ -488,6 +488,10 @@ namespace rpp
         return resolve_trace(d, (void*)addr);
     }
 
+#if __EMSCRIPTEN__ // wasm has no _Unwind_Backtrace: the browser owns the call stack, so a trace is empty
+#  define RPP_UNWIND_BACKTRACE(state) (void)(state)
+#else
+#  define RPP_UNWIND_BACKTRACE(state) _Unwind_Backtrace(backtrace_cb, &(state))
     static _Unwind_Reason_Code backtrace_cb(_Unwind_Context* context, void* arg) noexcept
     {
         auto* s = (BacktraceState*)arg;
@@ -502,6 +506,7 @@ namespace rpp
         }
         return _URC_NO_REASON;
     }
+#endif
 
     RPPAPI std::vector<uint64_t> get_callstack(size_t maxDepth, size_t entriesToSkip, uint64_t threadId) noexcept
     {
@@ -513,7 +518,7 @@ namespace rpp
         void* cs_temp[CALLSTACK_MAX_DEPTH];
         BacktraceState state { cs_temp, cs_temp + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
-        _Unwind_Backtrace(backtrace_cb, &state);
+        RPP_UNWIND_BACKTRACE(state);
         size_t count = size_t(state.current - cs_temp);
 
         std::vector<uint64_t> addresses;
@@ -535,7 +540,7 @@ namespace rpp
         void* cs_temp[CALLSTACK_MAX_DEPTH];
         BacktraceState state { cs_temp, cs_temp + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
-        _Unwind_Backtrace(backtrace_cb, &state);
+        RPP_UNWIND_BACKTRACE(state);
         size_t count = size_t(state.current - cs_temp);
 
         if (entriesToSkip >= count)
@@ -578,7 +583,7 @@ namespace rpp
         void* callstack[CALLSTACK_MAX_DEPTH];
         BacktraceState state { callstack, callstack + maxDepth };
         // _Unwind is called directly to reduce the number of frames in the stack trace
-        _Unwind_Backtrace(backtrace_cb, &state);
+        RPP_UNWIND_BACKTRACE(state);
         size_t count = size_t(state.current - callstack);
 
         CallstackFormatter fmt;

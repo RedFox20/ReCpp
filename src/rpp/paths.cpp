@@ -534,10 +534,10 @@ namespace rpp /* ReCpp */
 
         // now create all the parent dir between:
         p = p ? p + 1 : fs; // handle /dir/ vs dir/ case
-
         while (const tchar* e = T{ p,fe }.findany(constants<T>::slashes_a, 2))
         {
-            if (!sys_mkdir(T{ fs,e }))
+            // e == fs: no parent exists, so skip the root slash of an absolute path
+            if (e != fs && !sys_mkdir(T{ fs,e }))
                 return false; // ugh, something went really wrong here...
             p = e + 1;
         }
