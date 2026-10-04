@@ -726,10 +726,13 @@ for h in sorted(os.listdir('src/rpp')):
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
 the 19 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
+### B5. `update_doc_linerefs.py` matches a name in the wrong place
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
+After a header edit moved `socket_poller::wake()`, it pointed the ref at the trailing
+comment on `socket_poller::armed`, which names `wake()`, not at the declaration.
+Corrected by hand, and `--check` accepts the corrected line.
 
 ## Closed
 

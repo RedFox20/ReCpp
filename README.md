@@ -2194,7 +2194,7 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`ipaddress6`](src/rpp/sockets.h#L402) | IPv6 convenience wrapper |
 | [`ipinterface`](src/rpp/sockets.h#L434) | Network interface info (name, addr, netmask, broadcast, gateway) |
 | [`socket`](src/rpp/sockets.h#L479) | Full TCP/UDP socket with send, recv, select, etc. |
-| [`socket_poller`](src/rpp/sockets.h#L1441) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
+| [`socket_poller`](src/rpp/sockets.h#L1460) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
 
 ### socket Methods
 
@@ -2212,6 +2212,7 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`select(int millis)`](src/rpp/sockets.h#L1162) | Wait for socket readability |
 | [`good()`](src/rpp/sockets.h#L575) / [`bad()`](src/rpp/sockets.h#L577) | Socket state |
 | [`set_nagle(bool enable)`](src/rpp/sockets.h#L1014) | Enable/disable Nagle's algorithm |
+| [`send_arp_request(const raw_address& target)`](src/rpp/sockets.h#L1444) | Broadcast an ARP request for `target` from a make_arp() socket. A request for address() announces this host |
 
 ### socket Static Methods
 
@@ -2226,16 +2227,17 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1367) | Read the result of connect_start() once the socket is writable. True when connected |
 | [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1329) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
 | [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1378) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
+| [`socket::make_arp(iface, opt)`](src/rpp/sockets.h#L1436) | Open a Linux packet socket for the ARP frames of an interface. It needs CAP_NET_RAW, and its close is slow |
 | [`poll_entry`](src/rpp/sockets.h#L1239) | One socket in a poll set, with its own flags and its own ready result |
-| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1456) | Add a socket to the next poll. Returns its index for ready() |
-| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1470) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
-| [`socket_poller::wake()`](src/rpp/sockets.h#L1481) | End a poll in progress from any thread, a no-op when no poll is armed |
-| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1460) | True when the entry fired in the last poll. An error or a hangup fires too |
-| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1462) | True when wake() can end a poll. Without it a caller polls in short slices |
+| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1475) | Add a socket to the next poll. Returns its index for ready() |
+| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1489) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
+| [`socket_poller::wake()`](src/rpp/sockets.h#L1500) | End a poll in progress from any thread, a no-op when no poll is armed |
+| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1479) | True when the entry fired in the last poll. An error or a hangup fires too |
+| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1481) | True when wake() can end a poll. Without it a caller polls in short slices |
 | [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1254) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
 | [`protocol_info`](src/rpp/sockets.h#L86) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1492) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1498) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1511) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1517) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 

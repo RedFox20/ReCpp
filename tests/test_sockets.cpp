@@ -7,6 +7,8 @@
 #include <thread>
 #include <future> // std::async
 #include <string> // std::string
+#include <cerrno> // ENODEV, EPERM
+#include <cstring> // memcmp
 
 using namespace rpp;
 using namespace std::string_literals;
@@ -1294,6 +1296,59 @@ TestImpl(test_sockets)
         // however, we should have sent at least 1.5MB, otherwise the load balancer is inefficient
         AssertGreaterOrEqual(actualReceivedKB, (int)(0.75 * DATA_RATE_MiBps * TEST_RUNTIME_SEC / 1024));
     }
+
+    // an ARP open or send which cannot work gives an error the caller can test, also without CAP_NET_RAW
+    TestCase(arp_socket_fails_with_a_testable_error)
+    {
+        ipinterface ipv6;
+        ipv6.name = "lo";
+        ipv6.addr = ipaddress6{"::1", 0};
+        AssertEqual(socket::make_arp(ipv6).last_err_type(), socket::SE_SOCKFAMILY); // ARP is IPv4 only
+
+        ipinterface unknown;
+        unknown.name = "rpp-no-such-if";
+        unknown.addr = ipaddress4{"127.0.0.1", 0};
+        socket arp = socket::make_arp(unknown);
+        AssertFalse(arp.good());
+    #if __linux__
+        AssertEqual(arp.last_errno(), ENODEV);
+    #else
+        AssertEqual(arp.last_err_type(), socket::SE_SOCKFAMILY); // this platform has no packet sockets
+    #endif
+
+        socket udp = create_udp_listener();
+        AssertFalse(udp.send_arp_request(raw_address{AF_IPv4, "192.0.2.7"}));
+        AssertEqual(udp.last_err_type(), socket::SE_SOCKFAMILY);
+    }
+
+#if __linux__
+    // lo gives each frame to its packet sockets, so the sender reads its own request back.
+    // The zero MAC of lo cannot show the sender MAC, and recv() cannot show the broadcast destination.
+    TestCase(arp_request_carries_the_sender_and_the_target)
+    {
+        ipinterface lo;
+        lo.name = "lo";
+        lo.addr = ipaddress4{"127.0.0.1", 0};
+        socket arp = socket::make_arp(lo);
+        if (arp.bad())
+        {
+            AssertEqual(arp.last_errno(), EPERM); // a packet socket needs CAP_NET_RAW
+            print_info("no CAP_NET_RAW, so the case checks only EPERM\n");
+            return;
+        }
+
+        AssertTrue(arp.send_arp_request(raw_address{AF_IPv4, "192.0.2.7"})); // RFC 5737, no host answers it
+        uint8_t frame[28] = {};
+        AssertEqual(arp.recv_timeout(frame, sizeof(frame), 1000), (int)sizeof(frame)); // a hang guard, lo loops back at once
+        const uint8_t request[28] = { 0,1, 8,0, 6,4, 0,1, // Ethernet, IPv4, the address sizes, a request
+                                      0,0,0,0,0,0, 127,0,0,1, // the sender: the zero MAC of lo, and its address
+                                      0,0,0,0,0,0, 192,0,2,7 }; // the target: no MAC yet, and the address it asks for
+        AssertEqual(memcmp(frame, request, sizeof(request)), 0);
+
+        AssertFalse(arp.send_arp_request(raw_address{AF_IPv6}));
+        AssertEqual(arp.last_err_type(), socket::SE_SOCKFAMILY);
+    }
+#endif
 
     //////////////////////////////////////////////////////////////////
 };

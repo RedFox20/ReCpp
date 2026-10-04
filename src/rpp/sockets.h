@@ -442,7 +442,7 @@ namespace rpp
         ipinterface() noexcept = default;
 
         /**
-         * @returns All interfaces sorted by IP address
+         * @returns All interfaces sorted by IP address. The OS call can take several hundred ms, so list them once
          */
         static std::vector<ipinterface> get_interfaces(address_family af = AF_IPv4) noexcept;
 
@@ -1423,6 +1423,25 @@ namespace rpp
          * Clears any previous bind_to_interface
          */
         void unbind_interface() noexcept;
+
+        /**
+         * STATIC
+         * Opens a Linux packet socket for the ARP frames of `iface`. recv() gives the ARP payload of each frame.
+         * The open is one if_nametoindex() and one bind(). Keep it open, because the close waits for an RCU grace period.
+         * @param iface Its name selects the interface, and its IPv4 address is the sender of each request
+         * @param opt Socket options to set, use SO_NonBlock if a send must never block
+         * @returns valid socket if successful, otherwise last_errno() tells why: EPERM without CAP_NET_RAW,
+         *          or EAFNOSUPPORT (SE_SOCKFAMILY) on a platform without packet sockets
+         */
+        static socket make_arp(const ipinterface& iface, socket_option opt = SO_None) noexcept;
+
+        /**
+         * Broadcasts one ARP request from a make_arp() socket: who has `target`, tell address().
+         * A request for address() is an RFC 5227 announcement, and each neighbor which caches address() updates it.
+         * Each send is one getsockname() for the index and the MAC of the interface, and one sendto().
+         * @returns true on success, else false and last_errno() tells why
+         */
+        bool send_arp_request(const raw_address& target) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////
