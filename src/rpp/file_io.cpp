@@ -419,6 +419,7 @@ namespace rpp /* ReCpp */
         constexpr int64 SMALL_BLOCK_SIZE = 512LL * 1024LL;
     #endif
         // on the heap: an Emscripten thread stack is only 64 KB
+        // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive with the NDK r29 libc++ unique_ptr<T[]>
         std::unique_ptr<uint8_t[]> buf { new (std::nothrow) uint8_t[SMALL_BLOCK_SIZE] };
         if (!buf)
         {
