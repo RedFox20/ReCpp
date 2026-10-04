@@ -317,6 +317,7 @@ it counts no frame and asserts nothing about skew.
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
+| `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
