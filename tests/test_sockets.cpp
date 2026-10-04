@@ -118,6 +118,19 @@ TestImpl(test_sockets)
         AssertEqual(f.address().str(), "127.0.0.1");
     }
 
+    TestCase(ipv4_from_octets)
+    {
+        raw_address a { 192, 168, 1, 10 };
+        AssertTrue(a.is_ipv4());
+        AssertEqual(a.str(), "192.168.1.10");
+        AssertTrue(a == raw_address(AF_IPv4, "192.168.1.10"));
+        AssertEqual(a.ipv4_octet(0), 192);
+        AssertEqual(a.ipv4_octet(3), 10);
+
+        raw_address b { a.ipv4_octet(0), a.ipv4_octet(1), a.ipv4_octet(2), 20 }; // another host on the subnet of a
+        AssertEqual(b.str(), "192.168.1.20");
+    }
+
     TestCase(init_ipv6)
     {
         ipaddress6 a;
@@ -1317,7 +1330,7 @@ TestImpl(test_sockets)
     #endif
 
         socket udp = create_udp_listener();
-        AssertFalse(udp.send_arp_request(raw_address{AF_IPv4, "192.0.2.7"}));
+        AssertFalse(udp.send_arp_request(raw_address{192, 0, 2, 7}));
         AssertEqual(udp.last_err_type(), socket::SE_SOCKFAMILY);
     }
 
@@ -1337,7 +1350,7 @@ TestImpl(test_sockets)
             return;
         }
 
-        AssertTrue(arp.send_arp_request(raw_address{AF_IPv4, "192.0.2.7"})); // RFC 5737, no host answers it
+        AssertTrue(arp.send_arp_request(raw_address{192, 0, 2, 7})); // RFC 5737, no host answers it
         uint8_t frame[28] = {};
         AssertEqual(arp.recv_timeout(frame, sizeof(frame), 1000), (int)sizeof(frame)); // a hang guard, lo loops back at once
         const uint8_t request[28] = { 0,1, 8,0, 6,4, 0,1, // Ethernet, IPv4, the address sizes, a request

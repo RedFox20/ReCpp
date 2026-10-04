@@ -227,6 +227,14 @@ namespace rpp
         Addr4 = ipv4;
     }
 
+    raw_address::raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept : raw_address{AF_IPv4}
+    {
+        Addr4Parts[0] = a;
+        Addr4Parts[1] = b;
+        Addr4Parts[2] = c;
+        Addr4Parts[3] = d;
+    }
+
     raw_address::raw_address(address_family af, const void* ipv6,
                              unsigned long flowInfo, unsigned long scopeId) noexcept : raw_address{af}
     {
