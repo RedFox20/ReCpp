@@ -765,13 +765,9 @@ TestImpl(test_async)
         co_return value;
     }
 
-    TestCase(coroutine_returns_the_value)
+    TestCase(coroutine_returns_its_value_or_rethrows)
     {
         AssertThat(twice_async(21).get(), 42);
-    }
-
-    TestCase(coroutine_rethrows_its_exception)
-    {
         AssertThrows(throw_after_await().get(), std::runtime_error);
         AssertThrows((void)await_an_invalid_future().get(), std::logic_error);
     }
