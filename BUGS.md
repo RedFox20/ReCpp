@@ -10,12 +10,13 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ### B35. A `noexcept` error handler does not compile
 `rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
-`first_arg_type` fails on a `noexcept` lambda. A handler such as `[](const std::runtime_error&)
-noexcept { return 2; }` fails in `rpp::future::then()` and `cfuture::then()`, on g++ 14.4 and
-clang-18. The same handler without `noexcept` compiles.
+`first_arg_type` fails on a `noexcept` lambda. A handler such as
+`[](const std::runtime_error&) noexcept { return 2; }` fails in `rpp::future::then()` and
+`cfuture::then()`, where g++ 14.4 reports `'operator()' is not a member of`. The same handler
+without `noexcept` compiles, and so does a `noexcept` task.
 
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
-`test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that
+`test_timer::proc_cpu_times` reads `t1` before it spins. It asserts at `test_timer.cpp:737` that
 `t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
 gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
 full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
@@ -293,13 +294,16 @@ Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
 run. B17 reported on the same commit instead, which is a different race in another test.
 
-A second sighting came in `ubuntu-cpp23-tsan-clang18`, in
+A second sighting came on 78c9827 in `ubuntu-cpp23-tsan-clang18`, in
 `test_future::cross_thread_exception_propagation`. The libc++ `std::async` worker frees the
 exception in `__cxa_end_catch` after the main thread read `e.what()`. TSAN does not see the
-libc++abi refcount which orders the two. `cfuture` keeps this shape, because libc++
-`__assoc_state::move()` rethrows a copy of the stored exception. `rpp::future` reaches it when a
-caller frees the `exception_ptr` it gave `set_exception()` while a handler reads `e.what()`, in 3
-of 5 clang-18 TSAN runs. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
+libc++abi refcount which orders the two.
+
+`cfuture` keeps this shape, because libc++ `__assoc_state::move()` rethrows a copy of the stored
+exception, as C31 did in `rpp::future`. `rpp::future` reaches it when a caller passes
+`std::make_exception_ptr(std::runtime_error{"x"})` to `set_exception()`, then frees it while a
+handler reads `e.what()`. 3 of 5 clang-18 TSAN runs reported it, and 0 of 5 with the exception
+built before the race. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
 
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
@@ -335,7 +339,7 @@ warpable, so a later warp does not advance it. During a 20000 swap storm that re
 fresh frames, and outside a storm the window measures about 300ns per call.
 
 **The `frames` guard fired in CI, and the skew assertion did not.** CI reported
-`frames.load() => '0' must be greater than '0'` at `test_event_loop.cpp:1387`. That is the
+`frames.load() => '0' must be greater than '0'` at `test_event_loop.cpp:1398`. That is the
 guard which stops the case passing vacuously, not the pair check. A reader starved for the whole
 swap storm reads only the base generation, so it counts no frame and asserts nothing about skew.
 
@@ -355,7 +359,7 @@ hold the storm open until the reader counts one. That pins the invariant on the 
 than on the scheduler.
 
 **The skew check fired in CI.** Five Android runs under QEMU in #104 failed
-`skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1388`, one case each. So one reader
+`skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1399`, one case each. So one reader
 paired an offset with another generation. 20 local gcc-14 runs out of 20 pass, on 4 cores and on one.
 
 **qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
@@ -609,8 +613,9 @@ gives a parallel loop no margin over a single thread. AGENTS.md R2 already says 
 event, not on the clock.
 
 A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
-and requires 45 ms of CPU time at `test_timer.cpp:749`, which failed 1 of 5 runs under TSAN on a
-4 core VM. That VM reports steal time in `/proc/stat`, which its load average does not show.
+and requires 45 ms of CPU time at `test_timer.cpp:753`. On a 4 core VM that floor failed 1 of 5
+runs under TSAN and 1 of 20 on plain gcc-14. The VM reports steal time in `/proc/stat`, which its
+load average does not show.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
@@ -776,8 +781,8 @@ comment on `socket_poller::armed`, which names `wake()`, not at the declaration.
 Corrected by hand, and `--check` accepts the corrected line.
 
 A tie goes to the candidate nearest the old line, which can be a call, a trailing comment or a
-forward declaration, and `--check` accepts any candidate. `task.h` `task<T>` and `delegate.h`
-`reset()` are two of nine rows which reproduce it. A fix ranks a declaration above a call first.
+forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>` and `sprint.h`
+`write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
 

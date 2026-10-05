@@ -103,11 +103,12 @@ The names below read the same on both types, so a mechanical port compiles.
 `then()`, `continue_with()` and `co_await` park no thread. The pool thread which publishes the
 result runs the step inline, so a chain of `rpp::async` steps runs on one worker. `cfuture` parks a
 pool thread for each pending step. A promise of the caller starts the step as a pool task, because
-the caller can publish under a lock. `then(loop, task)` runs the step on an `rpp::event_loop`.
+the caller can publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the
+step on an `rpp::event_loop`.
 
 `continue_with()` of both types logs an error which no handler takes with `LogWarning()`.
-`get_all()` collects every future before it rethrows, where the `cfuture` overload stops at the
-first exception.
+`get_all()` collects every future before it rethrows. The `cfuture` overload stops at the first
+exception, so a later future which is not ready terminates in its destructor.
 
 `rpp::task<T>` does not overlap this. A task resumes on the loop thread and spawns nothing.
 A future carries `.then()`, and its `get()` blocks the caller. See `task.h`.
