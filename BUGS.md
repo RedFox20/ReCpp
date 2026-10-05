@@ -21,6 +21,10 @@ without `noexcept` compiles, and so does a `noexcept` task.
 gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
 full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
 
+The same case spins 50 ms and requires 45 ms of CPU time at `test_timer.cpp:753`. On a 4 core VM
+that floor failed 1 of 5 runs under TSAN and 1 of 20 on plain gcc-14. The VM reports steal time in
+`/proc/stat`, which its load average does not show.
+
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
@@ -599,7 +603,7 @@ No export list removes the crash. Only the fragment which carries `<future>` dec
 ### B2. A test which trusts the clock fails on a loaded machine
 Nearly every timing assertion sets its bound just above the delay it measures. A
 sanitizer, an emulator, or a busy CI runner erases that margin.
-This has four shapes. A bound too tight reports the overrun, as
+This has three shapes. A bound too tight reports the overrun, as
 `test_concurrent_queue::wait_pop_until` did with 219 ms against a 10 ms ceiling. A
 sleep used to order two threads reports a wrong result instead, as
 `test_close_sync::basic_close_prevention` did on MSVC with
@@ -611,11 +615,6 @@ A third shape compares two measured times, as
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
-
-A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
-and requires 45 ms of CPU time at `test_timer.cpp:753`. On a 4 core VM that floor failed 1 of 5
-runs under TSAN and 1 of 20 on plain gcc-14. The VM reports steal time in `/proc/stat`, which its
-load average does not show.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
