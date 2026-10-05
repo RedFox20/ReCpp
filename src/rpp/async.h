@@ -121,6 +121,9 @@ namespace rpp
                 return (status.fetch_or(CLAIMED, std::memory_order_acq_rel) & CLAIMED) == 0;
             }
 
+            /// @returns true after a publisher claimed the result. A stale false only sends the caller to claim()
+            bool claimed() const noexcept { return (status.load(std::memory_order_relaxed) & CLAIMED) != 0; }
+
             /// Frees the claim after a store which threw, so the result still takes a value or an exception
             void unclaim() noexcept { status.fetch_and(~CLAIMED, std::memory_order_release); }
 
@@ -145,11 +148,14 @@ namespace rpp
             /// Takes the reference of the one future. @returns false when a promise copy already gave it
             bool retrieve() noexcept
             {
-                int old = refs.load(std::memory_order_relaxed); // relaxed, because the promise already owns the state
+                int old = PROMISE_REF; // the usual refs, so the first CAS needs no load. Relaxed, as the promise owns the state
                 do { if (old & RETRIEVED) return false; }
                 while (!refs.compare_exchange_weak(old, old + RETRIEVED + FUTURE_REF, std::memory_order_relaxed));
                 return true;
             }
+
+            /// @returns true after get_future() gave the future
+            bool retrieved() const noexcept { return (refs.load(std::memory_order_relaxed) & RETRIEVED) != 0; }
 
             /// Drops a promise copy while another one remains. @returns false for the last copy, which keeps its reference
             bool drop_copy() noexcept
@@ -280,19 +286,17 @@ namespace rpp
 
         void abandon() noexcept
         {
-            if (!state) return;
-            if (!state->drop_copy()) // the last copy publishes the stored result, or the error below
+            detail::future_state<T>* s = std::exchange(state, nullptr);
+            if (!s) return;
+            if (s->claimed()) { s->release(s->PROMISE_REF); return; } // a publisher came, so no copy publishes
+            if (s->drop_copy()) return; // another copy remains, so the last one publishes
+            if (s->claim()) // the last copy publishes the stored result, or the error below
             {
-                if (state->claim()) // no publisher came
-                {
-                    bool retrieved = (state->refs.load(std::memory_order_relaxed) & state->RETRIEVED) != 0;
-                    if (retrieved && !state->value.alive && !state->error)
-                        state->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
-                    state->finish(inline_next);
-                }
-                state->release(state->PROMISE_REF);
+                if (s->retrieved() && !s->value.alive && !s->error)
+                    s->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
+                s->finish(inline_next);
             }
-            state = nullptr;
+            s->release(s->PROMISE_REF);
         }
     };
 
