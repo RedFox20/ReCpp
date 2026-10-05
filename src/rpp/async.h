@@ -13,8 +13,7 @@
 #include "timepoint.h" // rpp::Duration, rpp::TimePoint
 #include <atomic>
 #include <exception> // std::exception_ptr, std::terminate
-#include <memory> // std::unique_ptr
-#include <optional>
+#include <memory> // std::unique_ptr, std::construct_at, std::addressof
 #include <stdexcept> // std::logic_error
 #include <type_traits>
 #include <utility> // std::move, std::forward, std::exchange
@@ -33,9 +32,6 @@ namespace rpp
 
     namespace detail
     {
-        /// Stands in for the value of a future<void>, which has none
-        struct no_value {};
-
         /// A step which runs once, after the result it follows arrives
         struct continuation
         {
@@ -70,6 +66,35 @@ namespace rpp
             return new step_continuation<Step>{std::move(step)};
         }
 
+        /// Holds one T in place, which emplace() or `make()` builds, until reset() destroys it
+        template<class T>
+        struct holder
+        {
+            union { T obj; }; // a union member ends only in reset(), so the owner decides when it ends
+            bool alive = false;
+
+            holder() noexcept {}
+            template<class Make> explicit holder(const Make& make) : obj(make()), alive{true} {}
+            holder(const holder&) = delete;
+            holder& operator=(const holder&) = delete;
+            ~holder() noexcept { if (alive) obj.~T(); }
+
+            /// Builds the object in place. A constructor which throws leaves the holder empty
+            template<class... Args>
+            void emplace(Args&&... args) { std::construct_at(std::addressof(obj), std::forward<Args>(args)...); alive = true; }
+
+            /// Destroys the object, once
+            void reset() noexcept { if (alive) { alive = false; obj.~T(); } }
+        };
+
+        /// The value of a future<void> is only the flag
+        template<>
+        struct holder<void>
+        {
+            bool alive = false;
+            void emplace() noexcept { alive = true; }
+        };
+
         /// The result which one promise publishes and one future collects
         template<class T>
         struct future_state
@@ -83,7 +108,7 @@ namespace rpp
             std::atomic_int refs { 1 }; // counts the promise, and the future after get_future()
             std::atomic<void*> next { nullptr }; // the step which follows the result, or this state after the result is out
             std::exception_ptr error;
-            std::optional<std::conditional_t<std::is_void_v<T>, no_value, T>> value;
+            holder<T> value;
 
             /// @returns true for the one publisher which may store the result
             bool claim() noexcept
@@ -135,7 +160,7 @@ namespace rpp
             {
                 struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(); } } ref { this };
                 if constexpr (std::is_void_v<T>) { if (!error) return; }
-                else if (value) return std::move(*value);
+                else if (value.alive) return std::move(value.obj);
                 std::rethrow_exception(std::exchange(error, nullptr)); // libc++ 18 copies an exception_ptr on a move
             }
         };
@@ -231,7 +256,7 @@ namespace rpp
             if (!state) return;
             if (state->claim()) // no publisher came, so this publishes the stored result, or the error below
             {
-                if (retrieved && !state->value && !state->error)
+                if (retrieved && !state->value.alive && !state->error)
                     state->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
                 state->finish(inline_next);
             }
@@ -252,22 +277,6 @@ namespace rpp
             using promise<T>::publish;
         };
 
-        /// Holds the body of a step, built in place from what `make()` returns, until reset() destroys it
-        template<class Body>
-        struct body_slot
-        {
-            union { Body body; }; // a union member ends only in reset(), so the step decides when its body ends
-            bool alive = true;
-
-            template<class Make> explicit body_slot(const Make& make) : body(make()) {}
-            body_slot(const body_slot&) = delete;
-            body_slot& operator=(const body_slot&) = delete;
-            ~body_slot() noexcept { reset(); }
-
-            /// Destroys the body, once
-            void reset() noexcept { if (alive) { alive = false; body.~Body(); } }
-        };
-
         /// The input of a step which follows no result, as the task of async() does
         struct no_input { void detach() noexcept {} };
 
@@ -277,11 +286,11 @@ namespace rpp
         {
             In input; // the future this step follows
             step_promise<R> output;
-            body_slot<Body> slot;
+            holder<Body> body; // built in place, so the step never moves it
 
             template<class Make>
             step_node(In in, step_promise<R>&& out, const Make& make)
-                : input{std::move(in)}, output{std::move(out)}, slot{make} {}
+                : input{std::move(in)}, output{std::move(out)}, body{make} {}
 
             // a step which never ran leaves its input unread, so no dropped error fails an assertion
             ~step_node() noexcept override { input.detach(); }
@@ -291,11 +300,11 @@ namespace rpp
                 std::exception_ptr error; // publishes after the catch ends, so this thread keeps no reference, see BUGS.md C32
                 try
                 {
-                    if constexpr (std::is_void_v<R>) { slot.body(input); output.store(); }
-                    else output.store(slot.body(input));
+                    if constexpr (std::is_void_v<R>) { body.obj(input); output.store(); }
+                    else output.store(body.obj(input));
                 }
                 catch (...) { error = std::current_exception(); }
-                slot.reset(); // the owner of the step frees it late, so the body ends before the publish
+                body.reset(); // the owner of the step frees it late, so the body ends before the publish
                 if (error) output.set_exception(std::exchange(error, nullptr));
                 else output.publish();
             }
