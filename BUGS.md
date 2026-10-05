@@ -15,18 +15,6 @@ and in `cfuture::then()`. A handler such as `[](const std::runtime_error&) noexc
 fails on g++ 14.4 with `'operator()' is not a member of`, and on clang-18 with `cannot be used
 prior to '::'`. The same handler without `noexcept` compiles, and so does a `noexcept` task.
 
-### B34. Copying an `rpp::delegate` moves the functor out of its source
-`delegate(const delegate&)` calls `functor_copy()`, which calls `dest.reset(*instance)` at
-`delegate.h:578`. `reset()` passes `std::move(function)` to `init_functor()` at `delegate.h:305`, so
-the copy move-constructs its functor from the source. After a copy from a const source, a source
-lambda which captures a 40 character `std::string` returns 0 from `s.size()`, 3 of 3 runs.
-
-Two threads which copy one const delegate race. clang-18 TSAN reported a heap-use-after-free in
-`copy()` in 4 of 5 runs, and then a SEGV in `~delegate()`. The copy cases in `test_delegate.cpp`
-capture only trivial state, so no case sees it. A move-only functor has no copy, such as the
-`unique_ptr` capture in `loop_step_node::start()`. #119 tracks the fix: a copy copies a copyable
-functor, and a move-only functor still moves.
-
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
 `test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that
 `t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
@@ -828,6 +816,10 @@ A display text which names a parameter the call also names scores the call highe
 without a tie. A fix ranks a declaration above a call before the distance breaks the tie.
 
 ## Closed
+
+### C33. Copying an `rpp::delegate` moved the functor out of its source (was B34)
+`delegate(const delegate&)` move-constructed its functor from the source, so a copy emptied the
+captures of a const source. #125 copies a copyable functor, and a move-only functor still moves.
 
 ### C32. TSAN blamed the `async()` worker for freeing an exception the handler read (was B31)
 `async()` published the exception inside its catch block, and `set_exception()` and
