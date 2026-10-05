@@ -369,77 +369,43 @@ namespace rpp
                     return f;
                 }
             }
-        #elif __clang__ // disable on VC++ clang, enable on all other clang builds
+        #else // G++ and Clang++ use the Itanium C++ ABI member pointer {ptr, adj}
             struct VTable {
                 void* entries[16]; // size is pseudo, mainly for gdb
             };
-        #if defined(__arm__) || defined(__aarch64__) || defined(__wasm__) // wasm: table index 1 is a valid function
-            // ARM C++ ABI variant: virtual flag is in adj field (adj & 1),
-            // ptr is the raw vtable byte offset (NOT +1 like Itanium)
             struct VCallThunk {
-                void* ptr;         // function address, or vtable byte offset if virtual
-                size_t adj;        // (this_adjustment * 2) | is_virtual
+                void* ptr;     // function address, or the vtable byte offset of a virtual
+                ptrdiff_t adj; // this adjustment in bytes
             };
             template<class FClass, class MethodType>
-            static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
+            static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst) noexcept
             {
-                auto& t = *(struct VCallThunk*)&method;
-                if (t.adj & 1u) { // is_virtual? (ARM ABI: virtual flag in adj, not ptr)
-                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT
-                    size_t voffset = size_t(t.ptr) / sizeof(void*);
-                    if (out_inst) {
-                        *out_inst = (void*)((const uint8_t*)inst + (t.adj >> 1));
-                    }
-                    return { .pfunc = vtable->entries[voffset] }; // resolve from vtable NOLINT
-                }
-                if (out_inst) {
-                    *out_inst = (void*)((const uint8_t*)inst + (t.adj >> 1));
-                }
-                return func{ .pfunc = t.ptr }; // not a virtual method
-            }
-        #else
-            // Standard Itanium ABI: virtual flag is in ptr field (ptr & 1),
-            // ptr is vtable byte offset + 1
-            struct VCallThunk {
-                union {
-                    void* method;
-                    size_t vtable_index; // vtable byte offset + 1 (always odd for virtual)
-                };
-                size_t this_adjustment;
-            };
-            template<class FClass, class MethodType>
-            static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
-            {
-                auto& t = *(struct VCallThunk*)&method;
-                if (size_t(t.method) & 1u) { // is_virtual? (Itanium: virtual flag in ptr)
-                    auto* vtable = (struct VTable*) *(void**)inst; // NOLINT
-                    size_t voffset = (t.vtable_index - 1) / sizeof(void*);
-                    if (out_inst) {
-                        *out_inst = (void*)((const uint8_t*)inst + t.this_adjustment);
-                    }
-                    return { .pfunc = vtable->entries[voffset] }; // resolve from vtable NOLINT
-                }
-                return func{ .pfunc = t.method }; // not a virtual method
-            }
-        #endif
-        #elif __GNUG__ // G++
-            template<class IClass, class FClass, class MethodType>
-            static func devirtualize(IClass* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
-            {
-                #pragma GCC diagnostic push
-                #pragma GCC diagnostic ignored "-Wpmf-conversions"
-                #pragma GCC diagnostic ignored "-Wpedantic"
-                (void)out_inst;
-                memb_type mfunc = (memb_type)(inst->*method); // de-virtualize / pmf-conversion
-                return func{ .mfunc = mfunc };
-                #pragma GCC diagnostic pop
+                static_assert(sizeof(method) == sizeof(VCallThunk));
+                VCallThunk t;
+                memcpy(&t, &method, sizeof(t));
+            #if defined(__arm__) || defined(__aarch64__) || defined(__wasm__) || defined(__mips__)
+                // ARM variant: adj is (this_adjustment * 2) | is_virtual, because a function address can be odd
+                const bool is_virtual = t.adj & 1;
+                const ptrdiff_t adjust = t.adj >> 1;
+                const size_t voffset = size_t(t.ptr);
+            #else
+                const bool is_virtual = size_t(t.ptr) & 1u; // ptr is the vtable byte offset + 1
+                const ptrdiff_t adjust = t.adj;
+                const size_t voffset = size_t(t.ptr) - 1;
+            #endif
+                void* self = (void*)((const uint8_t*)inst + adjust);
+                *out_inst = self;
+                if (!std::is_polymorphic_v<FClass> || !is_virtual) return func{ .pfunc = t.ptr };
+                auto* vtable = (struct VTable*) *(void**)self; // NOLINT
+                return func{ .pfunc = vtable->entries[voffset / sizeof(void*)] }; // NOLINT
             }
         #endif
 
         template<class IClass, class FClass, class MethodType> void init_method(IClass* inst, MethodType FClass::*method) noexcept
         {
-            obj = inst;
-            f = devirtualize(inst, method, &obj);
+            FClass& base = *inst; // a method of a non-primary or a virtual base runs on that base subobject
+            obj = &base;
+            f = devirtualize(&base, method, &obj);
             RPP_DELEGATE_DEBUG("delegate::init_method(%p,%p)", obj, f.fun);
             destructor = nullptr;
             proxy_copy = nullptr;
@@ -448,15 +414,17 @@ namespace rpp
         // this ensures `const int&` is correctly passed as `int` and vice-versa
         template<class IClass, class FClass, class MethodType> void init_adapter(IClass* inst, MethodType FClass::*method) noexcept
         {
-            RPP_DELEGATE_DEBUG("delegate::init_adapter(%p,%p)", inst, devirtualize(inst, method).pfunc);
+            RPP_DELEGATE_DEBUG("delegate::init_adapter(%p)", inst);
             *this = [inst, method](Args... args) -> Ret {
                 return (inst->*method)(std::forward<Args>(args)...);
             };
         }
         template<class IClass, class FClass, class MethodType> bool equal_method(IClass* inst, MethodType FClass::*method) const noexcept
         {
-            func tmp = devirtualize(inst, method);
-            return f.fun == tmp.fun;
+            FClass& base = *inst;
+            void* self = &base;
+            func tmp = devirtualize(&base, method, &self);
+            return f.fun == tmp.fun && obj == self;
         }
 
     public:
@@ -654,14 +622,14 @@ namespace rpp
         /** @brief Class member function comparison is instance sensitive */
         template<class IClass, class FClass> bool equals(IClass* inst, Ret (FClass::*method)(Args...)) const noexcept
         {
-            return obj == inst && (!inst || equal_method(inst, method));
+            return inst ? equal_method(inst, method) : obj == nullptr;
         }
 
         /** @brief Class member function comparison is instance sensitive */
         template<class IClass, class FClass> bool equals(const IClass* inst, Ret (FClass::*method)(Args...) const) const noexcept
         {
             using NonConstMethod = Ret (FClass::*)(Args...);
-            return obj == inst && (!inst || equal_method(const_cast<IClass*>(inst), NonConstMethod(method)));
+            return inst ? equal_method(const_cast<IClass*>(inst), NonConstMethod(method)) : obj == nullptr;
         }
 
         /** @brief Compares Functor by signature. */
