@@ -497,6 +497,15 @@ TestImpl(test_async)
         AssertThat(second.get(), 5);
     }
 
+    // std::optional held a const value, and the holder which replaced it keeps that
+    TestCase(a_promise_of_a_const_value)
+    {
+        promise<const int> p;
+        future<const int> f = p.get_future();
+        p.set_value(3);
+        AssertThat(f.get(), 3);
+    }
+
     TestCase(detach_abandons_an_unready_future)
     {
         promise<std::string> p;
