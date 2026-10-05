@@ -102,10 +102,13 @@ namespace rpp
             static constexpr int CLAIMED = 1; // one publisher owns the result
             static constexpr int READY = 2; // the result is out
             static constexpr int WAITER = 4; // a thread blocks on `done`
+            static constexpr int FUTURE_REF = 1; // the reference of the one future
+            static constexpr int RETRIEVED = 2; // get_future() gave the future, and this stays set
+            static constexpr int PROMISE_REF = 4; // the reference of each promise copy
 
             rpp::semaphore_once_flag done; // wakes a thread which blocks on the result, only after it set WAITER
             std::atomic_int status { 0 };
-            std::atomic_int refs { 1 }; // counts the promise, and the future after get_future()
+            std::atomic_int refs { PROMISE_REF };
             std::atomic<void*> next { nullptr }; // the step which follows the result, or this state after the result is out
             std::exception_ptr error;
             holder<T> value;
@@ -130,12 +133,31 @@ namespace rpp
                 return !ready() && (status.fetch_or(WAITER, std::memory_order_acq_rel) & READY) == 0;
             }
 
-            /// Drops one owner, and deletes the state after the last one
-            void release() noexcept
+            /// Drops the reference `ref`, and deletes the state after the last one
+            void release(int ref) noexcept
             {
-                // acq_rel, so the owner which deletes sees every write of the other owner
-                if (refs.fetch_sub(1, std::memory_order_acq_rel) == 1)
+                // acq_rel, so the owner which deletes sees every write of the other owners
+                if ((refs.fetch_sub(ref, std::memory_order_acq_rel) & ~RETRIEVED) == ref)
                     delete this;
+            }
+
+            /// Takes the reference of the one future. @returns false when a promise copy already gave it
+            bool retrieve() noexcept
+            {
+                int old = refs.load(std::memory_order_relaxed); // relaxed, because the promise already owns the state
+                do { if (old & RETRIEVED) return false; }
+                while (!refs.compare_exchange_weak(old, old + RETRIEVED + FUTURE_REF, std::memory_order_relaxed));
+                return true;
+            }
+
+            /// Drops a promise copy while another one remains. @returns false for the last copy, which keeps its reference
+            bool drop_copy() noexcept
+            {
+                int old = refs.load(std::memory_order_relaxed);
+                while (old >= 2 * PROMISE_REF) // a CAS, so two copies which end together never both skip the last copy
+                    if (refs.compare_exchange_weak(old, old - PROMISE_REF, std::memory_order_acq_rel, std::memory_order_relaxed))
+                        return true;
+                return false;
             }
 
             /// Attaches the step which follows. @returns false when the result is already out, so `c` stays with the caller
@@ -158,7 +180,7 @@ namespace rpp
             /// Moves the result out and leaves no copy of the error, then drops the reference of the future. See BUGS.md C31
             T take()
             {
-                struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(); } } ref { this };
+                struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(FUTURE_REF); } } ref { this };
                 if constexpr (std::is_void_v<T>) { if (!error) return; }
                 else if (value.alive) return std::move(value.obj);
                 std::rethrow_exception(std::exchange(error, nullptr)); // libc++ 18 copies an exception_ptr on a move
@@ -176,19 +198,23 @@ namespace rpp
     }
 
 
-    /// The producer half of an rpp::future, which publishes one value or one exception
+    /// The producer half of an rpp::future, which publishes one value or one exception. Its copies share one state
     template<class T>
     class promise
     {
     protected:
         detail::future_state<T>* state = new detail::future_state<T>{};
-        bool retrieved = false; // get_future() gives exactly one future
         bool inline_next = false; // a caller may publish under a lock, so only a pool step runs the next step inline
 
     public:
         promise() = default;
-        promise(promise&& p) noexcept
-            : state{std::exchange(p.state, nullptr)}, retrieved{p.retrieved}, inline_next{p.inline_next} {}
+        promise(promise&& p) noexcept : state{std::exchange(p.state, nullptr)}, inline_next{p.inline_next} {}
+
+        /// Shares the state, so each copy can publish the result or give the one future
+        promise(const promise& p) noexcept : state{p.state}, inline_next{p.inline_next}
+        {
+            if (state) state->refs.fetch_add(detail::future_state<T>::PROMISE_REF, std::memory_order_relaxed);
+        }
 
         /// Abandons the state this promise holds, as the destructor does, then takes the state of `p`
         promise& operator=(promise&& p) noexcept
@@ -197,21 +223,21 @@ namespace rpp
             {
                 abandon();
                 state = std::exchange(p.state, nullptr);
-                retrieved = p.retrieved;
                 inline_next = p.inline_next;
             }
             return *this;
         }
 
-        /// Publishes the stored result, or a std::logic_error to a future which got none, so no waiter blocks forever
+        /// Abandons the state this promise holds, as the destructor does, then shares the state of `p`
+        promise& operator=(const promise& p) noexcept { return *this = promise{p}; }
+
+        /// The last copy publishes the stored result, or a std::logic_error to a future which got none
         ~promise() noexcept { abandon(); }
 
-        /// @returns the future which receives the result. Throws std::logic_error on a second call
+        /// @returns the future which receives the result. Throws std::logic_error when this copy or another one gave it
         RPP_CORO_WRAPPER future<T> get_future()
         {
-            if (!state || retrieved) throw std::logic_error{"rpp::promise has no future to give"};
-            retrieved = true;
-            state->refs.fetch_add(1, std::memory_order_relaxed); // relaxed, because the promise already owns the state
+            if (!state || !state->retrieve()) throw std::logic_error{"rpp::promise has no future to give"};
             return future<T>{state};
         }
 
@@ -254,13 +280,17 @@ namespace rpp
         void abandon() noexcept
         {
             if (!state) return;
-            if (state->claim()) // no publisher came, so this publishes the stored result, or the error below
+            if (!state->drop_copy()) // the last copy publishes the stored result, or the error below
             {
-                if (retrieved && !state->value.alive && !state->error)
-                    state->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
-                state->finish(inline_next);
+                if (state->claim()) // no publisher came
+                {
+                    bool retrieved = (state->refs.load(std::memory_order_relaxed) & state->RETRIEVED) != 0;
+                    if (retrieved && !state->value.alive && !state->error)
+                        state->error = std::make_exception_ptr(std::logic_error{"rpp::promise released its state with no result"});
+                    state->finish(inline_next);
+                }
+                state->release(state->PROMISE_REF);
             }
-            state->release();
             state = nullptr;
         }
     };
@@ -576,7 +606,7 @@ namespace rpp
         }
 
         /// Abandons the result, so the destructor does not terminate on it. Nobody sees the exception of the result
-        void detach() noexcept { if (state) state->release(); state = nullptr; }
+        void detach() noexcept { if (state) state->release(state->FUTURE_REF); state = nullptr; }
 
         /**
          * @brief Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.

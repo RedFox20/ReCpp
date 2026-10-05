@@ -106,6 +106,10 @@ pool thread for each pending step. A promise of the caller starts the step as a 
 the caller can publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the
 step on an `rpp::event_loop`.
 
+`rpp::promise` copies, where `std::promise` only moves. The copies share one state, so a runner
+publishes through one copy while the caller takes the future from another. Only the last copy
+publishes the `std::logic_error` of a promise which nobody fulfilled.
+
 `continue_with()` of both types logs an error which no handler takes with `LogWarning()`.
 `get_all()` collects every future before it rethrows. The `cfuture` overload stops at the first
 exception, so a later future which is not ready terminates in its destructor.

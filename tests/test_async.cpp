@@ -506,6 +506,53 @@ TestImpl(test_async)
         AssertThat(f.get(), 3);
     }
 
+    // a runner publishes through its copy, and the caller takes the future from its own copy later
+    TestCase(a_promise_copy_shares_its_state)
+    {
+        promise<int> caller;
+        rpp::async([runner=caller]() mutable { runner.set_value(7); }).get();
+        future<int> f = caller.get_future();
+        promise<int> late = caller;
+        AssertThrows((void)late.get_future(), std::logic_error);
+        AssertThrows(late.set_value(8), std::logic_error);
+        AssertThat(f.get(), 7);
+
+        future<int> broken;
+        {
+            promise<int> first;
+            broken = first.get_future();
+            promise<int> second;
+            second = first;
+            first = promise<int>{};
+            AssertThat(broken.await_ready(), false); // `second` still shares the state
+        }
+        AssertThrows((void)broken.get(), std::logic_error);
+    }
+
+    // copies which end together on pool threads break the future exactly once
+    TestCase(the_last_promise_copy_breaks_the_future)
+    {
+        for (int round = 0; round < 100; ++round)
+        {
+            promise<int> p;
+            future<int> f = p.get_future();
+            std::atomic_bool go { false };
+            std::vector<future<void>> ends;
+            for (int i = 0; i < 4; ++i)
+                ends.push_back(rpp::async([&go, copy=p] { while (!go) rpp::yield(); })); // the copy ends with the task
+            p = promise<int>{};
+            go = true;
+            for (future<void>& end : ends) end.get();
+            if (f.wait_for(rpp::seconds(1)) != rpp::wait_result::finished) // a hang guard, the last copy publishes
+            {
+                f.detach(); // the case fails, and the destructor does not terminate on it
+                AssertFailed("no promise copy published in round %d", round);
+                break;
+            }
+            AssertThrows((void)f.get(), std::logic_error);
+        }
+    }
+
     TestCase(detach_abandons_an_unready_future)
     {
         promise<std::string> p;
