@@ -15,7 +15,7 @@
 
 namespace rpp
 {
-    // gcc warns in an importer when only the definition carries [[deprecated]], so this declaration carries it too
+    // a gcc importer which includes this header first drops the attribute, unless this declaration has it too
     template<class T = void>
     class RPP_DEPRECATED_CFUTURE NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
 

@@ -207,7 +207,7 @@ buries the sites the consumer has to fix. GCC does not suppress a use inside a d
 entity, so the region is what does it:
 
 ```cpp
-// future_types.h. gcc warns in an importer when only the definition carries the attribute
+// future_types.h. A gcc importer which includes it first drops an attribute this line lacks
 template<class T = void> class RPP_DEPRECATED_CFUTURE NODISCARD cfuture;
 
 // future.h, event_loop.h and coroutines.h. config.h defines the pair for GCC, clang and MSVC
@@ -218,16 +218,17 @@ RPP_IGNORE_DEPRECATED_END
 
 Measured on gcc-13, gcc-14, gcc-15, clang-18 and clang-20. Each one warns at every consumer
 site and at no line of a ReCpp header. clang-18 misses the `cpromise` alias, which clang-20
-reports.
+reports. `run_test.py --warn-free` pins this on gcc-15, through the header and through
+`import rpp.future`.
 
 **B30 reaches a module importer until changeset 3.** gcc-14 and gcc-15 also warn at
 `future.h:260`, once for each `cfuture::then()` the importer instantiates. clang-20 keeps the
 region across the boundary. An importer region hides the line, so `test_modules_future.cpp`
 stays quiet.
 
-**MSVC needs its own half, and CI measures it.** `#pragma warning(push)` with `disable: 4996`
-is the shape. The `win64-cpp20-msvc` and `consumer-msvc` rows compile the header, so CI
-reads the answer from them rather than from a guess.
+**MSVC is not measured.** `#pragma warning(push)` with `disable: 4996` is the shape.
+`CMakeLists.txt` passes `/wd4996` to every ReCpp target, and the one `consumer-msvc` unit
+which names `cfuture` disables C4996 itself. So no CI row reports C4996.
 
 **It landed before changeset 2.** `event_loop.h` and `coroutines.h` still name `cfuture`, so
 each one wraps its namespace in the same region until changeset 2 ports it. The tests which
