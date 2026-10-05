@@ -9,11 +9,10 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ## Open
 
 ### B35. A `noexcept` error handler does not compile
-`rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function.
-So `first_arg_type` fails on the call operator of a `noexcept` lambda, in `rpp::future::then()`
-and in `cfuture::then()`. A handler such as `[](const std::runtime_error&) noexcept { return 2; }`
-fails on g++ 14.4 with `'operator()' is not a member of`, and on clang-18 with `cannot be used
-prior to '::'`. The same handler without `noexcept` compiles, and so does a `noexcept` task.
+`rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
+`first_arg_type` fails on a `noexcept` lambda. A handler such as `[](const std::runtime_error&)
+noexcept { return 2; }` fails in `rpp::future::then()` and `cfuture::then()`, on g++ 14.4 and
+clang-18. The same handler without `noexcept` compiles.
 
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
 `test_timer::proc_cpu_times` reads `t1` before it spins, and asserts at `test_timer.cpp:733` that
@@ -294,22 +293,13 @@ Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
 run. B17 reported on the same commit instead, which is a different race in another test.
 
-A second sighting came on 78c9827, in `ubuntu-cpp23-tsan-clang18` and
-`test_future::cross_thread_exception_propagation`. The detached libc++ `std::async` worker frees
-the exception object in `__cxa_end_catch`. The main thread read `e.what()` of that object at
-`test_future.cpp:91`, and all 658 cases passed. The catch block of the main thread holds a
-reference to the exception, so the free comes after the read. libc++abi is not built with TSAN,
-so TSAN does not see the refcount which orders them.
-
-C31 has the same shape in `rpp::future`. libc++ `__assoc_state::move()` rethrows a copy of
-`__exception_`, so the `std::future` state inside `cfuture` keeps the exception after `get()`.
-
-A caller can reach the same pair through `rpp::future` alone. It passes
-`std::make_exception_ptr(std::runtime_error{"x"})` to `promise::set_exception()`. The argument
-shares its libc++ message buffer with the published exception. The caller frees it while a
-`then()` handler reads `e.what()` on a pool thread. In 3 of 5 clang-18 TSAN runs, it reported the
-pair once. With the exception built before the race, 0 of 5 runs reported it.
-`test_sanitizers.cpp:23-24` already suppresses the destructor frames of this pair.
+A second sighting came in `ubuntu-cpp23-tsan-clang18`, in
+`test_future::cross_thread_exception_propagation`. The libc++ `std::async` worker frees the
+exception in `__cxa_end_catch` after the main thread read `e.what()`. TSAN does not see the
+libc++abi refcount which orders the two. `cfuture` keeps this shape, because libc++
+`__assoc_state::move()` rethrows a copy of the stored exception. `rpp::future` reaches it when a
+caller frees the `exception_ptr` it gave `set_exception()` while a handler reads `e.what()`, in 3
+of 5 clang-18 TSAN runs. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
 
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
@@ -353,9 +343,7 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 |---|---|
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
-| `ubuntu-cpp20-asan-clang18`, one run | `frames` reached 0, and 632 of 633 cases passed |
-| `ubuntu-cpp20-modules-clang21`, a second run | `frames` reached 0, and the re-run passed |
-| `ubuntu-cpp20-asan-clang20`, one run | `frames` reached 0, and the re-run passed |
+| three asan and modules runs in #104 | `frames` reached 0 in one case each |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
@@ -366,18 +354,9 @@ during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop 
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
 than on the scheduler.
 
-**The skew check fired in CI.** Android jobs reported `skewed.load() => '1' BUT EXPECTED '0'`
-at `test_event_loop.cpp:1388`. Each one runs the tests under QEMU on an x86 runner. So one
-reader paired an offset with another generation, which the publish order above exists to stop.
-
-| Where | Result |
-|---|---|
-| `android-cpp20-r27-clang-tidy-clang18` | 1 run in 3 failed, and its re-run passed |
-| `android-cpp20-r28b-clang-tidy-clang19` | 1 run failed, and 632 of 633 cases passed |
-| `android-cpp20-r29-ninja` | 1 run failed, and its re-run passed |
-| `android-cpp20-r27-clang-tidy-clang18`, a second run | 1 run failed, and 644 of 645 cases passed |
-| `android-cpp20-r28b-clang-tidy-clang19`, a second run | 1 run failed, and its re-run passed |
-| `test_event_loop` locally, gcc-14 | 20 runs out of 20 pass on 4 cores, and 20 out of 20 on one core |
+**The skew check fired in CI.** Five Android runs under QEMU in #104 failed
+`skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1388`, one case each. So one reader
+paired an offset with another generation. 20 local gcc-14 runs out of 20 pass, on 4 cores and on one.
 
 **qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
 on a6c2bd6 in #109, and 2 on the re-run. qemu-user on an x86 host fences before an STLR store
@@ -630,10 +609,8 @@ gives a parallel loop no margin over a single thread. AGENTS.md R2 already says 
 event, not on the clock.
 
 A fourth shape trusts the CPU time the kernel reports. `test_timer::proc_cpu_times` spins 50 ms
-and requires 45 ms of CPU time at `test_timer.cpp:749`. A local clang-18 TSAN run got
-`cpu_delta => '42103'`. On a 4 core VM, the case alone failed that floor 1 of 5 times under TSAN.
-It failed 1 of 20 times on plain gcc-14, at a load average of 0.02. `/proc/stat` on that VM
-reports steal time, which its load average does not show.
+and requires 45 ms of CPU time at `test_timer.cpp:749`, which failed 1 of 5 runs under TSAN on a
+4 core VM. That VM reports steal time in `/proc/stat`, which its load average does not show.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
@@ -777,9 +754,6 @@ headers it returns nothing for: 22
   tests.macros.h traits.h
 ```
 
-`async.h` is new and blind to the gate, so a manual read matched a README.md row to each of
-its public names.
-
 Reproduce it with the loop which produced that count:
 ```bash
 python3 -c "
@@ -793,7 +767,7 @@ for h in sorted(os.listdir('src/rpp')):
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
 the 22 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` points a row at a call or a comment, and `--check` accepts it
+### B5. `update_doc_linerefs.py` matches a name in the wrong place
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
@@ -801,19 +775,9 @@ After a header edit moved `socket_poller::wake()`, it pointed the ref at the tra
 comment on `socket_poller::armed`, which names `wake()`, not at the declaration.
 Corrected by hand, and `--check` accepts the corrected line.
 
-A tie between candidates goes to the line nearest the old reference. After an edit moves the
-declaration, the nearest line can be a call, a trailing comment, or a forward declaration.
-`--check` then passes, because it only asks whether the row names some candidate.
-
-Nine rows still sit on such a line, so they reproduce it:
-
-| Row | Points at |
-|---|---|
-| `sprint.h` `string_buffer`, `task.h` `task<T>` and `deferred<T>`, `tests.h` `test` | a forward declaration |
-| `sprint.h` `write_cont`, `delegate.h` `reset()`, `collections.h` `find_smallest` and `find_largest`, `concurrent_queue.h` `try_pop` | a call |
-
-A display text which names a parameter the call also names scores the call higher, so it wins
-without a tie. A fix ranks a declaration above a call before the distance breaks the tie.
+A tie goes to the candidate nearest the old line, which can be a call, a trailing comment or a
+forward declaration, and `--check` accepts any candidate. `task.h` `task<T>` and `delegate.h`
+`reset()` are two of nine rows which reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
 

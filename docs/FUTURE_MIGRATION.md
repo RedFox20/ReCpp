@@ -99,22 +99,15 @@ The names below read the same on both types, so a mechanical port compiles.
 - the destructor which drains a ready result and terminates on an unawaited one
 - `co_await`, through the same operator set
 
-`detach()` keeps its name and drops its cost. It releases the state at once, so no pool thread
-blocks on an abandoned result.
+`detach()` releases the state at once, so no pool thread blocks on an abandoned result.
+`then()`, `continue_with()` and `co_await` park no thread. The pool thread which publishes the
+result runs the step inline, so a chain of `rpp::async` steps runs on one worker. `cfuture` parks a
+pool thread for each pending step. A promise of the caller starts the step as a pool task, because
+the caller can publish under a lock. `then(loop, task)` runs the step on an `rpp::event_loop`.
 
-`then()`, `continue_with()` and `co_await` keep their names and park no thread. The step
-attaches to the shared state, and the pool thread which publishes the result runs it inline.
-So a chain of `rpp::async` steps runs on one worker. `cfuture` parks one pool thread for each
-pending step. A promise of the caller starts the step as a pool task, because the caller can
-publish under a lock. `then(loop, task)` and `continue_with(loop, task)` run the step on the
-thread of an `rpp::event_loop` instead.
-
-In `continue_with()` of both types, an error which no handler takes goes to `LogWarning()`, and
-the program continues.
-
-`get_all()` keeps its name and collects every future before it rethrows the first exception.
-The `cfuture` overload stops at the first one, so a later future which is not ready terminates
-in its destructor.
+`continue_with()` of both types logs an error which no handler takes with `LogWarning()`.
+`get_all()` collects every future before it rethrows, where the `cfuture` overload stops at the
+first exception.
 
 `rpp::task<T>` does not overlap this. A task resumes on the loop thread and spawns nothing.
 A future carries `.then()`, and its `get()` blocks the caller. See `task.h`.
