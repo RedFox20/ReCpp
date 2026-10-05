@@ -8,6 +8,8 @@
 #include <string> // std::string
 using namespace rpp;
 using namespace std::string_literals;
+// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
+RPP_IGNORE_DEPRECATED_BEGIN
 
 TestImpl(test_concurrent_queue)
 {
@@ -935,3 +937,5 @@ TestImpl(test_concurrent_queue)
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 };
+
+RPP_IGNORE_DEPRECATED_END

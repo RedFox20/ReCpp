@@ -35,18 +35,23 @@ no longer apply. So a suppression which holds for a header consumer reaches no i
 pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
 `run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
 
-Three regions remain, and each one sits in a template a module exports:
+Four regions remain, and each one sits in a template a module exports:
 
 | Where | Suppresses | An importer at `-Wall -Wextra` |
 |---|---|---|
 | `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` | warns at `delegate.h:433` |
 | `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` | warns at `tests.h:413` |
 | `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` | no probe has run |
+| `future.h`, the `cfuture` region | `-Wdeprecated-declarations` | warns at `future.h:260`, once for each `cfuture::then()` |
 
-Each one wraps the GNU pmf-conversion extension, which has no standard spelling, so the cast
-cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
+The first three wrap the GNU pmf-conversion extension, which has no standard spelling, so the
+cast cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
 flag set. The ReCpp build stays quiet because every consumer includes the header before the
 import. Measured on gcc-15.
+
+The fourth ends with changeset 3 of `docs/FUTURE_MIGRATION.md`, when `rpp.future` stops exporting
+`cfuture`. gcc-14 shows it too, and clang-20 keeps the region. `-Wdeprecated-declarations` needs no
+flag either. `test_modules_future.cpp` opens its own region, so the ReCpp build stays quiet.
 
 ### B29. `udp_load_balancer` misses its throughput floor under full-suite load
 `test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate

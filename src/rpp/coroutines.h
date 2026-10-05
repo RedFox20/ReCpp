@@ -12,6 +12,8 @@
 #include "thread_pool.h" // rpp::parallel_task_detached
 
 
+// these awaiters take rpp::cfuture until changeset 2 of docs/FUTURE_MIGRATION.md
+RPP_IGNORE_DEPRECATED_BEGIN
 namespace rpp
 {
     /**
@@ -318,3 +320,4 @@ namespace rpp
         }
     }
 } // namespace rpp
+RPP_IGNORE_DEPRECATED_END

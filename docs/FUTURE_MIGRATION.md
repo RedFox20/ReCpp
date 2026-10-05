@@ -10,8 +10,8 @@ stay in the header, and they keep every behavior they have today.
 **No existing consumer changes.** A project which includes `rpp/future.h` keeps `cfuture`
 and compiles as before. A project which imports `rpp.threading` gets the new type.
 
-**A consumer does move.** `cfuture` takes a `[[deprecated]]` attribute in the last
-changeset, so every remaining site names itself in the compiler output. See section 6.1.
+**A consumer does move.** `cfuture` carries a `[[deprecated]]` attribute, so every
+remaining site names itself in the compiler output. See section 6.1.
 
 ---
 
@@ -203,29 +203,32 @@ buries the sites the consumer has to fix. GCC does not suppress a use inside a d
 entity, so the region is what does it:
 
 ```cpp
-template<class T> class RPP_DEPRECATED_CFUTURE cfuture : public std::future<T> { ... };
-#if defined(__GNUC__)
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-// async_task, make_ready_future, wait_all, get_all and run_tasks declare in here
-#if defined(__GNUC__)
-#  pragma GCC diagnostic pop
-#endif
+// future_types.h. gcc warns in an importer when only the definition carries the attribute
+template<class T = void> class RPP_DEPRECATED_CFUTURE NODISCARD cfuture;
+
+// future.h, event_loop.h and coroutines.h. config.h defines the pair for GCC, clang and MSVC
+RPP_IGNORE_DEPRECATED_BEGIN
+namespace rpp { ... } // async_task, make_ready_future, wait_all, get_all and run_tasks declare in here
+RPP_IGNORE_DEPRECATED_END
 ```
 
-Measured on gcc-15, gcc-14 and clang-18. All three agree, every consumer line warns once,
-and no line of the header warns at all. B30 does not reach this, because `future.h` is the
-header path and no module carries it after changeset 3.
+Measured on gcc-13, gcc-14, gcc-15, clang-18 and clang-20. Each one warns at every consumer
+site and at no line of a ReCpp header. clang-18 misses the `cpromise` alias, which clang-20
+reports.
+
+**B30 reaches a module importer until changeset 3.** gcc-14 and gcc-15 also warn at
+`future.h:260`, once for each `cfuture::then()` the importer instantiates. clang-20 keeps the
+region across the boundary. An importer region hides the line, so `test_modules_future.cpp`
+stays quiet.
 
 **MSVC needs its own half, and CI measures it.** `#pragma warning(push)` with `disable: 4996`
-is the shape. The `win64-cpp20-msvc` and `consumer-msvc` rows compile the header, so
-changeset 5 reads the answer from them rather than from a guess.
+is the shape. The `win64-cpp20-msvc` and `consumer-msvc` rows compile the header, so CI
+reads the answer from them rather than from a guess.
 
-**It lands last, not first.** The attribute fires wherever a name is used, so `event_loop.h`
-and `coroutines.h` must stop naming `cfuture` first. That is changeset 2, so the deprecation
-is changeset 5. The legacy cases in `test_future.cpp` carry the same file scope suppression,
-because they test the deprecated type on purpose.
+**It landed before changeset 2.** `event_loop.h` and `coroutines.h` still name `cfuture`, so
+each one wraps its namespace in the same region until changeset 2 ports it. The tests which
+still use `cfuture` carry a file scope region. `test_future.cpp`, `test_modules_future.cpp`
+and `future_module_only.cpp` test the deprecated type on purpose.
 
 `cpromise` takes the attribute beside the type, because a site which ports one ports both.
 
@@ -245,8 +248,9 @@ Each one lands on its own and leaves the tree green.
    whether B28 condition 1 is really gone.
 4. **A downstream project ports its own files**, one at a time, with the header still
    available for the files it has not reached.
-5. **`cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**, unconditionally.
-   Every consumer site then names itself on the next build. See 6.1.
+5. **Landed. `cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**,
+   unconditionally. It landed before changesets 2 to 4, so each header and test which still
+   names `cfuture` carries a region. Every consumer site names itself on the next build. See 6.1.
 
 Changeset 3 is the one which pays, and it pays twice over. The module stops carrying
 `<future>`, which is the smaller and surer win. Whether that also ends the gcc-14 crash is
@@ -284,6 +288,7 @@ in place of the std includes a modules build still writes. That one also needs g
    exports no `cfuture`, no `async_task` and no `std_future_awaiter`.
 5. The header path still builds `cfuture` and passes every case it passes today. The two
    `std::future` coroutine cases still pass through `rpp/std_awaiter.h`.
-6. A consumer build warns once at every `cfuture` site and at no line of `future.h` itself.
-   The ReCpp build stays warning free, because the legacy cases suppress it by file.
+6. A consumer build warns at every `cfuture` site and at no line of `future.h` itself. A gcc
+   module importer also warns at `future.h` until changeset 3, see B30. The ReCpp build stays
+   warning free, because the legacy cases suppress it by file.
 7. One downstream project builds against the branch before changeset 3 merges.

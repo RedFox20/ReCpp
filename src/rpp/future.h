@@ -14,6 +14,9 @@
 #include <optional> // for async_task() deterministic task cleanup
 #include <future> // std::future, std::promise, std::future_status
 
+// the library names cfuture in its own declarations, so only the lines of a consumer warn
+RPP_IGNORE_DEPRECATED_BEGIN
+
 namespace rpp
 {
     // These name std::future, so they live here and not in future_types.h. Every header
@@ -51,7 +54,7 @@ namespace rpp
      * @brief Alias to std::promise<T>
      */
     template<typename T>
-    using cpromise = std::promise<T>;
+    using cpromise RPP_DEPRECATED_CFUTURE = std::promise<T>;
 
     namespace detail
     {
@@ -87,7 +90,7 @@ namespace rpp
      * @returns Composable future with return value set to task() return value.
      */
     template<typename Task>
-    RPP_CORO_WRAPPER auto async_task(Task task) noexcept -> cfuture<task_return_t<Task>>
+    RPP_DEPRECATED_CFUTURE RPP_CORO_WRAPPER auto async_task(Task task) noexcept -> cfuture<task_return_t<Task>>
     {
         using T = task_return_t<Task>; // decay_t on the return type
         cpromise<T> p;
@@ -188,7 +191,7 @@ namespace rpp
      * @endcode
      */
     template<typename T>
-    class NODISCARD RPP_CORO_RETURN_TYPE cfuture : public std::future<T>
+    class RPP_DEPRECATED_CFUTURE NODISCARD RPP_CORO_RETURN_TYPE cfuture : public std::future<T>
     {
     public:
         using super = std::future<T>;
@@ -609,7 +612,7 @@ namespace rpp
      * Composable Futures with Coroutine support. See docs in cfuture<T>.
      */
     template<>
-    class NODISCARD RPP_CORO_RETURN_TYPE cfuture<void> : public std::future<void>
+    class RPP_DEPRECATED_CFUTURE NODISCARD RPP_CORO_RETURN_TYPE cfuture<void> : public std::future<void>
     {
     public:
         using super = future<void>;
@@ -1015,7 +1018,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already completed. Useful for some chaining edge cases. */
     template<typename T>
-    RPP_CORO_WRAPPER inline auto make_ready_future(T value) -> cfuture<T>
+    RPP_DEPRECATED_CFUTURE RPP_CORO_WRAPPER inline auto make_ready_future(T value) -> cfuture<T>
     {
         std::promise<T> p;
         p.set_value(std::move(value));
@@ -1023,7 +1026,7 @@ namespace rpp
     }
 
     /** @brief Creates a future<void> which is already completed. Useful for some chaining edge cases. */
-    RPP_CORO_WRAPPER inline auto make_ready_future() -> cfuture<void>
+    RPP_DEPRECATED_CFUTURE RPP_CORO_WRAPPER inline auto make_ready_future() -> cfuture<void>
     {
         std::promise<void> p;
         p.set_value();
@@ -1032,7 +1035,7 @@ namespace rpp
 
     /** @brief Creates a future<T> which is already errored with the exception. Useful for some chaining edge cases. */
     template<typename T, typename E>
-    RPP_CORO_WRAPPER inline auto make_exceptional_future(E e) -> cfuture<T>
+    RPP_DEPRECATED_CFUTURE RPP_CORO_WRAPPER inline auto make_exceptional_future(E e) -> cfuture<T>
     {
         std::promise<T> p;
         p.set_exception(std::make_exception_ptr(std::forward<E>(e)));
@@ -1103,3 +1106,4 @@ namespace rpp
         return wait_all(futures);
     }
 } // namespace rpp
+RPP_IGNORE_DEPRECATED_END

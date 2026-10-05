@@ -7,6 +7,8 @@ using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
 using namespace std::string_literals;
+// these cases test the deprecated rpp::cfuture on purpose
+RPP_IGNORE_DEPRECATED_BEGIN
 
 // NOLINTBEGIN(performance-*)
 
@@ -421,3 +423,5 @@ TestImpl(test_future)
 };
 
 // NOLINTEND(performance-*)
+
+RPP_IGNORE_DEPRECATED_END

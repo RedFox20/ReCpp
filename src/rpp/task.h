@@ -40,7 +40,7 @@ namespace rpp
      *
      * NOT a future: there is intentionally no `get()` / `wait()`. These are for coroutine code
      * (`co_await`); a top-level task is driven by `event_loop::run_until_done()`. Use
-     * `rpp::cfuture<T>` when you need a thread-blocking future or `.then()`.
+     * `rpp::future<T>` when you need a thread-blocking future or `.then()`.
      *
      * LIFETIME: a running task must outlive its completion — destroying one whose body is still
      * suspended on a background leaf is undefined (the leaf would resume a destroyed frame). The
