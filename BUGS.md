@@ -351,7 +351,7 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 |---|---|
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
-| three asan and modules runs in #104 | `frames` reached 0 in one case each |
+| `ubuntu-cpp20-asan-clang18`, `ubuntu-cpp20-modules-clang21` and `ubuntu-cpp20-asan-clang20` twice, in #104 | `frames` reached 0 in one case each |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
@@ -362,9 +362,11 @@ during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop 
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
 than on the scheduler.
 
-**The skew check fired in CI.** Five Android runs under QEMU in #104 failed
-`skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1399`, one case each. So one reader
-paired an offset with another generation. 20 local gcc-14 runs out of 20 pass, on 4 cores and on one.
+**The skew check fired in CI.** Under QEMU in #104, `android-cpp20-r27-clang-tidy-clang18` and
+`android-cpp20-r28b-clang-tidy-clang19` failed twice each, and `android-cpp20-r29-ninja` once. Each
+run failed `skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1399` in one case. So one
+reader paired an offset with another generation. 20 local gcc-14 runs out of 20 pass, on 4 cores and
+on one.
 
 **qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
 on a6c2bd6 in #109, and 2 on the re-run. qemu-user on an x86 host fences before an STLR store
@@ -771,7 +773,7 @@ for h in sorted(os.listdir('src/rpp')):
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
 the 22 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` matches a name in the wrong place
+### B5. `update_doc_linerefs.py` points a row at a call or a comment, and `--check` accepts it
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.

@@ -265,7 +265,7 @@ namespace rpp
             ~body_slot() noexcept { reset(); }
 
             /// Destroys the body, once
-            void reset() noexcept { if (std::exchange(alive, false)) body.~Body(); }
+            void reset() noexcept { if (alive) { alive = false; body.~Body(); } }
         };
 
         /// The input of a step which follows no result, as the task of async() does
@@ -538,7 +538,12 @@ namespace rpp
             return forward_after(std::move(next), /*stop_on_error*/true);
         }
 
-        /// Downcasts this future into a future<void>, which waits for the chain and drops the value
+        /**
+         * @brief Downcasts this future into a future<void>, which waits for the chain and drops the value
+         * @code
+         *     co_await rpp::async(operation1).then(operation2).then();
+         * @endcode
+         */
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<void> then() noexcept
         {
             if constexpr (std::is_void_v<T>) return std::move(*this);
@@ -561,10 +566,17 @@ namespace rpp
         }
 
         /// Abandons the result, so the destructor does not terminate on it. Nobody sees the exception of the result
-        void detach() noexcept { if (state) std::exchange(state, nullptr)->release(); }
+        void detach() noexcept { if (state) state->release(); state = nullptr; }
 
-        /// Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.
-        /// @returns this future, which receives the result of `task`. The chain drops the error of every earlier task
+        /**
+         * @brief Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.
+         * @returns this future, which receives the result of `task`. The chain drops the error of every earlier task
+         * @code
+         *     rpp::future<void> tasks;
+         *     tasks.chain_async([&]{ task1(); }).chain_async([&]{ task2(); });
+         *     tasks.get(); // waits for task2, which ran after task1
+         * @endcode
+         */
         template<typename Task>
         future& chain_async(Task task) noexcept
         {
