@@ -2,6 +2,7 @@
 #include <rpp/delegate.h>
 #include <rpp/stack_trace.h>
 #include <functional>
+#include <memory> // std::make_shared
 #include <rpp/tests.h>
 
 namespace rpp
@@ -771,6 +772,25 @@ namespace rpp
 
             AssertEqual(original(data), "copy_lambda");
             AssertEqual(copied(data), "copy_lambda");
+        }
+
+        TestCase(copy_keeps_the_captures_of_the_source)
+        {
+            auto state = std::make_shared<int>(42);
+            auto lambda = [state] { return state ? *state : -1; }; // a moved-out capture reads as a sentinel, not a crash
+
+            rpp::delegate<int()> original { lambda };
+            rpp::delegate<int()> copied { original };
+            AssertThat(original(), 42);
+            copied = original;
+            AssertThat(original(), 42);
+            AssertThat(copied(), 42);
+
+            original = lambda;
+            AssertThat(lambda(), 42);
+            original.reset(lambda);
+            AssertThat(lambda(), 42);
+            AssertThat(state.use_count(), 4); // the owners are state, lambda, original and copied
         }
 
         ////////////////////////////////////////////////////

@@ -302,7 +302,7 @@ namespace rpp
             }
             else
             {
-                init_functor(std::move(function));
+                init_functor(std::forward<FunctionType>(function));
             }
         }
 
@@ -575,7 +575,10 @@ namespace rpp
         template<class FunctorType> static void functor_copy(void* self, delegate& dest) noexcept
         {
             auto* instance = static_cast<FunctorType*>(self);
-            dest.reset(*instance);
+            if constexpr (std::is_copy_constructible_v<FunctorType>)
+                dest.reset(*instance);
+            else // a move-only functor cannot copy, so the copy takes its state
+                dest.reset(std::move(*instance));
         }
 
         template<class Functor> bool equal_functor() const noexcept
