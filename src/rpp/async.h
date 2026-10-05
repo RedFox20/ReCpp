@@ -332,17 +332,13 @@ namespace rpp
         };
 
         /// @returns a step after `in`, whose body `make()` builds in place, so the step never moves the body
-        template<class In, class R, class Make>
-        continuation* make_step(In in, step_promise<R>&& out, const Make& make)
+        /// A `loop` runs the step on its own thread
+        template<class In, class R, class Make, class... Loop>
+        continuation* make_step(In in, step_promise<R>&& out, const Make& make, Loop&... loop)
         {
-            return new step_node<In, R, std::invoke_result_t<const Make&>>{std::move(in), std::move(out), make};
-        }
-
-        /// @returns a step as the other make_step() does, which runs on the thread of `loop`
-        template<class In, class R, class Make, class Loop>
-        continuation* make_step(In in, step_promise<R>&& out, const Make& make, Loop& loop)
-        {
-            return new loop_step_node<Loop, In, R, std::invoke_result_t<const Make&>>{loop, std::move(in), std::move(out), make};
+            using Body = std::invoke_result_t<const Make&>;
+            if constexpr (sizeof...(Loop) == 0) return new step_node<In, R, Body>{std::move(in), std::move(out), make};
+            else return new loop_step_node<Loop..., In, R, Body>{loop..., std::move(in), std::move(out), make};
         }
 
         /// Coroutine hooks of future<T>. ~promise() publishes after the locals end, but before the parameters do.
@@ -555,12 +551,7 @@ namespace rpp
             return forward_after(std::move(next), /*stop_on_error*/true);
         }
 
-        /**
-         * @brief Downcasts this future into a future<void>, which waits for the chain and drops the value
-         * @code
-         *     co_await rpp::async(operation1).then(operation2).then();
-         * @endcode
-         */
+        /// Downcasts this future into a future<void>, which waits for the chain and drops the value
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<void> then() noexcept
         {
             if constexpr (std::is_void_v<T>) return std::move(*this);
@@ -589,20 +580,11 @@ namespace rpp
             state = nullptr;
         }
 
-        /**
-         * @brief Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.
-         * @note The chain swallows the exception of every task before the last one
-         * @returns this future, which receives the result of `task`
-         * @code
-         *     rpp::future<void> tasks;
-         *     tasks.chain_async([&]{ task1(); }).chain_async([&]{ task2(); });
-         *     tasks.get(); // waits for task2, which ran after task1
-         * @endcode
-         */
+        /// Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.
+        /// @returns this future, which receives the result of `task`. The chain drops the error of every earlier task
         template<typename Task>
         future& chain_async(Task task) noexcept
         {
-            // a failed task does not stop the chain, so nobody sees its error
             *this = add_step<T>([&] { return [task=std::move(task)](future& f) mutable -> T { f.detach(); return task(); }; });
             return *this;
         }
