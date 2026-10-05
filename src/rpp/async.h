@@ -70,7 +70,8 @@ namespace rpp
         template<class T>
         struct holder
         {
-            union { std::remove_const_t<T> obj; }; // libstdc++ 15 std::construct_at() rejects a const T*
+            // a union member, so the owner decides when it ends
+            union { std::remove_const_t<T> obj; }; // non-const, because libstdc++ 15 std::construct_at() rejects a const T*
             bool alive = false;
 
             holder() noexcept {}

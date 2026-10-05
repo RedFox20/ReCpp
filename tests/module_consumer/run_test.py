@@ -233,7 +233,8 @@ def check_deprecation(cxx: str) -> str:
             errors = errors_of(prefix + body)
             first = prefix.count('\n') + 3  # the line of the first site
             for line, site in enumerate(DEPRECATED_SITES, first):
-                if f'use.cpp:{line}:' not in errors: return f'{site} compiles silently through {path}'
+                if not any(f'use.cpp:{line}:' in l and 'deprecated' in l for l in errors.splitlines()):
+                    return f'{site} compiles silently through {path}'
     return ''
 
 
