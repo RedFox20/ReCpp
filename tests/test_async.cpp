@@ -26,9 +26,7 @@ using namespace std::string_literals;
 
 TestImpl(test_async)
 {
-    TestInit(test_async)
-    {
-    }
+    TestInit(test_async) {}
 
     TestCase(simple_chaining)
     {
@@ -213,14 +211,10 @@ TestImpl(test_async)
         try { (void)rpp::exceptional_future<int>(std::runtime_error{"aargh!"s}).get(); }
         catch (const std::exception& e) { what = e.what(); }
         AssertThat(what, "aargh!"s);
-    }
 
-    // an exception_ptr from catch (...) names the error, so get() rethrows that error and not the pointer
-    TestCase(exceptional_future_keeps_an_exception_ptr)
-    {
+        // an exception_ptr from catch (...) names the error, so get() rethrows that error and not the pointer
         std::exception_ptr e = std::make_exception_ptr(std::runtime_error{"kept_msg"});
-        future<int> f = rpp::exceptional_future<int>(e);
-        AssertThrows((void)f.get(), std::runtime_error);
+        AssertThrows((void)rpp::exceptional_future<int>(e).get(), std::runtime_error);
     }
 
     // counts its live copies, so a case sees when the last owner freed the exception
@@ -376,7 +370,7 @@ TestImpl(test_async)
         AssertThat(f1.valid(), false);
     }
 
-    // a ready future which nobody collected was not abandoned, so its destructor collects it and returns
+    // a ready future which nobody collected was not abandoned, so its destructor or a move assignment collects it
     TestCase(destructor_collects_a_ready_future)
     {
         { future<int> value = rpp::ready_future(42); }
@@ -385,10 +379,6 @@ TestImpl(test_async)
             future<int> waited = rpp::async([] { return 7; });
             waited.wait(); // the result is ready, and get() never runs
         }
-    }
-
-    TestCase(move_assignment_collects_a_ready_future)
-    {
         future<int> f = rpp::ready_future(1);
         f = rpp::ready_future(2);
         AssertThat(f.get(), 2);
@@ -436,13 +426,14 @@ TestImpl(test_async)
         AssertThrows((void)f.get(), std::logic_error);
     }
 
+    // std::promise gives its future after set_value(), and a port from cpromise relies on that order
     TestCase(a_promise_gives_one_future_and_publishes_once)
     {
         promise<int> p;
-        future<int> f = p.get_future();
-        AssertThrows((void)p.get_future(), std::logic_error);
-
         p.set_value(1);
+        future<int> f = p.get_future();
+        AssertThat(f.await_ready(), true);
+        AssertThrows((void)p.get_future(), std::logic_error);
         AssertThrows(p.set_value(2), std::logic_error);
         AssertThrows(p.set_exception(std::make_exception_ptr(std::runtime_error{"late"})), std::logic_error);
         AssertThat(f.get(), 1);
@@ -491,16 +482,6 @@ TestImpl(test_async)
     TestCase(ready_future_rethrows_a_move_which_throws)
     {
         AssertThrows((void)rpp::ready_future(throws_on_move{}), std::runtime_error);
-    }
-
-    // std::promise gives its future after set_value(), and a port from cpromise relies on that order
-    TestCase(a_promise_gives_its_future_after_it_published)
-    {
-        promise<int> p;
-        p.set_value(7);
-        future<int> f = p.get_future();
-        AssertThat(f.await_ready(), true);
-        AssertThat(f.get(), 7);
     }
 
     // std::vector::erase() needs the move assignment, which breaks the promise it replaces
@@ -593,10 +574,6 @@ TestImpl(test_async)
     {
         auto failing = [] { throw std::domain_error{"continue_with_unhandled_msg"}; };
         AssertThat(continue_with_warns(failing, "continue_with_unhandled_msg"), true);
-    }
-
-    TestCase(continue_with_logs_an_error_of_an_unknown_type)
-    {
         AssertThat(continue_with_warns([] { throw 42; }, "of an unknown type"), true);
     }
 
@@ -721,17 +698,8 @@ TestImpl(test_async)
         std::vector<int> expected { 1, 2 };
         AssertThat(get_all(ints), expected);
 
-        std::vector<future<void>> nothing;
-        nothing.push_back(rpp::async([] {}));
-        nothing.push_back(rpp::ready_future());
-        get_all(nothing);
-        AssertThat(nothing[0].valid(), false);
-    }
-
-    // a future which stays valid in the vector would terminate in its destructor, so get_all() collects every one
-    TestCase(get_all_collects_every_future_before_it_rethrows)
-    {
-        std::vector<future<int>> ints;
+        // a future which stays valid in the vector would terminate in its destructor, so get_all() collects every one
+        ints.clear();
         ints.push_back(rpp::exceptional_future<int>(std::runtime_error{"first_msg"}));
         ints.push_back(rpp::async([] { return 2; }));
         ints.push_back(rpp::exceptional_future<int>(std::domain_error{"second_msg"}));
@@ -740,6 +708,12 @@ TestImpl(test_async)
         AssertThat(ints[2].valid(), false);
 
         std::vector<future<void>> nothing;
+        nothing.push_back(rpp::async([] {}));
+        nothing.push_back(rpp::ready_future());
+        get_all(nothing);
+        AssertThat(nothing[0].valid(), false);
+
+        nothing.clear();
         nothing.push_back(rpp::exceptional_future<void>(std::runtime_error{"first_msg"}));
         nothing.push_back(rpp::exceptional_future<void>(std::domain_error{"second_msg"}));
         AssertThrows(get_all(nothing), std::runtime_error);
@@ -840,7 +814,7 @@ TestImpl(test_async)
         return false;
     }
 
-    TestCase(then_on_a_loop_runs_the_task_on_the_loop_thread)
+    TestCase(then_and_continue_with_on_a_loop_run_the_task_on_the_loop_thread)
     {
         rpp::event_loop loop;
         rpp::uint64 ranOn = 0;
@@ -851,12 +825,8 @@ TestImpl(test_async)
         AssertThat(run_until_ready(loop, f), true); // a hang guard, the loop runs the task
         AssertThat(f.get(), 21);
         AssertThat(ranOn, rpp::get_thread_id());
-    }
 
-    TestCase(continue_with_on_a_loop_runs_the_task_on_the_loop_thread)
-    {
-        rpp::event_loop loop;
-        rpp::uint64 ranOn = 0;
+        ranOn = 0;
         promise<void> ran;
         future<void> done = ran.get_future();
         rpp::async([] { return 42; }).continue_with(loop, [&](int x) {
@@ -905,11 +875,7 @@ TestImpl(test_async)
     TestCase(a_loop_which_drops_the_step_ends_its_promise)
     {
         drop_the_step_after(rpp::ready_future(1));
-    }
-
-    // a dropped step detaches its input, so an error which nobody read fails no assertion
-    TestCase(a_loop_which_drops_the_step_after_an_error_ends_its_promise)
-    {
+        // a dropped step detaches its input, so an error which nobody read fails no assertion
         drop_the_step_after(rpp::exceptional_future<int>(std::runtime_error{"dropped_input_msg"}));
     }
 

@@ -250,19 +250,16 @@ TestImpl(test_future)
         warning_capture bare { "cfuture_bare_msg" };
         rpp::async_task([]() -> int { throw std::domain_error{"cfuture_bare_msg"}; }).continue_with([](int) {});
         AssertThat(bare.wait("continue_with()"), true);
-    }
 
-    // a handler of cfuture<void> which takes another type must not stop the program
-    TestCase(continue_with_on_a_void_future_logs_an_error_of_an_unknown_type)
-    {
-        warning_capture warning { "of an unknown type" };
-        cfuture<void> failed = rpp::async_task([] { throw 42; });
-        failed.continue_with([] {}, [](const std::invalid_argument&) {}); // this handler takes another type
-        AssertThat(warning.wait("continue_with()"), true);
+        // a handler of cfuture<void> which takes another type must not stop the program
+        warning_capture unknown { "of an unknown type" };
+        cfuture<void> failedVoid = rpp::async_task([] { throw 42; });
+        failedVoid.continue_with([] {}, [](const std::invalid_argument&) {});
+        AssertThat(unknown.wait("continue_with()"), true);
 
-        warning_capture bare { "cfuture_void_bare_msg" };
+        warning_capture bareVoid { "cfuture_void_bare_msg" };
         rpp::async_task([] { throw std::domain_error{"cfuture_void_bare_msg"}; }).continue_with([] {});
-        AssertThat(bare.wait("continue_with()"), true);
+        AssertThat(bareVoid.wait("continue_with()"), true);
     }
 
     TestCase(chain_async_futures_void)
