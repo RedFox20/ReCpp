@@ -363,10 +363,11 @@ namespace rpp
             void return_void() noexcept { this->state->value.emplace(); }
         };
 
-        template<class T, class Task>
-        using step_result = std::conditional_t<std::is_void_v<T>, std::invoke_result<Task&>, std::invoke_result<Task&, T>>;
+        /// The result of `Task` on the value of a future<T>. It has no type when `Task` cannot take that value
+        template<class T, class Task> struct step_result : std::invoke_result<Task&, T> {};
+        template<class Task> struct step_result<void, Task> : std::invoke_result<Task&> {}; // a future<void> has no value
 
-        /// The decayed result of a step. It has no type when `Task` cannot take the result
+        /// The decayed result of a step
         template<class T, class Task>
         using next_t = std::decay_t<typename step_result<T, Task>::type>;
 
