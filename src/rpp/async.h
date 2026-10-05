@@ -5,7 +5,8 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include "future_types.h" // rpp::wait_result, rpp::coro_handle, rpp::suspend_never
+#include "future_types.h" // rpp::coro_handle, rpp::suspend_never
+#include "thread_pool.h" // rpp::wait_result
 #include "semaphore.h" // rpp::semaphore_once_flag
 #include "delegate.h" // rpp::delegate, which an event loop runs
 #include "traits.h" // rpp::task_return_t, rpp::first_arg_type
@@ -134,15 +135,9 @@ namespace rpp
             T take()
             {
                 struct release_on_exit { future_state* s; ~release_on_exit() noexcept { s->release(); } } ref { this };
-                if constexpr (std::is_void_v<T>)
-                {
-                    if (error) std::rethrow_exception(std::exchange(error, nullptr));
-                }
-                else
-                {
-                    if (value) return std::move(*value);
-                    std::rethrow_exception(std::exchange(error, nullptr)); // libc++ 18 copies an exception_ptr on a move
-                }
+                if constexpr (std::is_void_v<T>) { if (!error) return; }
+                else if (value) return std::move(*value);
+                std::rethrow_exception(std::exchange(error, nullptr)); // libc++ 18 copies an exception_ptr on a move
             }
         };
 
@@ -271,14 +266,7 @@ namespace rpp
             ~body_slot() noexcept { reset(); }
 
             /// Destroys the body, once
-            void reset() noexcept
-            {
-                if (alive)
-                {
-                    alive = false;
-                    body.~Body();
-                }
-            }
+            void reset() noexcept { if (std::exchange(alive, false)) body.~Body(); }
         };
 
         /// The input of a step which follows no result, as the task of async() does
@@ -574,11 +562,7 @@ namespace rpp
         }
 
         /// Abandons the result, so the destructor does not terminate on it. Nobody sees the exception of the result
-        void detach() noexcept
-        {
-            if (state) state->release();
-            state = nullptr;
-        }
+        void detach() noexcept { if (state) std::exchange(state, nullptr)->release(); }
 
         /// Runs `task` after this future, so the chain runs in sequence. An invalid future starts `task` at once.
         /// @returns this future, which receives the result of `task`. The chain drops the error of every earlier task
@@ -620,11 +604,7 @@ namespace rpp
         template<typename Task>
         decltype(auto) forward_to(Task& task)
         {
-            if constexpr (std::is_void_v<T>)
-            {
-                get();
-                return task();
-            }
+            if constexpr (std::is_void_v<T>) { get(); return task(); }
             else return task(get());
         }
 
