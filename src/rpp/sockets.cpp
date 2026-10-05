@@ -57,6 +57,11 @@
         #include <linux/sockios.h>  // SIOCOUTQ (get send queue size)
     #endif
     #include <arpa/inet.h>          // inet_addr, inet_ntoa
+    #if __linux__
+        #include <net/if.h>             // if_nametoindex
+        #include <netinet/if_ether.h>   // ether_arp, ETH_P_ARP
+        #include <netpacket/packet.h>   // sockaddr_ll
+    #endif
     // on Android this requires API level 24
     #if RPP_ANDROID && __ANDROID_API__ < 24
         #error "<ifaddrs.h> requires ANDROID_API level 24"
@@ -220,6 +225,14 @@ namespace rpp
     raw_address::raw_address(address_family af, uint32_t ipv4) noexcept : raw_address{af}
     {
         Addr4 = ipv4;
+    }
+
+    raw_address::raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept : raw_address{AF_IPv4}
+    {
+        Addr4Parts[0] = a;
+        Addr4Parts[1] = b;
+        Addr4Parts[2] = c;
+        Addr4Parts[3] = d;
     }
 
     raw_address::raw_address(address_family af, const void* ipv6,
@@ -2252,6 +2265,74 @@ namespace rpp
         bind_to_interface(0); // 0=NETWORK_UNSPECIFIED
     #else
         // TODO: implement for other platforms
+    #endif
+    }
+
+    socket socket::make_arp(const ipinterface& iface, socket_option opt) noexcept
+    {
+    #if __linux__
+        if (!iface.addr.Address.is_ipv4())
+            return from_err_code(EAFNOSUPPORT, iface.addr);
+
+        sockaddr_ll local{};
+        local.sll_family = AF_PACKET;
+        local.sll_protocol = htons(ETH_P_ARP);
+        local.sll_ifindex = (int)if_nametoindex(iface.name.c_str());
+        if (local.sll_ifindex == 0)
+            return from_err_code(ENODEV, iface.addr);
+
+        // with no protocol the socket has no hook yet, so bind() skips the RCU grace period of a hook change
+        int fd = ::socket(AF_PACKET, SOCK_DGRAM, 0);
+        if (fd == INVALID)
+            return from_err_code(errno, iface.addr);
+        socket s = from_os_handle(fd, iface.addr);
+        if (::bind(fd, (sockaddr*)&local, sizeof(local)) != 0)
+            return from_err_code(errno, iface.addr);
+        s.Type = ST_Datagram;
+        if (opt & SO_NonBlock)
+            s.set_blocking(false);
+        return s;
+    #else
+        (void)opt;
+        return from_err_code(ESOCK(EAFNOSUPPORT), iface.addr); // no packet sockets on this platform
+    #endif
+    }
+
+    bool socket::send_arp_request(const raw_address& target) noexcept
+    {
+    #if __linux__
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        sockaddr_ll to{}; // the bound interface, with its index and its MAC
+        socklen_t len = sizeof(to);
+        if (getsockname(os_handle_unsafe(), (sockaddr*)&to, &len) != 0)
+        {
+            set_errno_unlocked(os_getsockerr());
+            return false;
+        }
+        if (to.sll_family != AF_PACKET || !target.is_ipv4())
+        {
+            set_errno_unlocked(EAFNOSUPPORT);
+            return false;
+        }
+
+        ether_arp arp{};
+        arp.ea_hdr.ar_hrd = htons(ARPHRD_ETHER);
+        arp.ea_hdr.ar_pro = htons(ETH_P_IP);
+        arp.ea_hdr.ar_hln = ETH_ALEN;
+        arp.ea_hdr.ar_pln = sizeof(arp.arp_spa);
+        arp.ea_hdr.ar_op = htons(ARPOP_REQUEST);
+        uint32_t sender_ip = Addr.Address.ipv4_address();
+        uint32_t target_ip = target.ipv4_address();
+        memcpy(arp.arp_sha, to.sll_addr, ETH_ALEN);
+        memcpy(arp.arp_spa, &sender_ip, sizeof(arp.arp_spa));
+        memcpy(arp.arp_tpa, &target_ip, sizeof(arp.arp_tpa));
+
+        memset(to.sll_addr, 0xff, ETH_ALEN); // the Ethernet broadcast address
+        return handle_txres(::sendto(os_handle_unsafe(), &arp, sizeof(arp), 0, (sockaddr*)&to, sizeof(to))) > 0;
+    #else
+        (void)target;
+        set_errno(ESOCK(EAFNOSUPPORT));
+        return false;
     #endif
     }
 

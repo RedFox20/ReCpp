@@ -125,6 +125,9 @@ namespace rpp
         // manually initialize address from an IPv4 integer address
         raw_address(address_family af, uint32_t ipv4) noexcept;
 
+        /// @brief An IPv4 address from its octets in the written order, such as raw_address{192, 168, 1, 10}
+        raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d) noexcept;
+
         // manually initialize an IPv6 address
         raw_address(address_family af, const void* ipv6, unsigned long flowInfo, unsigned long scopeId) noexcept;
 
@@ -144,6 +147,9 @@ namespace rpp
 
         /** @returns IPv4 address as a 32-bit integer */
         uint32_t ipv4_address() const noexcept { return Addr4; }
+
+        /** @returns IPv4 octet `index` 0..3 in the written order, so octet 3 of 192.168.1.10 is 10 */
+        uint8_t ipv4_octet(int index) const noexcept { return Addr4Parts[index]; }
 
         /** Resets this raw_address to a default state */
         void reset() noexcept;
@@ -442,7 +448,7 @@ namespace rpp
         ipinterface() noexcept = default;
 
         /**
-         * @returns All interfaces sorted by IP address
+         * @returns All interfaces sorted by IP address. The OS call can take several hundred ms, so list them once
          */
         static std::vector<ipinterface> get_interfaces(address_family af = AF_IPv4) noexcept;
 
@@ -1423,6 +1429,26 @@ namespace rpp
          * Clears any previous bind_to_interface
          */
         void unbind_interface() noexcept;
+
+        /**
+         * STATIC
+         * Opens a Linux packet socket for the ARP frames of `iface`. recv() gives the ARP payload of each frame.
+         * `iface` must have an Ethernet MAC, such as eth0 or lo.
+         * The open is one if_nametoindex() and one bind(). Keep it open, because the close waits for an RCU grace period.
+         * @param iface Its name selects the interface, and its IPv4 address is the sender of each request
+         * @param opt Socket options to set, use SO_NonBlock if a send must never block
+         * @returns valid socket if successful, otherwise last_errno() tells why: EPERM without CAP_NET_RAW,
+         *          or EAFNOSUPPORT (SE_SOCKFAMILY) on a platform without packet sockets
+         */
+        static socket make_arp(const ipinterface& iface, socket_option opt = SO_None) noexcept;
+
+        /**
+         * Broadcasts one ARP request from a make_arp() socket: who has `target`, tell address().
+         * A request for address() is an RFC 5227 announcement, and each neighbor which caches address() updates it.
+         * Each send is one getsockname() for the index and the MAC of the interface, and one sendto().
+         * @returns true on success, else false and last_errno() tells why
+         */
+        bool send_arp_request(const raw_address& target) noexcept;
     };
 
     ////////////////////////////////////////////////////////////////////////////////

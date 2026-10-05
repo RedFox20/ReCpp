@@ -317,6 +317,7 @@ it counts no frame and asserts nothing about skew.
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
+| `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
@@ -726,10 +727,13 @@ for h in sorted(os.listdir('src/rpp')):
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
 the 19 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` matches a macro name inside another macro body
+### B5. `update_doc_linerefs.py` matches a name in the wrong place
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
+After a header edit moved `socket_poller::wake()`, it pointed the ref at the trailing
+comment on `socket_poller::armed`, which names `wake()`, not at the declaration.
+Corrected by hand, and `--check` accepts the corrected line.
 
 ## Closed
 
