@@ -5,8 +5,7 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include "future_types.h" // rpp::coro_handle, rpp::suspend_never
-#include "thread_pool.h" // rpp::wait_result
+#include "future_types.h" // rpp::wait_result, rpp::coro_handle, rpp::suspend_never
 #include "semaphore.h" // rpp::semaphore_once_flag
 #include "delegate.h" // rpp::delegate, which an event loop runs
 #include "traits.h" // rpp::task_return_t, rpp::first_arg_type

@@ -16,6 +16,15 @@ namespace rpp
     class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
 
 
+    /// The outcome of a timed wait on a task or a future
+    enum class wait_result : int
+    {
+        finished, // the result is ready, and it can hold an exception
+        timeout,  // waiting on task timed out
+        deferred, // the task runs on get(), so no wait can finish it
+    };
+
+
     template<typename T = void>
     using coro_handle = std::coroutine_handle<T>;
     using suspend_never = std::suspend_never;
