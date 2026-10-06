@@ -322,10 +322,23 @@ TestImpl(test_condition_variable)
         int counter = 0;
         std::vector<std::thread> threads;
         threads.reserve(4);
+        m.lock(); // the lockers start blocked, so every run takes the contended path
         for (int t = 0; t < 4; ++t)
-            threads.emplace_back([&] { for (int i = 0; i < 10'000; ++i) { std::lock_guard guard { m }; ++counter; } });
-        for (std::thread& t : threads) t.join();
-        AssertThat(counter, 40'000);
+        {
+            threads.emplace_back([&] {
+                for (int i = 0; i < 1'000; ++i)
+                {
+                    std::lock_guard guard { m };
+                    ++counter;
+                }
+            });
+        }
+        while (word_of(m) != 2u) // a locker marked the mutex contended, and sleeps until the unlock
+            rpp::yield();
+        m.unlock();
+        for (std::thread& t : threads)
+            t.join();
+        AssertThat(counter, 4'000);
         AssertThat(word_of(m), 0u);
         AssertThat(m.try_lock(), true);
         AssertThat(m.try_lock(), false);
