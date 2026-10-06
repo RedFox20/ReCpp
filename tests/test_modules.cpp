@@ -14,7 +14,6 @@
 #include <memory>                 // std::make_shared, which rpp::atomic_shared_ptr takes
 #include <type_traits>            // std::is_same_v, which pins an exported signature
 #include <atomic>                 // std::atomic_bool, which rpp::atomic_test_and_set takes
-#include <condition_variable>     // std::cv_status, which rpp::condition_variable returns
 
 import rpp.text;   // includes come first, the import goes last
 import rpp.core;
@@ -393,7 +392,7 @@ TestImpl(test_modules)
         rpp::condition_variable cv;
         rpp::mutex m;
         std::unique_lock<rpp::mutex> lock { m };
-        AssertThat(cv.wait_for(lock, rpp::millis(1)) == std::cv_status::timeout, true);
+        AssertThat(cv.wait_for(lock, rpp::millis(1)) == rpp::cv_status::timeout, true);
     }
 
     TestCase(file_io_module_carries_the_whole_surface)
@@ -512,7 +511,6 @@ TestImpl(test_modules)
     TestCase(thread_pool_module_carries_the_whole_surface)
     {
         static_assert(std::is_same_v<rpp::task_delegate<void()>, rpp::delegate<void()>>);
-        static_assert(std::is_same_v<rpp::duration_t<float>, rpp::fseconds_t>);
 
         // a local pool keeps the probe off whatever parallelism another suite left on the global
         rpp::thread_pool local { 2 };

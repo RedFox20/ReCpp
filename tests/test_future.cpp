@@ -1,11 +1,10 @@
 #include <rpp/future.h>
+#include <rpp/timepoint.h> // rpp::sleep_ms
 #include <rpp/tests.h>
 #include <stdexcept> // std::domain_error, std::invalid_argument
 #include <string> // std::string
 #include "warning_capture.h"
 using namespace rpp;
-using namespace std::chrono_literals;
-using namespace std::this_thread;
 using namespace std::string_literals;
 
 // NOLINTBEGIN(performance-*)
@@ -18,8 +17,9 @@ TestImpl(test_future)
 
     TestCase(simple_chaining)
     {
-        std::packaged_task<std::string()> loadString{[]{ 
-            ::sleep_for(15ms);
+        std::packaged_task<std::string()> loadString{[]{
+            // keeps the result pending, so the step attaches before it arrives
+            rpp::sleep_ms(15);
             return "future string";
         }};
 
@@ -38,8 +38,9 @@ TestImpl(test_future)
 
     TestCase(chain_mutate_void_to_string)
     {
-        std::packaged_task<void()> loadSomething{[]{ 
-            ::sleep_for(15ms);
+        std::packaged_task<void()> loadSomething{[]{
+            // keeps the result pending, so the step attaches before it arrives
+            rpp::sleep_ms(15);
         }};
         std::thread{[&]{ loadSomething(); }}.detach();
 
@@ -55,8 +56,9 @@ TestImpl(test_future)
 
     TestCase(chain_decay_string_to_void)
     {
-        std::packaged_task<std::string()> loadString{[]{ 
-            ::sleep_for(15ms);
+        std::packaged_task<std::string()> loadString{[]{
+            // keeps the result pending, so the step attaches before it arrives
+            rpp::sleep_ms(15);
             return "some string";
         }};
 

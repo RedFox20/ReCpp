@@ -37,7 +37,7 @@ TestImpl(test_condition_variable)
         auto lock = std::unique_lock<rpp::mutex>{mtx};
 
         rpp::Timer t;
-        AssertEqual(cv.wait_for(lock, ms(20)), std::cv_status::timeout);
+        AssertEqual(cv.wait_for(lock, ms(20)), rpp::cv_status::timeout);
         AssertGreater(t.elapsed_millis(), 10.0);
         AssertLess(t.elapsed_millis(), 100.0);
     }
@@ -49,7 +49,7 @@ TestImpl(test_condition_variable)
 
         std::thread notifier(notify_after, std::ref(cv), 5);
         auto lock = std::unique_lock<rpp::mutex>{mtx};
-        AssertEqual(cv.wait_for(lock, ms(200)), std::cv_status::no_timeout);
+        AssertEqual(cv.wait_for(lock, ms(200)), rpp::cv_status::no_timeout);
         notifier.join();
     }
 
@@ -60,7 +60,7 @@ TestImpl(test_condition_variable)
         auto lock = std::unique_lock<rpp::mutex>{mtx};
 
         rpp::Timer t;
-        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() + ms(20)), std::cv_status::timeout);
+        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() + ms(20)), rpp::cv_status::timeout);
         AssertGreater(t.elapsed_millis(), 10.0);
         AssertLess(t.elapsed_millis(), 100.0);
     }
@@ -72,7 +72,7 @@ TestImpl(test_condition_variable)
 
         std::thread notifier(notify_after, std::ref(cv), 5);
         auto lock = std::unique_lock<rpp::mutex>{mtx};
-        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() + ms(200)), std::cv_status::no_timeout);
+        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() + ms(200)), rpp::cv_status::no_timeout);
         notifier.join();
     }
 
@@ -83,7 +83,7 @@ TestImpl(test_condition_variable)
         auto lock = std::unique_lock<rpp::mutex>{mtx};
 
         rpp::Timer t;
-        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() - ms(100)), std::cv_status::timeout);
+        AssertEqual(cv.wait_until(lock, rpp::TimePoint::monotonic_now() - ms(100)), rpp::cv_status::timeout);
         AssertLess(t.elapsed_millis(), 10.0);
     }
 
@@ -110,7 +110,7 @@ TestImpl(test_condition_variable)
         auto deadline = rpp::TimePoint::monotonic_now() + ms(200);
         while (!ready)
         {
-            if (cv.wait_until(lock, deadline) == std::cv_status::timeout)
+            if (cv.wait_until(lock, deadline) == rpp::cv_status::timeout)
                 break;
             ++wakeup_count;
         }
@@ -166,6 +166,20 @@ TestImpl(test_condition_variable)
         notifier.join();
     }
 
+    // a wait needs only lock() and unlock(), so a plain mutex works as the lock
+    TestCase(wait_takes_any_lock)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        bool ready = false;
+
+        std::thread notifier(set_ready_and_notify, std::ref(cv), std::ref(mtx), std::ref(ready), 5);
+        mtx.lock();
+        AssertTrue(cv.wait_for(mtx, ms(1000), [&] { return ready; })); // a hang guard, the notifier releases it
+        mtx.unlock();
+        notifier.join();
+    }
+
     TestCase(wait_for_zero_duration_returns_immediately)
     {
         rpp::condition_variable cv;
@@ -173,8 +187,68 @@ TestImpl(test_condition_variable)
         auto lock = std::unique_lock<rpp::mutex>{mtx};
 
         rpp::Timer t;
-        AssertEqual(cv.wait_for(lock, rpp::Duration::zero()), std::cv_status::timeout);
+        AssertEqual(cv.wait_for(lock, rpp::Duration::zero()), rpp::cv_status::timeout);
         AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    // WaitOnAddress() takes whole milliseconds and can wake a timer tick early
+    TestCase(a_timed_wait_never_ends_before_its_timeout)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        for (int i = 0; i < 3; ++i)
+        {
+            rpp::Timer t;
+            AssertEqual(cv.wait_for(lock, rpp::micros(1900)), rpp::cv_status::timeout);
+            AssertGreaterOrEqual(t.elapsed_millis(), 1.9);
+        }
+    }
+
+    TestCase(wait_for_negative_duration_returns_immediately)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        rpp::Timer t;
+        AssertEqual(cv.wait_for(lock, rpp::millis(-20)), rpp::cv_status::timeout);
+        AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    // a notify with no waiter makes no RMW, so a wait which starts after it must still sleep
+    TestCase(a_notify_without_waiters_does_not_wake_a_later_wait)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        cv.notify_one();
+        cv.notify_all();
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        rpp::Timer t;
+        AssertEqual(cv.wait_for(lock, rpp::millis(3)), rpp::cv_status::timeout);
+        AssertGreaterOrEqual(t.elapsed_millis(), 3.0);
+    }
+
+    TestCase(cvar_wait_returns_at_once_when_the_word_already_changed)
+    {
+        std::atomic_uint32_t word { 1 };
+        rpp::cvar::wake_one(&word); // no thread sleeps on it
+        rpp::cvar::wake_all(&word);
+        rpp::Timer t;
+        rpp::cvar::wait(&word, 0);
+        AssertTrue(rpp::cvar::wait_for(&word, 0, rpp::seconds(1)));
+        AssertFalse(rpp::cvar::wait_for(&word, 1, rpp::Duration::zero()));
+        AssertFalse(rpp::cvar::wait_for(&word, 1, rpp::millis(-20)));
+        AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    TestCase(cvar_wait_for_returns_true_when_another_thread_changes_the_word)
+    {
+        std::atomic_uint32_t word { 0 };
+        std::thread changer([&] { rpp::sleep_ms(3); word.store(1); rpp::cvar::wake_all(&word); });
+        rpp::Timer t;
+        AssertTrue(rpp::cvar::wait_for(&word, 0, rpp::seconds(1)));
+        AssertLess(t.elapsed_millis(), 200.0);
+        changer.join();
     }
 
     TestCase(multiple_waiters_all_notified)
@@ -193,7 +267,7 @@ TestImpl(test_condition_variable)
                 auto lock = std::unique_lock<rpp::mutex>{mtx};
                 auto deadline = rpp::TimePoint::monotonic_now() + ms(200);
                 while (!ready)
-                    if (cv.wait_until(lock, deadline) == std::cv_status::timeout)
+                    if (cv.wait_until(lock, deadline) == rpp::cv_status::timeout)
                         return;
                 ++notified_count;
             });

@@ -35,12 +35,6 @@ struct test_threadpool; // forward declaration for unit tests
 
 namespace rpp
 {
-    using seconds_t  = std::chrono::seconds;
-    using fseconds_t = std::chrono::duration<float>;
-    using dseconds_t = std::chrono::duration<double>;
-    using milliseconds_t = std::chrono::milliseconds;
-    template<class T> using duration_t = std::chrono::duration<T>;
-
     //////////////////////////////////////////////////////////////////////////////////////////
 
     // Optimized Action delegate, using the 'Fastest Possible C++ Delegates' method
@@ -315,7 +309,7 @@ namespace rpp
         friend class pool_task_handle;
         friend class thread_pool;
     private:
-        rpp::semaphore_flag new_task_flag;
+        rpp::semaphore new_task_flag { 0, 1 }; // its mutex also guards the task slots, so the lock-free flag does not fit
         std::thread th;
         char name[32] {};
 

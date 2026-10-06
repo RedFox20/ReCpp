@@ -15,6 +15,33 @@ namespace rpp
     // forward declaration: avoids circular include with thread_pool.h
     void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
 
+    namespace sem
+    {
+        /// Awaits a semaphore or a semaphore flag on a pool thread, then resumes the coroutine on that thread
+        template<class Waitable, class WaitResult>
+        struct RPP_CORO_RETURN_TYPE wait_awaiter
+        {
+            Waitable& sem;
+            rpp::Duration timeout;
+            WaitResult result = WaitResult::timeout;
+
+            bool await_ready() noexcept
+            {
+                if (sem.try_wait()) { result = WaitResult::notified; return true; }
+                return false;
+            }
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                {
+                    result = sem.wait(timeout);
+                    cont.resume(); // the coroutine can free this awaiter, so nothing touches it after
+                }});
+            }
+            WaitResult await_resume() noexcept { return result; }
+        };
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////
 
     /**
@@ -306,7 +333,7 @@ namespace rpp
                 while (value <= 0)
                 {
                     // wait_until() treats a far deadline as a clock mismatch, so wait for the time left
-                    if (cv.wait_for(lock, until - rpp::TimePoint::monotonic_now()) == std::cv_status::timeout)
+                    if (cv.wait_for(lock, until - rpp::TimePoint::monotonic_now()) == rpp::cv_status::timeout)
                     {
                         // recheck value after timeout: a concurrent notify() may have
                         // incremented value between the CV timeout and lock reacquisition
@@ -366,114 +393,191 @@ namespace rpp
          *     if (result == rpp::semaphore::notified) { // signaled }
          * @endcode
          */
-        struct RPP_CORO_RETURN_TYPE co_await_handle
-        {
-            semaphore& sem;
-            rpp::Duration timeout;
-            wait_result result = wait_result::timeout;
+        using co_await_handle = sem::wait_awaiter<semaphore, wait_result>;
+        RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
+    };
 
-            bool await_ready() noexcept
+    namespace sem
+    {
+        /// The word of a semaphore flag: bit 0 is the flag, and the bits above count the threads which wait on it
+        struct flag_word
+        {
+            static constexpr rpp::uint32 SET = 1;
+            static constexpr rpp::uint32 WAITER = 2;
+            std::atomic_uint32_t state { 0 };
+
+            bool is_set() const noexcept { return (state.load(std::memory_order_acquire) & SET) != 0; }
+
+            void unset() noexcept { state.fetch_and(~SET, std::memory_order_relaxed); }
+
+            /// Sets the flag and wakes one waiter, or all. @returns false if the flag was already set
+            bool set(bool wake_all) noexcept
             {
-                if (sem.try_wait()) { result = notified; return true; }
+                // release pairs with the waiter which sees SET. A waiter can free this flag
+                // as soon as it sees SET, so the wake takes the address and reads nothing
+                const rpp::uint32 prev = state.fetch_or(SET, std::memory_order_release);
+                if (prev >= WAITER)
+                {
+                    if (wake_all) cvar::wake_all(&state);
+                    else          cvar::wake_one(&state);
+                }
+                return (prev & SET) == 0;
+            }
+
+            /// @returns true if the flag is set, and clears it when `consume`
+            bool try_wait(bool consume) noexcept
+            {
+                rpp::uint32 s = state.load(std::memory_order_acquire);
+                if (!consume)
+                    return (s & SET) != 0;
+                while (s & SET)
+                    if (state.compare_exchange_weak(s, s & ~SET, std::memory_order_acquire, std::memory_order_relaxed))
+                        return true;
                 return false;
             }
-            void await_suspend(rpp::coro_handle<> cont) noexcept
+
+            /// Sleeps until the flag is set, and clears it when `consume`. A null timeout waits forever.
+            /// @returns false when the timeout elapsed first
+            NOINLINE bool wait(bool consume, const rpp::Duration* timeout) noexcept
             {
-                rpp::parallel_task_detached(rpp::delegate<void()>{[this, cont]() mutable
+                if (try_wait(consume))
+                    return true;
+                if (timeout && timeout->nsec <= 0)
+                    return false;
+                const rpp::TimePoint deadline = timeout ? rpp::TimePoint::monotonic_now() + *timeout : rpp::TimePoint{};
+                // one RMW word holds the flag and the count, so set() sees this waiter, or this waiter sees SET
+                rpp::uint32 s = state.fetch_add(WAITER, std::memory_order_relaxed) + WAITER;
+                bool waiting = true;
+                for (;;)
                 {
-                    result = sem.wait(timeout);
-                    cont.resume();
-                }});
+                    if ((s & SET) || !waiting)
+                    {
+                        // leaves as a waiter, and takes the flag when it is set
+                        rpp::uint32 next = (s & SET) && consume ? (s - WAITER) & ~SET : s - WAITER;
+                        if (state.compare_exchange_weak(s, next, std::memory_order_acquire, std::memory_order_relaxed))
+                            return (s & SET) != 0;
+                        continue;
+                    }
+                    if (!timeout)
+                    {
+                        cvar::wait(&state, s);
+                    }
+                    else
+                    {
+                        rpp::Duration remaining = deadline - rpp::TimePoint::monotonic_now();
+                        waiting = remaining.nsec > 0 && cvar::wait_for(&state, s, remaining);
+                    }
+                    s = state.load(std::memory_order_relaxed);
+                }
             }
-            wait_result await_resume() noexcept { return result; }
         };
+    }
+
+    /**
+     * @brief A flag which can be set and unset, in one 32-bit word.
+     *        A wait sleeps in the kernel on that word, see rpp::condition_variable.
+     *
+     * notify() - sets the flag and wakes one waiter
+     * wait() - waits until set, then unsets the flag
+     * wait_no_unset() - waits until set, never unsets
+     */
+    class semaphore_flag
+    {
+        sem::flag_word word;
+
+    public:
+        using wait_result = rpp::semaphore::wait_result;
+
+        semaphore_flag() noexcept = default;
+
+        /// @returns true if the flag is set. Does not unset it
+        [[nodiscard]] bool is_set() const noexcept { return word.is_set(); }
+
+        /// Unsets the flag without a notify
+        void unset() noexcept { word.unset(); }
+
+        /// Sets the flag and wakes one waiter if `newCount > 0`, unsets it if `newCount == 0`
+        void reset(int newCount = 0) noexcept
+        {
+            if (newCount > 0) (void)word.set(false);
+            else if (newCount == 0) word.unset();
+        }
+
+        /// Sets the flag and wakes one waiter
+        void notify() noexcept { (void)word.set(false); }
+
+        /// Sets the flag and wakes all waiters, and one of them unsets it
+        void notify_all() noexcept { (void)word.set(true); }
+
+        /// Sets the flag and wakes one waiter. @returns false if the flag was already set
+        bool notify_once() noexcept { return word.set(false); }
+
+        /// @returns true if the flag was set, and unsets it
+        bool try_wait() noexcept { return word.try_wait(true); }
+
+        /// Waits until the flag is set, then unsets it
+        void wait() noexcept { (void)word.wait(true, nullptr); }
+
+        /// Waits until the flag is set, then unsets it. @returns timeout if `timeout` elapsed first
+        wait_result wait(const rpp::Duration& timeout) noexcept
+        {
+            return word.wait(true, &timeout) ? semaphore::notified : semaphore::timeout;
+        }
+
+        /// Waits until the flag is set, and keeps it set
+        void wait_no_unset() noexcept { (void)word.wait(false, nullptr); }
+
+        /// Waits until the flag is set, and keeps it set. @returns timeout if `timeout` elapsed first
+        wait_result wait_no_unset(const rpp::Duration& timeout) noexcept
+        {
+            return word.wait(false, &timeout) ? semaphore::notified : semaphore::timeout;
+        }
+
+        /// Awaits the flag on a pool thread, and unsets it, as wait(timeout) does
+        using co_await_handle = sem::wait_awaiter<semaphore_flag, wait_result>;
         RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
     };
 
     /**
-     * @brief A semaphore that can only be set or unset.
-     * 
-     * notify() - sets the semaphore flag
-     * wait() - waits until set, then unsets the semaphore flag
-     * wait_no_unset() - waits until set, never unsets
-     */
-    class semaphore_flag : protected rpp::semaphore
-    {
-    public:
-        semaphore_flag() noexcept : semaphore{0, 1} {}
-
-        /** @returns TRUE if the semaphore is signaled. Does not unset the semaphore count. */
-        [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
-        [[nodiscard]] FINLINE bool is_set(lock_t& lock) const noexcept { return count(lock) > 0; }
-
-        // unsets the semaphore flag without notifying
-        FINLINE void unset() noexcept { reset(0); }
-
-        using semaphore::reset;
-
-        using semaphore::mutex;
-        using semaphore::spin_lock;
-
-        using semaphore::notify;
-        using semaphore::notify_all;
-        using semaphore::notify_once;
-
-        using semaphore::try_wait;
-        using semaphore::wait;
-        using semaphore::wait_no_unset;
-        using semaphore::co_await_handle;
-        using semaphore::await;
-    };
-
-    /**
-     * @brief A semaphore that can only be set once and never unset.
+     * @brief A flag which can only be set once and never unset, in one 32-bit word.
      *        This is useful to signal that a run-once task has completed.
-     * notify() - sets the semaphore flag and notified ONE listener
-     * notify_once() - sets the semaphore flag and notifies ALL listeners
-     * wait() - waits until set, but never unsets,
-     *          returns immediately if already set
+     *
+     * notify(), notify_all() - set the flag and wake all waiters
+     * wait() - waits until set, never unsets, and returns at once if already set
      */
-    class semaphore_once_flag : protected rpp::semaphore
+    class semaphore_once_flag
     {
+        sem::flag_word word;
+
     public:
-        semaphore_once_flag() noexcept : semaphore{0, 1} {}
+        using wait_result = rpp::semaphore::wait_result;
 
-        /** @returns TRUE if the semaphore is signaled. Does not unset the semaphore count. */
-        [[nodiscard]] FINLINE bool is_set() const noexcept { return count() > 0; }
-        [[nodiscard]] FINLINE bool is_set(lock_t& lock) const noexcept { return count(lock) > 0; }
+        semaphore_once_flag() noexcept = default;
 
-        using semaphore::mutex;
-        using semaphore::spin_lock;
+        /// @returns true if the flag is set
+        [[nodiscard]] bool is_set() const noexcept { return word.is_set(); }
 
-        using semaphore::notify;
-        using semaphore::notify_all;
+        /// Sets the flag and wakes all waiters, because the flag stays set for each of them
+        void notify() noexcept { (void)word.set(true); }
 
-        bool try_wait() noexcept
+        /// Sets the flag and wakes all waiters
+        void notify_all() noexcept { (void)word.set(true); }
+
+        /// @returns true if the flag is set
+        bool try_wait() noexcept { return word.try_wait(false); }
+
+        /// Waits until the flag is set
+        void wait() noexcept { (void)word.wait(false, nullptr); }
+
+        /// Waits until the flag is set. @returns timeout if `timeout` elapsed first
+        wait_result wait(const rpp::Duration& timeout) noexcept
         {
-            auto lock = spin_lock();
-            return value > 0;
+            return word.wait(false, &timeout) ? semaphore::notified : semaphore::timeout;
         }
 
-        FINLINE void wait() noexcept
-        {
-            auto lock = spin_lock();
-            wait_no_unset(lock);
-        }
-        FINLINE void wait(lock_t& lock) noexcept
-        {
-            wait_no_unset(lock);
-        }
-        FINLINE wait_result wait(const rpp::Duration& timeout) noexcept
-        {
-            auto lock = spin_lock();
-            return wait_no_unset(lock, timeout);
-        }
-        FINLINE wait_result wait(lock_t& lock, const rpp::Duration& timeout) noexcept
-        {
-            return wait_no_unset(lock, timeout);
-        }
-        using semaphore::co_await_handle;
-        using semaphore::await;
+        /// Awaits the flag on a pool thread, and keeps it set
+        using co_await_handle = sem::wait_awaiter<semaphore_once_flag, wait_result>;
+        RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
     };
 
     //////////////////////////////////////////////////////////////////////////////////////////
