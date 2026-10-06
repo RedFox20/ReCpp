@@ -1370,32 +1370,23 @@ namespace rpp
             AssertThat(int(evt.end() - evt.begin()), 6);
         }
 
-        struct CopyCounter
+        // a listener can change or free the argument of the caller, so every listener reads one snapshot
+        TestCase(multicast_delegate_passes_one_snapshot_of_a_by_value_argument)
         {
-            int* copies = nullptr;
-            explicit CopyCounter(int* counter) noexcept : copies{counter} {}
-            CopyCounter(const CopyCounter& c) noexcept : copies{c.copies} { ++*copies; }
-            CopyCounter(CopyCounter&& c) noexcept = default;
-            CopyCounter& operator=(const CopyCounter&) = default;
-            CopyCounter& operator=(CopyCounter&&) noexcept = default;
-            ~CopyCounter() = default;
-        };
+            std::string source = "a long string which needs a heap buffer";
+            std::vector<std::string> seen;
+            multicast_delegate<std::string> evt;
+            evt += [&](std::string s) { seen.push_back(s); source = "changed by the first listener"; };
+            evt += [&](std::string s) { seen.push_back(s); };
+            evt(source);
+            AssertThat(seen.size(), size_t(2));
+            AssertThat(seen[1], seen[0]);
 
-        TestCase(multicast_delegate_copies_a_by_value_argument_once_per_listener)
-        {
-            int copies = 0;
-            multicast_delegate<CopyCounter> evt;
-            evt += [](CopyCounter c) { (void)c; };
-            evt += [](CopyCounter c) { (void)c; };
-            CopyCounter counter { &copies };
-            evt(counter);
-            AssertThat(copies, 2);
-
-            copies = 0;
-            multicast_delegate<const CopyCounter&> by_ref;
-            by_ref += [](const CopyCounter& c) { (void)c; };
-            by_ref.invoke(counter);
-            AssertThat(copies, 0);
+            seen.clear();
+            source = "a long string which needs a heap buffer";
+            evt.invoke(source);
+            AssertThat(seen.size(), size_t(2));
+            AssertThat(seen[1], seen[0]);
         }
 
         TestCase(multicast_delegate_empty_states)

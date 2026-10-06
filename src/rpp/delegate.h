@@ -907,9 +907,9 @@ namespace rpp
 
         /**
          * @brief Invokes every registered delegate, in the order of registration
-         * @note A by-value argument arrives by const reference, so each delegate makes the only copy
+         * @note A by-value argument is a snapshot, because a listener can change or free the original
          */
-        DELEGATE_FINLINE void operator()(multicast_fwd_t<Args>... args) const
+        DELEGATE_FINLINE void operator()(Args... args) const
         {
             const container* c = ptr;
             if (!c) return;
@@ -918,9 +918,13 @@ namespace rpp
                 (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
         }
         /** @brief Invokes every registered delegate, in the order of registration */
-        DELEGATE_FINLINE void invoke(multicast_fwd_t<Args>... args) const
+        DELEGATE_FINLINE void invoke(Args... args) const
         {
-            operator()(static_cast<multicast_fwd_t<Args>>(args)...);
+            const container* c = ptr;
+            if (!c) return;
+            const deleg* end = c->data + c->size;
+            for (const deleg* d = c->data; d != end; ++d)
+                (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
         }
     };
 

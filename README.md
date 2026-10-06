@@ -1456,7 +1456,7 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 |--------|-------------|
 | [`add(delegate)`](src/rpp/delegate.h#L851) / [`operator+=`](src/rpp/delegate.h#L891) | Register a callback |
 | [`operator-=`](src/rpp/delegate.h#L901) | Unregister a callback |
-| [`operator()(multicast_fwd_t<Args>... args)`](src/rpp/delegate.h#L912) | Invoke all registered callbacks |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L912) | Invoke all registered callbacks |
 | [`clear()`](src/rpp/delegate.h#L766) | Remove all callbacks |
 | [`size()`](src/rpp/delegate.h#L785) | Number of registered callbacks |
 | [`multicast_fwd<T>`](src/rpp/delegate.h#L695) | Trait to deduce forwarding reference type for multicast args |
