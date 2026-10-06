@@ -16,8 +16,6 @@
 import rpp.core; // includes come first, the imports go last
 import rpp.time;
 import rpp.future;
-// these cases pin the module exports of the deprecated rpp::cfuture
-RPP_IGNORE_DEPRECATED_BEGIN
 
 TestImpl(test_modules_future)
 {
@@ -90,5 +88,4 @@ TestImpl(test_modules_future)
     }
 };
 
-RPP_IGNORE_DEPRECATED_END
 #endif // RPP_BUILD_WITH_MODULES

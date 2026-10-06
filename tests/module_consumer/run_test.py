@@ -167,7 +167,7 @@ def build_one_importer(cxx: str, group: str, body: str, common_flags=(), use_fla
     @param body the whole source of the importing unit
     @param common_flags extra flags for both units
     @param use_flags extra flags for the importing unit alone
-    @returns the error lines of the first step which fails, or an empty string when both units compile
+    @returns the first error line, or an empty string when both units compile
     """
     root = os.path.dirname(os.path.dirname(HERE))
     with tempfile.TemporaryDirectory() as d:
@@ -179,7 +179,7 @@ def build_one_importer(cxx: str, group: str, body: str, common_flags=(), use_fla
                      [*flags, *use_flags, '-c', use, '-o', f'{d}/u.o']):
             p = subprocess.run(step, cwd=root, capture_output=True, text=True)
             if p.returncode != 0:
-                return '\n'.join(l for l in p.stderr.splitlines() if 'error:' in l) or p.stderr[:200]
+                return next((l for l in p.stderr.splitlines() if 'error:' in l), p.stderr[:200])
     return ''
 
 
@@ -198,46 +198,6 @@ def check_module_warnings(cxx: str) -> str:
                               use_flags=['-Werror=cast-function-type'])
 
 
-# one deprecated cfuture name on each line, so a deleted [[deprecated]] leaves its line silent
-DEPRECATED_SITES = ['rpp::cfuture<int>* f = nullptr;', 'rpp::cpromise<int>* p = nullptr;',
-                    'rpp::async_task([] { return 1; }).get();', 'rpp::make_ready_future(2).get();',
-                    'rpp::make_exceptional_future<int>(3).get();']
-
-
-def check_deprecation(cxx: str) -> str:
-    """Names each deprecated `cfuture` entity through the header and through an import of `rpp.future`.
-
-    Each site must warn, and the headers which name `cfuture` in a region must not warn on their own.
-    See docs/FUTURE_MIGRATION.md section 6.1.
-
-    @param cxx the compiler to run, such as `g++-15`
-    @returns the first failure, or an empty string when every check passes
-    """
-    werror = ['-Werror=deprecated-declarations', '-Werror=attributes']
-    body = 'int main()\n{\n' + ''.join(f'    {site}\n' for site in DEPRECATED_SITES) + '    return f || p;\n}\n'
-    root = os.path.dirname(os.path.dirname(HERE))
-    with tempfile.TemporaryDirectory() as d:
-        use = os.path.join(d, 'use.cpp')
-        def syntax_errors(source: str) -> str:
-            with open(use, 'w') as f: f.write(source)
-            p = subprocess.run([cxx, '-std=c++20', '-I', 'src', *werror, '-fsyntax-only', use], cwd=root,
-                               capture_output=True, text=True)
-            return '\n'.join(l for l in p.stderr.splitlines() if 'error:' in l)
-        headers = '#include <rpp/future.h>\n#include <rpp/event_loop.h>\n#include <rpp/coroutines.h>\n'
-        if err := syntax_errors(headers): return f'the headers warn on their own: {err}'
-        # the module path includes future_types.h first, so its declaration meets the imported definition
-        paths = (('the header', '#include <rpp/future.h>\n', syntax_errors),
-                 ('the module', '#include <typeinfo>\n#include <new>\n#include <rpp/future_types.h>\nimport rpp.future;\n',
-                  lambda source: build_one_importer(cxx, 'future', source, use_flags=werror)))
-        for path, prefix, errors_of in paths:
-            errors = errors_of(prefix + body)
-            first = prefix.count('\n') + 3  # the line of the first site
-            for line, site in enumerate(DEPRECATED_SITES, first):
-                if not any(f'use.cpp:{line}:' in l and 'deprecated' in l for l in errors.splitlines()):
-                    return f'{site} compiles silently through {path}'
-    return ''
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--compiler', default='', help='mama compiler arg, eg clang, gcc or windows')
@@ -248,7 +208,7 @@ def main() -> int:
     ap.add_argument('--unicode-off', default='',
                     help='g++ binary that compiles the module with RPP_ENABLE_UNICODE=0')
     ap.add_argument('--warn-free', default='',
-                    help='g++ binary that compiles an importer with -Werror=cast-function-type, and the deprecation probe')
+                    help='g++ binary that compiles an importer with -Werror=cast-function-type')
     args = ap.parse_args()
 
     if args.warn_free:
@@ -258,12 +218,6 @@ def main() -> int:
             print(f'FAILED: an importer warns where a header consumer does not: {err}')
             return 1
         print('the importer builds a delegate with no cast warning')
-        print(f'--- naming each deprecated cfuture entity using {args.warn_free} ---')
-        err = check_deprecation(args.warn_free)
-        if err:
-            print(f'FAILED: {err}')
-            return 1
-        print('each deprecated name warns, and the headers alone do not')
 
     if args.unicode_off:
         print(f'--- compiling the module with RPP_ENABLE_UNICODE=0 using {args.unicode_off} ---')

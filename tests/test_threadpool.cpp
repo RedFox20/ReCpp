@@ -10,8 +10,6 @@
 #include <latch>
 #include <unordered_set>
 using namespace rpp;
-// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
-RPP_IGNORE_DEPRECATED_BEGIN
 
 namespace rpp
 {
@@ -865,5 +863,3 @@ TestImpl(test_threadpool)
         AssertThat(future.get().value, worker_cleanup_state::RESULT);
     }
 };
-
-RPP_IGNORE_DEPRECATED_END

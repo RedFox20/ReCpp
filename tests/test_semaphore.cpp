@@ -6,8 +6,6 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <deque>
-// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
-RPP_IGNORE_DEPRECATED_BEGIN
 
 constexpr rpp::Duration millis(int milliseconds)
 {
@@ -410,5 +408,3 @@ TestImpl(test_semaphore)
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 };
-
-RPP_IGNORE_DEPRECATED_END

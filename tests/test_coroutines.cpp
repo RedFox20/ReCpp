@@ -8,8 +8,6 @@
 using namespace rpp;
 using namespace std::this_thread;
 using namespace std::string_literals;
-// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
-RPP_IGNORE_DEPRECATED_BEGIN
 
 TestImpl(test_coroutines)
 {
@@ -293,5 +291,3 @@ TestImpl(test_coroutines)
     }
 
 };
-
-RPP_IGNORE_DEPRECATED_END

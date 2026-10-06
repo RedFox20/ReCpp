@@ -10,8 +10,8 @@ stay in the header, and they keep every behavior they have today.
 **No existing consumer changes.** A project which includes `rpp/future.h` keeps `cfuture`
 and compiles as before. A project which imports `rpp.threading` gets the new type.
 
-**A consumer does move.** `cfuture` carries a `[[deprecated]]` attribute, so every
-remaining site names itself in the compiler output. See section 6.1.
+**A consumer does move.** `cfuture` takes a `[[deprecated]]` attribute in the last
+changeset, so every remaining site names itself in the compiler output. See section 6.1.
 
 ---
 
@@ -189,8 +189,12 @@ anybody renames it.
 ### 6.1 The deprecation which moves a consumer
 
 A plan nobody acts on leaves two types forever. `[[deprecated]]` names every remaining site
-in the compiler output, and it breaks none of them. It is unconditional, with no opt-in
-macro, because a warning nobody turns on moves nobody.
+in the compiler output. It is unconditional, with no opt-in macro, because a warning nobody
+turns on moves nobody.
+
+**#104 landed it early, and it was withdrawn.** Each site fails a consumer which builds with
+`-Werror`, and those builds broke. So the attribute waits until such a consumer ports its
+sites. The trial measured what changeset 5 needs, below.
 
 **The attribute goes on the type and on its factories.** A consumer reaches `cfuture` two
 ways, and only both attributes cover both:
@@ -204,36 +208,20 @@ ways, and only both attributes cover both:
 **A pragma region keeps the library itself quiet.** `future.h` names `cfuture` in its own
 declarations. An unguarded attribute warns at ReCpp lines in every consumer build, which
 buries the sites the consumer has to fix. GCC does not suppress a use inside a deprecated
-entity, so the region is what does it:
+entity, so a `GCC diagnostic` region around each header which names `cfuture` does it. The
+forward declaration in `future_types.h` needs the attribute too. A gcc importer which
+includes that header first drops an attribute which only the definition carries.
 
-```cpp
-// future_types.h. A gcc importer which includes it first drops an attribute this line lacks
-template<class T = void> class RPP_DEPRECATED_CFUTURE NODISCARD cfuture;
+The trial measured gcc-13, gcc-14, gcc-15, clang-18 and clang-20. Each one warned at every
+consumer site and at no line of a ReCpp header. clang-18 missed the `cpromise` alias, which
+clang-20 reported. A gcc module importer also warned at `future.h:260`, once for each
+`cfuture::then()`, see B30. MSVC was not measured, because `CMakeLists.txt` passes `/wd4996`
+to every ReCpp target.
 
-// future.h, event_loop.h and coroutines.h. config.h defines the pair for GCC, clang and MSVC
-RPP_IGNORE_DEPRECATED_BEGIN
-namespace rpp { ... } // async_task, make_ready_future, wait_all, get_all and run_tasks declare in here
-RPP_IGNORE_DEPRECATED_END
-```
-
-Measured on gcc-13, gcc-14, gcc-15, clang-18 and clang-20. Each one warns at every consumer
-site and at no line of a ReCpp header. clang-18 misses the `cpromise` alias, which clang-20
-reports. `run_test.py --warn-free` pins this on gcc-15, through the header and through
-`import rpp.future`.
-
-**B30 reaches a module importer until changeset 3.** gcc-14 and gcc-15 also warn at
-`future.h:260`, once for each `cfuture::then()` the importer instantiates. clang-20 keeps the
-region across the boundary. An importer region hides the line, so `test_modules_future.cpp`
-stays quiet.
-
-**MSVC is not measured.** `#pragma warning(push)` with `disable: 4996` is the shape.
-`CMakeLists.txt` passes `/wd4996` to every ReCpp target, and the one `consumer-msvc` unit
-which names `cfuture` disables C4996 itself. So no CI row reports C4996.
-
-**It landed before changeset 2.** `event_loop.h` and `coroutines.h` still name `cfuture`, so
-each one wraps its namespace in the same region until changeset 2 ports it. The tests which
-still use `cfuture` carry a file scope region. `test_future.cpp`, `test_modules_future.cpp`
-and `future_module_only.cpp` test the deprecated type on purpose.
+**It lands last, not first.** The attribute fires wherever a name is used, so `event_loop.h`
+and `coroutines.h` must stop naming `cfuture` first. That is changeset 2, so the deprecation
+is changeset 5. The legacy cases in `test_future.cpp` carry the same file scope suppression,
+because they test the deprecated type on purpose.
 
 `cpromise` takes the attribute beside the type, because a site which ports one ports both.
 
@@ -253,9 +241,9 @@ Each one lands on its own and leaves the tree green.
    whether B28 condition 1 is really gone.
 4. **A downstream project ports its own files**, one at a time, with the header still
    available for the files it has not reached.
-5. **Landed. `cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**,
-   unconditionally. It landed before changesets 2 to 4, so each header and test which still
-   names `cfuture` carries a region. Every consumer site names itself on the next build. See 6.1.
+5. **`cfuture`, `cpromise` and the legacy factories take `[[deprecated]]`**, unconditionally.
+   Every consumer site then names itself on the next build. It waits for changeset 4,
+   because a consumer which builds with `-Werror` fails on each site. See 6.1.
 
 Changeset 3 is the one which pays, and it pays twice over. The module stops carrying
 `<future>`, which is the smaller and surer win. Whether that also ends the gcc-14 crash is
