@@ -311,7 +311,8 @@ jobs:
           # --compare-paths builds the same source through the headers and compares the report.
           # --unicode-off reaches the half of the module surface no consumer job builds, because
           # config.h turns unicode on for every one of them
-          # --warn-free proves an importer compiles a delegate with no cast warning, see BUGS.md B30
+          # --warn-free proves an importer compiles a delegate with no cast warning, see BUGS.md B30,
+          # and that each deprecated cfuture name warns through the header and the module
           JOBS=$(nproc)
           CC_NAME="${{ matrix.cc }}" # gcc-15 names the g++-15 this step runs
           UNICODE_OFF=""

@@ -8,6 +8,23 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B35. A `noexcept` error handler does not compile
+`rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
+`first_arg_type` fails on a `noexcept` lambda. A handler such as
+`[](const std::runtime_error&) noexcept { return 2; }` fails in `rpp::future::then()` and
+`cfuture::then()`, where g++ 14.4 reports `'operator()' is not a member of`. The same handler
+without `noexcept` compiles, and so does a `noexcept` task.
+
+### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
+`test_timer::proc_cpu_times` reads `t1` before it spins. It asserts at `test_timer.cpp:737` that
+`t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
+gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
+full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
+
+The same case spins 50 ms and requires 45 ms of CPU time at `test_timer.cpp:753`. On a 4 core VM
+that floor failed 1 of 5 runs under TSAN and 1 of 20 on plain gcc-14. The VM reports steal time in
+`/proc/stat`, which its load average does not show.
+
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
@@ -18,18 +35,23 @@ no longer apply. So a suppression which holds for a header consumer reaches no i
 pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
 `run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
 
-Three regions remain, and each one sits in a template a module exports:
+Four regions remain, and each one sits in a template a module exports:
 
 | Where | Suppresses | An importer at `-Wall -Wextra` |
 |---|---|---|
 | `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` | warns at `delegate.h:433` |
 | `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` | warns at `tests.h:413` |
 | `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` | no probe has run |
+| `future.h`, the `cfuture` region | `-Wdeprecated-declarations` | warns at `future.h:260`, once for each `cfuture::then()` |
 
-Each one wraps the GNU pmf-conversion extension, which has no standard spelling, so the cast
-cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
+The first three wrap the GNU pmf-conversion extension, which has no standard spelling, so the
+cast cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
 flag set. The ReCpp build stays quiet because every consumer includes the header before the
 import. Measured on gcc-15.
+
+The fourth ends with changeset 3 of `docs/FUTURE_MIGRATION.md`, when `rpp.future` stops exporting
+`cfuture`. gcc-14 shows it too, and clang-20 keeps the region. `-Wdeprecated-declarations` needs no
+flag either. `test_modules_future.cpp` opens its own region, so the ReCpp build stays quiet.
 
 ### B29. `udp_load_balancer` misses its throughput floor under full-suite load
 `test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
@@ -54,9 +76,10 @@ the send loop would pin the balancer instead of the load. Issue #70 took that sa
 ### B28. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
 gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
 
-1. The module fragment carries `<future>`, which carries `bits/exception_ptr.h`.
+1. The module exports a template which compares an `exception_ptr` with `==` or `!=`.
+   `<future>` does, in `_M_get_result()` at `future:749`.
 2. The importer includes a header which reaches `bits/exception_ptr.h` by text.
-3. The importer instantiates `std::future<T>::get()`.
+3. The importer instantiates that compare, as `std::future<T>::get()` does.
 
 The compiler reports `internal compiler error: Segmentation fault` at
 `bits/exception_ptr.h`. This predates the `rpp.future` split, and `import rpp.threading`
@@ -121,8 +144,17 @@ through `cfuture<T>`, so no importer of it reaches zero includes. It starts at
 `<typeinfo>` and `<new>`, and on gcc-14 it may add `<vector>`, `<string>` and
 `<functional>` and nothing else.
 
-**`exception_ptr.h` is the crash site, not the cause.** Condition 1 names `<future>`, and no
-other header stands in for it. Measured on the same compiler:
+**The defaulted `operator==` of `exception_ptr` is the cause, at `exception_ptr.h:169`.**
+`<future>` is only one caller:
+
+| Module fragment and exported template | Importer | gcc 14.2 and 14.4 | gcc 15.2 |
+|---|---|---|---|
+| `<exception>` only, returns `e != nullptr` | includes `<memory>` | ICE at `-O0` and `-O2` | compiles |
+| `<exception>` only, returns `bool(e)` | includes `<memory>` | compiles | compiles |
+| `rpp.threading`, `take()` tests `error == nullptr` | includes `<memory>`, calls `get()` | ICE at `-O0` and `-O2` | compiles |
+
+`async.h` tests every `exception_ptr` as a bool, so `rpp::future` stays clear of this. These
+shapes compile, because none of them instantiates the operator:
 
 | Shape | Result |
 |---|---|
@@ -131,8 +163,8 @@ other header stands in for it. Measured on the same compiler:
 | an `<exception>` module, importer includes `<memory>`, `exception_ptr` returned | compiles |
 | a `<memory>` module, importer includes `<memory>` | compiles |
 
-So a plain import of this group is safe. The three conditions must meet, and dropping
-`<future>` from the fragment drops the crash even when `exception_ptr` stays on both sides.
+So a plain import of this group is safe. Without `<future>` the fragment holds no compare, so
+the crash goes even when `exception_ptr` stays on both sides.
 
 **The compiler is gcc 14.2.0**, Ubuntu package `14.2.0-4ubuntu2~24.04.1`, from August 2024.
 
@@ -271,6 +303,17 @@ Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
 The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
 run. B17 reported on the same commit instead, which is a different race in another test.
 
+A second sighting came on 78c9827 in `ubuntu-cpp23-tsan-clang18`, in
+`test_future::cross_thread_exception_propagation`. The libc++ `std::async` worker frees the
+exception in `__cxa_end_catch` after the main thread read `e.what()`. TSAN does not see the
+libc++abi refcount which orders the two.
+
+`cfuture` keeps this shape, because libc++ `__assoc_state::move()` rethrows a copy of the stored
+exception, as C31 did in `rpp::future`. `rpp::future` reaches it when a caller passes
+`std::make_exception_ptr(std::runtime_error{"x"})` to `set_exception()`, then frees it while a
+handler reads `e.what()`. 3 of 5 clang-18 TSAN runs reported it, and 0 of 5 with the exception
+built before the race. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
@@ -304,16 +347,16 @@ out of 20, and it costs no second drain. A frame captured inside the null window
 warpable, so a later warp does not advance it. During a 20000 swap storm that reaches most
 fresh frames, and outside a storm the window measures about 300ns per call.
 
-**The `frames` guard fired in CI, and the skew assertion did not.**
-`ubuntu-cpp20-modules-clang21` reported `frames.load() => '0' must be greater than '0'` on a
-commit which changes no C++. That is the guard which stops the case passing vacuously, not
-the pair check. A reader starved for the whole swap storm reads only the base generation, so
-it counts no frame and asserts nothing about skew.
+**The `frames` guard fired in CI, and the skew assertion did not.** CI reported
+`frames.load() => '0' must be greater than '0'` at `test_event_loop.cpp:1398`. That is the
+guard which stops the case passing vacuously, not the pair check. A reader starved for the whole
+swap storm reads only the base generation, so it counts no frame and asserts nothing about skew.
 
 | Where | Result |
 |---|---|
 | `ubuntu-cpp20-modules-clang21`, one run | `frames` reached 0, and the re-run passed |
 | seven other ASAN jobs, same commit | pass |
+| `ubuntu-cpp20-asan-clang18`, `ubuntu-cpp20-modules-clang21` and `ubuntu-cpp20-asan-clang20` twice, in #104 | `frames` reached 0 in one case each |
 | `test_event_loop` locally, clang headers | 10 runs out of 10 pass |
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
@@ -323,6 +366,12 @@ it counts no frame and asserts nothing about skew.
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
 hold the storm open until the reader counts one. That pins the invariant on the reader rather
 than on the scheduler.
+
+**The skew check fired in CI.** Under QEMU in #104, `android-cpp20-r27-clang-tidy-clang18` and
+`android-cpp20-r28b-clang-tidy-clang19` failed twice each, and `android-cpp20-r29-ninja` once. Each
+run failed `skewed.load() => '1' BUT EXPECTED '0'` at `test_event_loop.cpp:1399` in one case. So one
+reader paired an offset with another generation. 20 local gcc-14 runs out of 20 pass, on 4 cores and
+on one.
 
 **qemu-user breaks the drain handshake.** `android-cpp20-r29-ninja` reported 1 skewed frame
 on a6c2bd6 in #109, and 2 on the re-run. qemu-user on an x86 host fences before an STLR store
@@ -484,12 +533,12 @@ the same creation stack. That commit edits two build files and two markdown file
 changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
 set exit 66 on its own.
 
-### B15. Six headers do not compile on bare metal
+### B15. Seven headers do not compile on bare metal
 `condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
 inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
 only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
 `cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
-function for call to 'wait'`. `thread_pool.h`, `future.h`, `event_loop.h` and
+function for call to 'wait'`. `thread_pool.h`, `future.h`, `async.h`, `event_loop.h` and
 `coroutines.h` reach one of those two, so they report the same.
 
 The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
@@ -499,7 +548,7 @@ bare metal takes that branch too, and it needs a target which can run the result
 `event_loop.h` carries a second gap of its own. It calls `rpp::get_thread_id()` at lines
 445 and 517, and `threads.h:31` declares that name only when `!RPP_BARE_METAL`.
 
-All six headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
+All seven headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
 bare-metal build never reaches the module either, so the export list stays unguarded.
 
 ### B16. gcc-14 crashes an importer which instantiates `std::promise` at `-O1` and above
@@ -573,6 +622,7 @@ A third shape compares two measured times, as
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
+
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
 for h in 1 2; do taskset -c 0 bash -c 'while :; do :; done' & done
@@ -701,17 +751,18 @@ g++ -std=c++20 -fmodules-ts -I ~/ReCpp/src -c u.cpp -o u.o    # 0 errors under R
 Put the offending line back into the generated block by hand to watch it fail. Only gcc 14.2
 ran this check, so retry on clang-21 and on a newer gcc.
 
-### B9. `--check-undocumented` reads 29 of the 48 headers and reports the rest as clean
-`extract_public_decls` returns nothing for 19 headers, so the gate never asks whether
+### B9. `--check-undocumented` reads 28 of the 50 headers and reports the rest as clean
+`extract_public_decls` returns nothing for 22 headers, so the gate never asks whether
 README.md documents them. It reported "All public declarations are documented" while the
 `sort.h` table listed 1 of its 4 functions.
 
 ```
-headers the extractor reads: 29
-headers it returns nothing for: 19
-  bitutils.h close_sync.h concurrent_queue.h condition_variable.h coroutines.h debugging.h
-  debugging.macros.h future.h jni_cpp.h log_colors.h math.h memory_pool.h obfuscated_string.h
-  predicates.h proc_utils.h semaphore.h sort.h task.h traits.h
+headers the extractor reads: 28
+headers it returns nothing for: 22
+  async.h bitutils.h close_sync.h concurrent_queue.h condition_variable.h coroutines.h
+  debugging.h debugging.macros.h future.h future_types.h jni_cpp.h log_colors.h math.h
+  memory_pool.h obfuscated_string.h predicates.h proc_utils.h semaphore.h sort.h task.h
+  tests.macros.h traits.h
 ```
 
 Reproduce it with the loop which produced that count:
@@ -725,9 +776,9 @@ for h in sorted(os.listdir('src/rpp')):
 "
 ```
 A fix teaches the extractor the declaration shapes it misses, and it needs a count of what
-the 19 headers then owe README.md. The count decides whether the gate can stay green.
+the 22 headers then owe README.md. The count decides whether the gate can stay green.
 
-### B5. `update_doc_linerefs.py` matches a name in the wrong place
+### B5. `update_doc_linerefs.py` points a row at a call or a comment, and `--check` accepts it
 It pointed `LogError` at `debugging.macros.h:162`, which is the `LogError` call
 inside `DbgAssert`, not the `#define LogError` at line 139. Corrected by hand.
 The script's own docstring already warns that it has mistakes.
@@ -735,7 +786,25 @@ After a header edit moved `socket_poller::wake()`, it pointed the ref at the tra
 comment on `socket_poller::armed`, which names `wake()`, not at the declaration.
 Corrected by hand, and `--check` accepts the corrected line.
 
+A tie goes to the candidate nearest the old line, which can be a call, a trailing comment or a
+forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>` and `sprint.h`
+`write_cont` rows reproduce it. A fix ranks a declaration above a call first.
+
 ## Closed
+
+### C33. Copying an `rpp::delegate` moved the functor out of its source (was B34)
+`delegate(const delegate&)` move-constructed its functor from the source, so a copy emptied the
+captures of a const source. #125 copies a copyable functor, and a move-only functor still moves.
+
+### C32. TSAN blamed the `async()` worker for freeing an exception the handler read (was B31)
+`async()` published the exception inside its catch block, and `set_exception()` and
+`exceptional_future()` kept a reference on libc++ 18. All three now publish with no reference left,
+and each has a `test_async` case which fails on the old code with libc++.
+
+### C31. TSAN blamed a pool worker for freeing an exception a handler had read
+`future_state::take()` rethrew a copy of the error, so a late `~promise()` on another pool worker
+freed an exception which a handler had read. `take()` now exchanges the error for null, which
+`get_takes_ownership_of_the_exception` pins.
 
 ### C30. `set_time_source()` wrote a plain pointer a `delay()` worker still read (was B23)
 A poll step re-read the raw pointer, so a detach dropped the warp offset and left the worker

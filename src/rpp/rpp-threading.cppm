@@ -12,6 +12,7 @@ module;
 #include "future_types.h"
 #include "atomic_shared_ptr.h"
 #include "close_sync.h"
+#include "async.h"
 
 export module rpp.threading;
 
@@ -44,7 +45,6 @@ export namespace rpp {
     using rpp::task_delegate;
     using rpp::pool_signal_handler;
     using rpp::pool_trace_provider;
-    using rpp::wait_result;
     using rpp::pool_worker;
     using rpp::pool_task_state;
     using rpp::pool_task_handle;
@@ -56,6 +56,7 @@ export namespace rpp {
     using rpp::task;
     using rpp::deferred;
     using rpp::cfuture;
+    using rpp::wait_result;
     using rpp::coro_handle;
     using rpp::suspend_never;
     using rpp::suspend_always;
@@ -65,6 +66,14 @@ export namespace rpp {
     using rpp::readonly_lock;
     using rpp::exclusive_lock;
     using rpp::close_sync;
+    using rpp::future;
+    using rpp::IsEventLoop;
+    using rpp::promise;
+    using rpp::async;
+    using rpp::ready_future;
+    using rpp::exceptional_future;
+    using rpp::wait_all;
+    using rpp::get_all;
 #if !RPP_BARE_METAL
     using rpp::set_this_thread_name;
     using rpp::get_this_thread_name;

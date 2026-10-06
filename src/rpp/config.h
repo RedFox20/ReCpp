@@ -349,12 +349,23 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #    define RPP_CORO_RETURN_TYPE [[clang::coro_return_type]]
 #    define RPP_CORO_WRAPPER [[clang::coro_wrapper]]
 #    define RPP_CORO_LIFETIMEBOUND [[clang::coro_lifetimebound]]
+#    define RPP_CORO_DISABLE_LIFETIMEBOUND [[clang::coro_disable_lifetimebound]] // the CRT borrows no argument
 #  else
 #    define RPP_CORO_RETURN_TYPE
 #    define RPP_CORO_WRAPPER
 #    define RPP_CORO_LIFETIMEBOUND
+#    define RPP_CORO_DISABLE_LIFETIMEBOUND
 #  endif
 #endif // RPP_CORO_RETURN_TYPE
+
+// Hides [[deprecated]] warnings until the END macro, so a header or a test can name a deprecated API
+#if defined(_MSC_VER) && !defined(__clang__)
+#  define RPP_IGNORE_DEPRECATED_BEGIN __pragma(warning(push)) __pragma(warning(disable: 4996))
+#  define RPP_IGNORE_DEPRECATED_END __pragma(warning(pop))
+#else
+#  define RPP_IGNORE_DEPRECATED_BEGIN _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#  define RPP_IGNORE_DEPRECATED_END _Pragma("GCC diagnostic pop")
+#endif
 
 
 #define RPP_INT64_MAX     0x7FFFFFFFFFFFFFFFLL

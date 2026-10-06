@@ -1,0 +1,44 @@
+/**
+ * Chainable and coroutine compatible futures, which own their shared state
+ * Copyright (c) 2026, Jorma Rebane
+ * Distributed under MIT Software License
+ */
+#include "async.h"
+#include "thread_pool.h" // rpp::parallel_task_detached
+#include <utility> // std::exchange
+
+namespace rpp::detail
+{
+    // each result a step publishes nests the next step one level deeper, so a longer chain continues after the stack unwinds
+    static constexpr int MAX_NESTED_STEPS = 32;
+
+    // the steps this thread runs inside each other. A thread outside the pool runs none
+    static thread_local int nested_steps = 0;
+
+    // a step which the depth cap postponed, so the pool task runs it after the stack unwinds
+    static thread_local continuation* deferred = nullptr;
+
+    static void run_step(continuation* c) noexcept
+    {
+        ++nested_steps;
+        c->run();
+        delete c;
+        --nested_steps;
+    }
+
+    void continuation::run_pool_task() noexcept
+    {
+        for (continuation* c = this; c; c = std::exchange(deferred, nullptr))
+            run_step(c);
+    }
+
+    void continuation::start_on_pool(bool may_run_here) noexcept
+    {
+        if (may_run_here && nested_steps < MAX_NESTED_STEPS)
+            run_step(this);
+        else if (may_run_here && !deferred)
+            deferred = this;
+        else
+            rpp::parallel_task_detached(rpp::delegate<void()>{this, &continuation::run_pool_task});
+    }
+}
