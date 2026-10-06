@@ -70,7 +70,15 @@ namespace rpp::cvar
     #if RPP_FREERTOS
         rpp::yield();
     #elif RPP_CORTEX_M_ARCH
-        asm volatile("wfe"); // an exception return sets the event register, so WFE after the notifying ISR returns at once
+        asm volatile("wfe"); // the notifier runs SEV, so a WFE after the notify returns at once
+    #endif
+    }
+
+    // Cortex-M3 r1p1 does not set the event register on an exception return (erratum 563915), so SEV sets it
+    static FINLINE void send_event() noexcept
+    {
+    #if !RPP_FREERTOS && RPP_CORTEX_M_ARCH
+        asm volatile("sev");
     #endif
     }
 
@@ -82,8 +90,8 @@ namespace rpp::cvar
             relax();
     }
 
-    void wake_one(const void*) noexcept {}
-    void wake_all(const void*) noexcept {}
+    void wake_one(const void*) noexcept { send_event(); }
+    void wake_all(const void*) noexcept { send_event(); }
 
 #elif __linux__ && !RPP_ADDRESS_WAIT_PARKING_LOT
 
