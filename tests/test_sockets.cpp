@@ -12,8 +12,6 @@
 
 using namespace rpp;
 using namespace std::string_literals;
-// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
-RPP_IGNORE_DEPRECATED_BEGIN
 
 #if !__EMSCRIPTEN__ // Emscripten sockets emulate TCP over WebSocket, and listen() needs the node 'ws' package
 TestImpl(test_sockets)
@@ -1371,5 +1369,3 @@ TestImpl(test_sockets)
     //////////////////////////////////////////////////////////////////
 };
 #endif // !__EMSCRIPTEN__
-
-RPP_IGNORE_DEPRECATED_END

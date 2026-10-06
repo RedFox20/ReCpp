@@ -30,8 +30,6 @@
 #include <type_traits>
 
 
-// the loop still awaits rpp::cfuture until changeset 2 of docs/FUTURE_MIGRATION.md
-RPP_IGNORE_DEPRECATED_BEGIN
 namespace rpp
 {
     /**
@@ -1184,5 +1182,4 @@ namespace rpp
     };
 
 } // namespace rpp
-RPP_IGNORE_DEPRECATED_END
 

@@ -16,8 +16,6 @@
 using namespace rpp;
 using namespace std::chrono_literals;
 using namespace std::string_literals;
-// these cases still use the deprecated rpp::cfuture, see docs/FUTURE_MIGRATION.md section 6.1
-RPP_IGNORE_DEPRECATED_BEGIN
 
 namespace rpp
 {
@@ -2031,5 +2029,3 @@ TestImpl(test_event_loop)
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
 
 };
-
-RPP_IGNORE_DEPRECATED_END
