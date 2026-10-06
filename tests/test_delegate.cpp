@@ -1344,14 +1344,19 @@ namespace rpp
             void on_event(int x) { log->push_back(id * 100 + x); }
         };
 
-        // a capture whose destructor adds a listener to the multicast_delegate which holds it
+        // a capture whose destructor adds a listener to its multicast_delegate, which holds the next generation
         struct Adder
         {
             multicast_delegate<int>* evt;
-            explicit Adder(multicast_delegate<int>* evt) : evt{evt} {}
+            int generations;
+            explicit Adder(multicast_delegate<int>* evt, int generations = 0) : evt{evt}, generations{generations} {}
             Adder(const Adder&) = delete;
             Adder& operator=(const Adder&) = delete;
-            ~Adder() { *evt += [name = std::string(40, 'x')](int) {}; }
+            ~Adder()
+            {
+                if (generations) *evt += [next = std::make_shared<Adder>(evt, generations - 1)](int) {};
+                else *evt += [name = std::string(40, 'x')](int) {};
+            }
         };
 
         TestCase(multicast_delegate_grows_and_removes_in_order)
@@ -1645,7 +1650,7 @@ namespace rpp
             multicast_delegate<int>* raw = evt.get();
             *evt += [&evt, raw](int)
             {
-                *raw += [a = std::make_shared<Adder>(raw)](int) {}; // waits for the dispatch, and its destructor adds
+                *raw += [a = std::make_shared<Adder>(raw, 2)](int) {}; // waits for the dispatch, and its destructors add
                 evt.reset();
             };
             (*raw)(1);

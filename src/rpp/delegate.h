@@ -763,7 +763,8 @@ namespace rpp
         ~multicast_delegate() noexcept
         {
             clear();
-            while (ptr && ptr->state < one_dispatch) // a functor destructor added a listener
+            // a functor destructor can add listeners, and an added one never ran, so it dies while `this` lives
+            while (ptr && (ptr->state < one_dispatch || ptr->added))
                 clear();
             if (ptr) ptr->owner = nullptr; // the running dispatch frees the container when it ends
         }
@@ -848,15 +849,11 @@ namespace rpp
 
         static void destroy(container* c) noexcept
         {
-            while (c) // a functor destructor can add listeners to `c->added` while `c` dies
-            {
-                for (int i = 0; i < c->size; ++i)
-                    c->data[i].~deleg();
-                container* added = c->added;
-                if (c->removed_mask) free(c->removed_mask);
-                free(c);
-                c = added;
-            }
+            if (!c) return;
+            for (int i = 0; i < c->size; ++i)
+                c->data[i].~deleg();
+            if (c->removed_mask) free(c->removed_mask);
+            free(c);
         }
 
         // moves the slots, so it never runs on the slots of a running dispatch
