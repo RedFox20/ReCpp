@@ -322,7 +322,7 @@ See `BUGS.md` B8.
 | [Threads](#rppthreadsh) | [`threads.h`](src/rpp/threads.h) | Thread naming, ID queries, and CPU core info |
 | [Mutex](#rppmutexh) | [`mutex.h`](src/rpp/mutex.h) | Cross-platform mutex, spin locks, and `synchronized<T>` wrapper |
 | [Semaphore](#rppsemaphoreh) | [`semaphore.h`](src/rpp/semaphore.h) | Counting semaphore, semaphore flag, and one-shot flag |
-| [Condition Variable](#rppcondition_variableh) | [`condition_variable.h`](src/rpp/condition_variable.h) | Condition variable with high-resolution timeout support |
+| [Condition Variable](#rppcondition_variableh) | [`condition_variable.h`](src/rpp/condition_variable.h) | Condition variable with 1ms timeout granularity on every platform |
 | [Sockets](#rppsocketsh) | [`sockets.h`](src/rpp/sockets.h) | Cross-platform TCP/UDP sockets, IP addresses, and network interfaces |
 | [Binary Stream](#rppbinary_streamh) | [`binary_stream.h`](src/rpp/binary_stream.h) | Buffered binary read/write streams |
 | [Binary Serializer](#rppbinary_serializerh) | [`binary_serializer.h`](src/rpp/binary_serializer.h) | Reflection-based binary and string serialization |
@@ -1942,9 +1942,9 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L395) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](src/rpp/thread_pool.h#L140) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](src/rpp/thread_pool.h#L313) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L389) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L134) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L307) | Individual worker thread in the pool |
 
 ### Configuration
 
@@ -1956,24 +1956,24 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int range_start, int range_end, int max_range_size, const Func& func)`](src/rpp/thread_pool.h#L530) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L537) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L433) | Set max concurrent workers |
-| [`max_parallelism()`](src/rpp/thread_pool.h#L436) | Get max concurrent workers |
-| [`active_tasks()`](src/rpp/thread_pool.h#L449) | Number of currently running tasks |
-| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L467) | Blocks until no pool task is running, including task delegate destruction |
-| [`idle_tasks()`](src/rpp/thread_pool.h#L470) | Number of idle workers |
-| [`total_tasks()`](src/rpp/thread_pool.h#L473) | Total number of workers |
-| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L477) | Remove idle workers |
+| [`parallel_for(int range_start, int range_end, int max_range_size, const Func& func)`](src/rpp/thread_pool.h#L524) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L531) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L427) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L430) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L443) | Number of currently running tasks |
+| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L461) | Blocks until no pool task is running, including task delegate destruction |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L464) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L467) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L471) | Remove idle workers |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L589) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L608) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L629) | Run async task on the global pool |
-| [`action<TArgs...>`](src/rpp/thread_pool.h#L50) | Lightweight non-owning delegate for blocking call contexts |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L583) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L602) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L623) | Run async task on the global pool |
+| [`action<TArgs...>`](src/rpp/thread_pool.h#L44) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for
 
@@ -2138,23 +2138,23 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](src/rpp/semaphore.h#L27) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L400) | Lighter semaphore using a single atomic flag |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L436) | One-shot semaphore that can only be set once |
+| [`semaphore`](src/rpp/semaphore.h#L54) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L484) | Flag in one 32-bit word, whose wait sleeps in the kernel and unsets the flag on success |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L548) | Flag in one 32-bit word which stays set, and whose `notify()` wakes every waiter |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L103) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L145) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L175) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L220) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L240) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L275) | Wait with timeout |
-| [`await(Duration timeout)`](src/rpp/semaphore.h#L390) | C++20 coroutine `co_await` — dispatches wait to background thread |
-| [`count()`](src/rpp/semaphore.h#L66) | Current count |
-| [`reset()`](src/rpp/semaphore.h#L75) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L130) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L167) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L202) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L242) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L262) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L297) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L397) | C++20 coroutine `co_await` — dispatches wait to background thread |
+| [`count()`](src/rpp/semaphore.h#L88) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L102) | Reset to zero |
 
 ### Example: Coroutine co_await
 
@@ -2228,15 +2228,49 @@ initDone.wait(); // does NOT consume the signal
 initDone.wait(); // still returns immediately
 ```
 
+### Migration: the flags have no mutex
+
+`semaphore_flag` and `semaphore_once_flag` keep `is_set()`, `notify()`, `notify_all()`, `try_wait()`, `wait()`,
+`wait(Duration)` and `await(Duration)`. `semaphore_flag` also keeps `unset()`, `reset()`, `notify_once()` and
+`wait_no_unset()`. The flags no longer derive from `rpp::semaphore`, so these members are gone:
+
+- `mutex()`, `spin_lock()`, and every overload which takes a `lock_t&`. Guard shared state with your own mutex, or
+  use `rpp::semaphore{0, 1}`, which keeps the lock overloads.
+- The `notify(callback)` overloads. They ran the callback under the flag mutex. Run the callback before `notify()`.
+- `semaphore_once_flag::notify()` now wakes every waiter, and `semaphore_once_flag::await()` keeps the flag set.
+
 ---
 
 ## rpp/condition_variable.h
 
-Extended condition variable with `rpp::Duration` and `rpp::TimePoint` overloads. On Windows provides a custom implementation with spin-wait for sub-15.6ms timeouts. This is a significant upgrade for MSVC++ where `std::condition_variable` cannot do fine-grained waits.
+Condition variable which takes `rpp::Duration` and `rpp::TimePoint` only. A wait sleeps in the kernel on one 32-bit
+word, through a futex on Linux and Android, and `WaitOnAddress()` on Windows. The Windows wait raises the timer
+resolution, so a timeout keeps 1ms granularity instead of the ~15.6ms default tick. It works with any lock which has
+`lock()` and `unlock()`, and takes 8 bytes.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L62) | Condition variable with high-resolution timeout support |
+| [`condition_variable`](src/rpp/condition_variable.h#L71) | Condition variable with 1ms timeout granularity on every platform |
+| [`cv_status`](src/rpp/condition_variable.h#L37) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
+
+| Method | Description |
+|--------|-------------|
+| [`notify_one()`](src/rpp/condition_variable.h#L97) | Wakes one waiting thread, and makes no syscall when no thread waits |
+| [`notify_all()`](src/rpp/condition_variable.h#L104) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L131) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L144) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+
+`rpp::cvar` holds the word wait under the condition variable and the semaphore flags.
+
+| Function | Description |
+|----------|-------------|
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/condition_variable.h#L24) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/condition_variable.h#L27) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/condition_variable.h#L30) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/condition_variable.h#L33) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
+
+Migration: the `std::chrono` overloads, the `clock`, `duration` and `time_point` aliases, and the MSVC
+`native_handle()` are gone. A timed wait returns `rpp::cv_status` instead of `std::cv_status`.
 
 ### Example
 
@@ -2261,10 +2295,10 @@ bool dataReady = false;
 }
 cv.notify_one();
 
-// high-resolution wait with rpp::Duration (sub-15.6ms on Windows), does not exceed the specified timeout
+// a 5ms wait also on Windows, where the default timer tick is ~15.6ms
 {
     std::unique_lock<rpp::mutex> lock{mtx};
-    if (cv.wait_for(lock, rpp::Duration::from_millis(5)) == std::cv_status::timeout)
+    if (cv.wait_for(lock, rpp::Duration::from_millis(5)) == rpp::cv_status::timeout)
         handleTimeout();
 }
 ```

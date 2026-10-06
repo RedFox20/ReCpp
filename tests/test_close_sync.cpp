@@ -1,10 +1,9 @@
 #include <rpp/close_sync.h>
 #include <rpp/semaphore.h>
 #include <rpp/thread_pool.h>
+#include <rpp/timepoint.h> // rpp::sleep_ms
 #include <rpp/tests.h>
 using namespace rpp;
-using namespace std::chrono_literals;
-using namespace std::this_thread;
 
 TestImpl(test_close_sync)
 {
@@ -32,7 +31,8 @@ TestImpl(test_close_sync)
             {
                 try_lock_or_return(CloseSync);
                 Locked.notify(); // the worker holds the close_sync from here
-                ::sleep_for(30ms);
+                // holds the close_sync, so the destructor must wait in lock_for_close()
+                rpp::sleep_ms(30);
                 //AssertThat(data, "xxxxyyyyzzzzaaaabbbbcccc");
                 if (data != "xxxxyyyyzzzzaaaabbbbcccc")
                     throw std::runtime_error("SomeAsyncOperation: data != \"xxxxyyyyzzzzaaaabbbbcccc\"");

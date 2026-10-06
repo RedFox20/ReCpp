@@ -7,7 +7,6 @@
 #include <atomic>
 #include <memory> // shared_ptr
 #include <thread>  // hardware_concurrency
-#include <latch>
 #include <unordered_set>
 using namespace rpp;
 
@@ -571,14 +570,16 @@ TestImpl(test_threadpool)
         pool_task_handle shared{nullptr};
 
         // All threads start simultaneously for maximum initial contention
-        std::latch ready{N_COPIERS + 1};
+        rpp::semaphore started;
+        rpp::semaphore_once_flag go; // its notify wakes every copier at once
 
         std::vector<std::thread> copiers;
         copiers.reserve(N_COPIERS);
         for (int t = 0; t < N_COPIERS; ++t)
         {
             copiers.emplace_back([&]() {
-                ready.arrive_and_wait(); // synchronize start with main + other copiers
+                started.notify();
+                go.wait(); // synchronize start with main + other copiers
                 while (!stop.load(std::memory_order_relaxed))
                 {
                     pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref // NOLINT(performance-unnecessary-copy-initialization)
@@ -587,7 +588,9 @@ TestImpl(test_threadpool)
             });
         }
 
-        ready.arrive_and_wait(); // release all copiers at once
+        for (int t = 0; t < N_COPIERS; ++t)
+            started.wait();
+        go.notify(); // release all copiers at once
 
         for (int i = 0; i < ITERATIONS; ++i)
         {
@@ -616,14 +619,19 @@ TestImpl(test_threadpool)
     {
         constexpr int TASKS_PER_THREAD = 500;
         std::atomic_int completed{0};
-        std::latch go{4};
+        rpp::semaphore started;
+        rpp::semaphore_once_flag go; // its notify wakes every submitter at once
 
         auto submitter = [&] {
-            go.arrive_and_wait();
+            started.notify();
+            go.wait();
             for (int i = 0; i < TASKS_PER_THREAD; ++i)
                 rpp::parallel_task([&] { completed += 1; }).wait();
         };
         std::thread t1{submitter}, t2{submitter}, t3{submitter}, t4{submitter}; // NOLINT(readability-isolate-declaration)
+        for (int t = 0; t < 4; ++t)
+            started.wait();
+        go.notify();
         t1.join(); t2.join(); t3.join(); t4.join();
 
         AssertThat((int)completed, 4 * TASKS_PER_THREAD);

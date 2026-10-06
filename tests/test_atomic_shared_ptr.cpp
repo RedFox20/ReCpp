@@ -5,7 +5,6 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <vector>
-#include <latch>
 
 TestImpl(test_atomic_shared_ptr)
 {
@@ -114,8 +113,7 @@ TestImpl(test_atomic_shared_ptr)
         std::atomic_bool stop{false};
         std::atomic_int valid_reads{0};
         std::atomic_int invalid_reads{0};
-        std::atomic_int readers_spinning{0};
-        std::latch readers_ready{NUM_READERS};
+        rpp::semaphore readers_started;
 
         std::vector<std::thread> readers;
         readers.reserve(NUM_READERS);
@@ -123,8 +121,7 @@ TestImpl(test_atomic_shared_ptr)
         {
             readers.emplace_back([&]
             {
-                readers_ready.arrive_and_wait();
-                readers_spinning.fetch_add(1, std::memory_order_release);
+                readers_started.notify();
                 while (!stop.load(std::memory_order_acquire))
                 {
                     auto sp = asp.load(std::memory_order_acquire);
@@ -140,9 +137,9 @@ TestImpl(test_atomic_shared_ptr)
             });
         }
 
-        // wait until all readers have entered the while-loop
-        while (readers_spinning.load(std::memory_order_acquire) < NUM_READERS)
-            std::this_thread::yield();
+        // every reader is about to enter its loop before the first store
+        for (int i = 0; i < NUM_READERS; ++i)
+            readers_started.wait();
 
         for (int i = 1; i <= NUM_ITERATIONS; ++i)
             asp.store(std::make_shared<int>(i), std::memory_order_release);
@@ -212,7 +209,7 @@ TestImpl(test_atomic_shared_ptr)
             {
                 if (auto s = asp.load())
                 {
-                    (void)s->finished.is_set(); // locks finished.m briefly
+                    (void)s->finished.is_set(); // reads the flag word of a state which may reuse freed memory
                     checks.fetch_add(1, std::memory_order_relaxed);
                 }
             }
@@ -223,12 +220,9 @@ TestImpl(test_atomic_shared_ptr)
         {
             asp.store(std::make_shared<task_state>()); // new state (may reuse freed memory)
             std::this_thread::yield();
-            // signal_finish_and_cleanup pattern: take → lock finished → notify → destroy
+            // signal_finish_and_cleanup pattern: take → notify → destroy
             if (auto taken = asp.exchange(nullptr))
-            {
-                auto lock = taken->finished.spin_lock();
-                taken->finished.notify_all(lock);
-            }
+                taken->finished.notify_all();
         }
 
         stop.store(true, std::memory_order_release);
@@ -323,8 +317,7 @@ TestImpl(test_atomic_shared_ptr)
 
         std::atomic_bool stop{false};
         std::atomic_int valid_reads{0};
-        std::atomic_int readers_spinning{0};
-        std::latch readers_ready{NUM_READERS};
+        rpp::semaphore readers_started;
 
         // keep shared_ptrs alive for the duration of the test
         std::vector<std::shared_ptr<int>> kept_alive;
@@ -337,8 +330,7 @@ TestImpl(test_atomic_shared_ptr)
         {
             readers.emplace_back([&]
             {
-                readers_ready.arrive_and_wait();
-                readers_spinning.fetch_add(1, std::memory_order_release);
+                readers_started.notify();
                 while (!stop.load(std::memory_order_acquire))
                 {
                     auto wp = awp.load(std::memory_order_acquire);
@@ -352,9 +344,9 @@ TestImpl(test_atomic_shared_ptr)
             });
         }
 
-        // wait until all readers have entered the while-loop
-        while (readers_spinning.load(std::memory_order_acquire) < NUM_READERS)
-            std::this_thread::yield();
+        // every reader is about to enter its loop before the first store
+        for (int i = 0; i < NUM_READERS; ++i)
+            readers_started.wait();
 
         for (int i = 1; i <= NUM_ITERATIONS; ++i)
         {

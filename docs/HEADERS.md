@@ -21,7 +21,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `threads.h` | Thread naming, ID queries, CPU core info |
 | `mutex.h` | Mutex, spin locks, synchronized<T> wrapper |
 | `semaphore.h` | Counting semaphore, semaphore flag, one-shot flag |
-| `condition_variable.h` | Condition variable with high-res timeout |
+| `condition_variable.h` | Condition variable with 1ms timeouts on every platform |
 | `concurrent_queue.h` | Thread-safe FIFO queue |
 | `close_sync.h` | Read-write sync for safe async destruction |
 | `sockets.h` | TCP/UDP sockets, IP addresses, network interfaces |
