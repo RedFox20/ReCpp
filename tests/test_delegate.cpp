@@ -1455,6 +1455,7 @@ namespace rpp
                 void on_event(int x)
                 {
                     evt->remove(first, &Recorder::on_event); // ran before this listener
+                    evt->remove(*evt->begin()); // the empty slot of `first` matches nothing
                     evt->remove(this, &Remover::on_event);
                     evt->remove(last, &Recorder::on_event); // runs after this listener
                     size_inside = evt->size();
@@ -1538,7 +1539,7 @@ namespace rpp
                 evt += [&log](int) { log.emplace_back("added, then cleared"); };
                 evt.clear();
                 evt.clear(); // finds every slot removed already
-                log.push_back(name);
+                log.push_back(evt.empty() ? name : "not empty");
             };
             evt += [&log](int) { log.emplace_back("cleared"); };
             AssertThat(is_inline(*evt.begin()), false);
@@ -1566,14 +1567,15 @@ namespace rpp
             {
                 if (x != 1) return;
                 evt.remove(&first, &Recorder::on_event);
+                evt.add(&first, &Recorder::on_event); // joins after the outer dispatch, so the nested one skips it
                 evt(2);
             };
             evt.add(&middle, &Recorder::on_event);
             evt.add(&last, &Recorder::on_event);
             evt(1);
             AssertThat(log, (std::vector<int>{ 1, 202, 302, 201, 301 }));
-            AssertThat(evt.size(), 3);
-            AssertThat(int(evt.end() - evt.begin()), 3);
+            AssertThat(evt.size(), 4);
+            AssertThat(int(evt.end() - evt.begin()), 4);
         }
 
         // a listener which destroys its multicast_delegate stops the rest, and the dispatch frees the container
@@ -1600,6 +1602,28 @@ namespace rpp
             raw->evt += [holder = std::move(holder), raw](int) { raw->evt.clear(); };
             raw->evt(1);
             AssertThat(alive.expired(), true);
+        }
+
+        // a removed functor destructor can remove a listener which the end of the dispatch checked already
+        TestCase(multicast_delegate_removed_functor_removes_an_earlier_listener)
+        {
+            struct Remover
+            {
+                multicast_delegate<int>* evt;
+                explicit Remover(multicast_delegate<int>* evt) : evt{evt} {}
+                Remover(const Remover&) = delete;
+                Remover& operator=(const Remover&) = delete;
+                ~Remover() { evt->remove(*evt->begin()); }
+            };
+            auto token = std::make_shared<int>(1);
+            const std::weak_ptr<int> alive = token;
+            multicast_delegate<int> evt;
+            evt += [token = std::move(token)](int) {};
+            evt += [&evt](int) { evt.remove(*(evt.begin() + 2)); };
+            evt += [r = std::make_shared<Remover>(&evt)](int) {};
+            evt(1);
+            AssertThat(alive.expired(), true);
+            AssertThat(evt.size(), 1);
         }
 
         // a functor destructor can edit its multicast_delegate, so the container is consistent before it runs
@@ -1657,6 +1681,19 @@ namespace rpp
             AssertThat(evt == nullptr, true); // LeakSanitizer reports the second listener if the dispatch misses it
         }
 
+        // an added listener waits outside the slots, so a running mutable functor keeps what it writes
+        TestCase(multicast_delegate_mutable_listener_keeps_its_state_while_it_adds)
+        {
+            multicast_delegate<int> evt;
+            int seen = 0;
+            evt += [&evt, &seen, n = 0](int) mutable { evt += [](int) {}; seen = ++n; };
+            AssertThat(is_inline(*evt.begin()), true);
+            evt(1);
+            evt(2);
+            AssertThat(seen, 2);
+            AssertThat(evt.size(), 3);
+        }
+
         // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
         TestCase(multicast_delegate_listener_moves_it_while_it_runs)
         {
@@ -1664,34 +1701,46 @@ namespace rpp
             Recorder rec { 1, &log };
             struct Owners
             {
-                multicast_delegate<int> source, assigned;
+                multicast_delegate<int> source, assigned, spare;
                 std::unique_ptr<multicast_delegate<int>> constructed;
                 Recorder* rec;
             };
             Owners o;
             o.rec = &rec;
+            o.spare.add(&rec, &Recorder::on_event);
             o.source.add(&rec, &Recorder::on_event);
-            o.source += [&o](int x)
+            o.source += [&o](int x) // each move follows an add, so the edits change their owner
             {
                 if (x == 1)
                 {
+                    o.source.add(o.rec, &Recorder::on_event);
                     o.constructed = std::make_unique<multicast_delegate<int>>(std::move(o.source));
                     o.constructed->add(o.rec, &Recorder::on_event);
                 }
                 else if (x == 2)
                 {
+                    o.constructed->add(o.rec, &Recorder::on_event);
                     o.assigned = std::move(*o.constructed);
                     o.assigned.add(o.rec, &Recorder::on_event);
+                }
+                else if (x == 3)
+                {
+                    o.assigned.add(o.rec, &Recorder::on_event);
+                    o.assigned = std::move(o.spare); // the running dispatch moves into `spare`
                 }
             };
             o.source(1);
             AssertThat(o.source.size(), 0);
-            AssertThat(o.constructed->size(), 3);
+            AssertThat(o.constructed->size(), 4);
 
             (*o.constructed)(2);
             AssertThat(o.constructed->size(), 0);
-            AssertThat(o.assigned.size(), 4);
-            AssertThat(log, (std::vector<int>{ 101, 102, 102 }));
+            AssertThat(o.assigned.size(), 6);
+            AssertThat(log, (std::vector<int>{ 101, 102, 102, 102 }));
+
+            o.assigned(3);
+            AssertThat(o.assigned.size(), 1);
+            AssertThat(o.spare.size(), 7);
         }
 
         // a listener which throws still ends the dispatch, so the removed slot goes away
