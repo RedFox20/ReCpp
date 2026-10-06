@@ -1344,6 +1344,16 @@ namespace rpp
             void on_event(int x) { log->push_back(id * 100 + x); }
         };
 
+        // a capture whose destructor adds a listener to the multicast_delegate which holds it
+        struct Adder
+        {
+            multicast_delegate<int>* evt;
+            explicit Adder(multicast_delegate<int>* evt) : evt{evt} {}
+            Adder(const Adder&) = delete;
+            Adder& operator=(const Adder&) = delete;
+            ~Adder() { *evt += [name = std::string(40, 'x')](int) {}; }
+        };
+
         TestCase(multicast_delegate_grows_and_removes_in_order)
         {
             std::vector<int> log;
@@ -1619,14 +1629,6 @@ namespace rpp
         // a functor destructor can add a listener while its multicast_delegate dies, so the destructor clears again
         TestCase(multicast_delegate_destructor_frees_a_listener_which_a_functor_adds)
         {
-            struct Adder
-            {
-                multicast_delegate<int>* evt;
-                explicit Adder(multicast_delegate<int>* evt) : evt{evt} {}
-                Adder(const Adder&) = delete;
-                Adder& operator=(const Adder&) = delete;
-                ~Adder() { *evt += [name = std::string(40, 'x')](int) {}; }
-            };
             int calls = 0;
             {
                 multicast_delegate<int> evt;
@@ -1634,6 +1636,20 @@ namespace rpp
                 evt(1);
             }
             AssertThat(calls, 1); // LeakSanitizer reports the added listener if the destructor misses it
+        }
+
+        // a pending listener can add another while a listener destroys the multicast_delegate mid dispatch
+        TestCase(multicast_delegate_destroyed_mid_dispatch_frees_a_listener_which_a_functor_adds)
+        {
+            auto evt = std::make_unique<multicast_delegate<int>>();
+            multicast_delegate<int>* raw = evt.get();
+            *evt += [&evt, raw](int)
+            {
+                *raw += [a = std::make_shared<Adder>(raw)](int) {}; // waits for the dispatch, and its destructor adds
+                evt.reset();
+            };
+            (*raw)(1);
+            AssertThat(evt == nullptr, true); // LeakSanitizer reports the second listener if the dispatch misses it
         }
 
         // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
