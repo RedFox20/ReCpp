@@ -25,6 +25,7 @@
     #include <cerrno>
     #include <cstdint>
     #include <ctime>
+    #include <type_traits>
 #endif
 
 namespace rpp::detail
@@ -56,13 +57,13 @@ namespace rpp::detail
 
 #elif RPP_BARE_METAL
 
-    static rpp::uint32 load_word(const void* addr) noexcept
+    static FINLINE rpp::uint32 load_word(const void* addr) noexcept
     {
         return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
     }
 
     // without an RTOS, rpp::yield() sleeps in WFI, which misses an ISR that changed the word after the check
-    static void relax() noexcept
+    static FINLINE void relax() noexcept
     {
     #if RPP_FREERTOS
         rpp::yield();
@@ -103,7 +104,7 @@ namespace rpp::detail
         constexpr long FUTEX_SYSCALL = SYS_futex_time64;
     #endif
 
-    static long futex(const void* addr, int op, rpp::uint32 value, const futex_timeout* timeout) noexcept
+    static FINLINE long futex(const void* addr, int op, rpp::uint32 value, const futex_timeout* timeout) noexcept
     {
         return syscall(FUTEX_SYSCALL, addr, op, value, timeout, nullptr, 0);
     }
@@ -165,14 +166,15 @@ namespace rpp::detail
             }
         };
 
-        // never freed, because a thread can still wait while the static destructors run
+        // no destructor runs at exit, so a thread can still wait while the static destructors run
+        static_assert(std::is_trivially_destructible_v<parking_lot>);
         parking_lot& lot() noexcept
         {
-            static parking_lot* p = new parking_lot{};
-            return *p;
+            static parking_lot instance;
+            return instance;
         }
 
-        rpp::uint32 load_word(const void* addr) noexcept
+        FINLINE rpp::uint32 load_word(const void* addr) noexcept
         {
             return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
         }
