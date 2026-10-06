@@ -53,8 +53,10 @@
  *  @endcode
  */
 #include "config.h"
-#include <cstdlib> // malloc/free for event<()>
-#include <cstring> // memmove for event<()>
+#include <cstddef> // size_t, ptrdiff_t
+#include <cstdlib> // malloc/free for multicast_delegate
+#include <cstring> // memcpy
+#include <new> // placement new
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
 #include <exception> // std::terminate
@@ -82,13 +84,6 @@ namespace rpp
     #  endif
     #endif
 
-    #define RPP_DELEGATE_DEBUGGING 0
-    #if RPP_DELEGATE_DEBUGGING
-        #define RPP_DELEGATE_DEBUG(fmt, ...) printf(fmt "\n", __VA_ARGS__)
-    #else
-        #define RPP_DELEGATE_DEBUG(...)
-    #endif
-
     /**
      * @brief Function delegate to encapsulate global functions,
      *        instance member functions, lambdas and functors
@@ -97,6 +92,9 @@ namespace rpp
      *       caller -> delegate::operator() -> target
      *       Which is the same as fastest possible delegates and
      *       inlining results are rather good thanks to this.
+     *
+     * @note A trivially copyable functor which fits the inline storage lives inside the delegate,
+     *       so a small lambda does not allocate. Every other functor lives on the heap.
      *
      * @example
      * @code
@@ -115,18 +113,15 @@ namespace rpp
         using ret_type  = Ret;
         using func_type = Ret (*)(Args...);
         using func_noexcept_type = Ret (*)(Args...) noexcept; // needed for template overload resolution
-        using dtor_type = void (*)(void*) noexcept;
-        using copy_type = void (*)(void*, delegate&) noexcept;
-
-        struct dummy {
-            // proxy for plain old functions to avoid a branch check in delegate::operator()
-            Ret func_proxy(Args... args) {
-                auto func = reinterpret_cast<func_type>(this);
-                return func(std::forward<Args>(args)...);
-            }
-        };
 
         #if _MSC_VER  // VC++
+            struct dummy {
+                // proxy for plain old functions to avoid a branch check in delegate::operator()
+                Ret func_proxy(Args... args) {
+                    auto func = reinterpret_cast<func_type>(this);
+                    return func(std::forward<Args>(args)...);
+                }
+            };
             #if DELEGATE_32_BIT // __thiscall only applies for 32-bit MSVC
                 using memb_type = Ret (__thiscall*)(void*, Args...);
             #else
@@ -134,100 +129,128 @@ namespace rpp
             #endif
             using dummy_type = Ret (dummy::*)(Args...);
         #else // G++ and Clang++
-            // dummy_type matches &dummy::func_proxy, so init_function needs no cast, see BUGS.md B30
-            using memb_type  = Ret (*)(void*, Args...);
-            using dummy_type = Ret (dummy::*)(Args...);
+            using memb_type = Ret (*)(void*, Args...);
         #endif
+
     private:
 
         union func
         {
             func_type fun;
             memb_type mfunc;
+        #if _MSC_VER
             dummy_type dfunc;
+        #endif
             void* pfunc;
         };
 
+        // destroys a heap functor when `to` is null, else copies it into `to`
+        using manager_type = void (*)(void* functor, delegate* to) noexcept;
+        static constexpr size_t inline_words = 3;
+        static constexpr size_t inline_size = inline_words * sizeof(void*);
+
         func f; // the function pointer
-        void* obj; // optional instance ptr
-        dtor_type destructor; // optional destructor if we allocated obj
-        copy_type proxy_copy; // optional copy constructor
+        void* obj; // the instance, the function, or the functor, which can point into `storage`
+        union
+        {
+            manager_type manager; // owns a heap functor, and stays null for every other kind
+            void* words[inline_words]; // always initialized, so copy_bits can copy every byte
+            alignas(void*) unsigned char storage[inline_size]; // holds an inline functor, then `obj == storage`
+        };
 
     public:
         //////////////////////////////////////////////////////////////////////////////////////
 
         /** @brief Default constructor */
         delegate() noexcept
-            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
+            : f{nullptr}, obj{nullptr}, words{}
         {
         }
 
         /** @brief Handles functor copy cleanup */
-        ~delegate() noexcept
+        DELEGATE_FINLINE ~delegate() noexcept
         {
-            if (destructor) {
-                destructor(obj);
-            }
+            if (owns_heap()) manager(obj, nullptr);
         }
 
+        /** @brief Copies this delegate into `to`, and frees what `to` held before */
         void copy(delegate& to) const noexcept
         {
-            if (this == &to) return; // a self copy has nothing to do, and both branches free first
-            if (destructor) // looks like we have a functor
-            {
-                proxy_copy(obj, to);
-                to.f = f;
-                to.proxy_copy = proxy_copy;
-            }
-            else
-            {
-                to.reset(); // a function source frees whatever functor `to` already owns
-                to.f = f;
-                to.obj = obj;
-            }
+            if (this == &to) return; // a self copy has nothing to do, and reset() would free the source
+            to.reset();
+            if (owns_heap()) manager(obj, &to); // a heap functor clones itself
+            else to.copy_bits(*this);
         }
 
         /** @brief Creates a copy of the delegate */
-        delegate(const delegate& d) noexcept
-            : f{nullptr}, obj{nullptr}, destructor{nullptr}, proxy_copy{nullptr}
+        delegate(const delegate& d) noexcept : delegate{}
         {
             d.copy(*this);
         }
         /** @brief Assigns a copy of the delegate */
         delegate& operator=(const delegate& d) noexcept
         {
-            if (this != &d)
-            {
-                d.copy(*this);
-            }
+            d.copy(*this);
             return *this;
         }
 
         /** @brief Forward reference initialization (move) */
-        delegate(delegate&& d) noexcept
-            : f{d.f}, obj{d.obj}, destructor{d.destructor}, proxy_copy{d.proxy_copy}
+        DELEGATE_FINLINE delegate(delegate&& d) noexcept
         {
-            d.f.fun = nullptr;
-            d.obj = nullptr;
-            d.destructor = nullptr;
-            d.proxy_copy = nullptr;
+            copy_bits(d);
+            d.clear_bits();
         }
         /** @brief Forward reference assignment (swap) */
         delegate& operator=(delegate&& d) noexcept
         {
-            auto tmp_f = f;
-            auto tmp_obj = obj;
-            auto tmp_destructor = destructor;
-            auto tmp_proxy_copy = proxy_copy;
-            f = d.f;
-            obj = d.obj;
-            destructor = d.destructor;
-            proxy_copy = d.proxy_copy;
-            d.f = tmp_f;
-            d.obj = tmp_obj;
-            d.destructor = tmp_destructor;
-            d.proxy_copy = tmp_proxy_copy;
+            if (this != &d)
+            {
+                // loads both sides before any store, so the compiler keeps the swap in registers
+                void* this_obj = is_inline() ? d.storage : obj; // an inline functor moves into the other storage
+                void* d_obj = d.is_inline() ? storage : d.obj;
+                func this_f = f, d_f = d.f; // NOLINT(readability-isolate-declaration)
+                for (size_t i = 0; i < inline_size; i += sizeof(uintptr_t))
+                {
+                    uintptr_t this_word, d_word; // NOLINT(readability-isolate-declaration)
+                    memcpy(&this_word, storage + i, sizeof(this_word));
+                    memcpy(&d_word, d.storage + i, sizeof(d_word));
+                    memcpy(storage + i, &d_word, sizeof(d_word));
+                    memcpy(d.storage + i, &this_word, sizeof(this_word));
+                }
+                f = d_f;
+                obj = d_obj;
+                d.f = this_f;
+                d.obj = this_obj;
+            }
             return *this;
+        }
+
+    private:
+        DELEGATE_FINLINE bool is_inline() const noexcept { return obj == static_cast<const void*>(storage); }
+        // a null first word ends the test in one load, and an inline functor overlaps that word
+        DELEGATE_FINLINE bool owns_heap() const noexcept
+        {
+            manager_type first_word;
+            memcpy(&first_word, storage, sizeof(first_word));
+            return first_word && !is_inline();
+        }
+
+        // copies every kind except a heap functor bit by bit, which moves the heap pointer
+        DELEGATE_FINLINE void copy_bits(const delegate& d) noexcept
+        {
+            f = d.f;
+            memcpy(storage, d.storage, inline_size);
+            obj = d.is_inline() ? storage : d.obj;
+        }
+        DELEGATE_FINLINE void clear_storage() noexcept
+        {
+            memset(words, 0, sizeof(words));
+        }
+        DELEGATE_FINLINE void clear_bits() noexcept
+        {
+            f.fun = nullptr;
+            obj = nullptr;
+            clear_storage();
         }
 
     public:
@@ -242,16 +265,11 @@ namespace rpp
 
         // the member constructors take the method arguments verbatim, and the adapters take the rest
         template<class...TArgs>
-        static constexpr bool args_match = std::is_same_v<std::tuple<TArgs...>, std::tuple<Args...>>;
+        static constexpr bool args_match = std::is_same_v<void(TArgs...), void(Args...)>;
 
+        // a function pointer of the exact signature, which init_function stores without a functor
         template<class Function>
-        static constexpr bool is_func_type = std::is_same_v<Function, func_type>;
-
-        // does it match a function pointer or a stateless lambda that can be initialized via init_function?
-        template<class Function>
-        static constexpr bool is_function_pointer =
-               (std::is_same_v<Function, func_type> || std::is_same_v<Function, func_noexcept_type>)
-            || (std::is_same_v<Function, func_type> && std::is_empty_v<Function>/*stateless lambda*/);
+        static constexpr bool is_function_pointer = std::is_same_v<Function, func_type> || std::is_same_v<Function, func_noexcept_type>;
 
         /**
          * @brief Master constructor for most delegate types
@@ -260,22 +278,7 @@ namespace rpp
         template<class FunctionType> requires not_copy_ctor<FunctionType>
         delegate(FunctionType&& function) noexcept
         {
-            using Function = typename std::decay_t<FunctionType>;
-            if constexpr (std::is_same_v<Function, std::nullptr_t>)
-            {
-                f.fun = nullptr;
-                obj = nullptr;
-                destructor = nullptr;
-                proxy_copy = nullptr;
-            }
-            else if constexpr (is_function_pointer<Function>)
-            {
-                init_function(function);
-            }
-            else
-            {
-                init_functor(std::forward<FunctionType>(function));
-            }
+            init(std::forward<FunctionType>(function));
         }
 
         /** @brief Basic operator= shortcut for reset() */
@@ -291,22 +294,21 @@ namespace rpp
         void reset(FunctionType&& function) noexcept
         {
             reset();
-            using Function = typename std::decay_t<FunctionType>;
-            if constexpr (std::is_same_v<Function, std::nullptr_t>)
-            {
-                // do nothing, reset() already called
-            }
-            else if constexpr (is_function_pointer<Function>)
-            {
-                init_function(function);
-            }
-            else
-            {
-                init_functor(std::forward<FunctionType>(function));
-            }
+            init(std::forward<FunctionType>(function));
         }
 
     private:
+        template<class FunctionType> void init(FunctionType&& function) noexcept
+        {
+            using Function = std::decay_t<FunctionType>;
+            if constexpr (std::is_same_v<Function, std::nullptr_t>)
+                clear_bits();
+            else if constexpr (is_function_pointer<Function>)
+                init_function(function);
+            else
+                init_functor(std::forward<FunctionType>(function));
+        }
+
         ///////////////////////////////////////////////////////////////////////////
         // -------------------------- Static Functions ------------------------- //
         ///////////////////////////////////////////////////////////////////////////
@@ -315,24 +317,26 @@ namespace rpp
         // we wrap regular functions behind a proxy trampoline
         void init_function(func_type function) noexcept
         {
-            RPP_DELEGATE_DEBUG("delegate::init_function(%p)", function);
-            if (function)
+            if (!function)
             {
-                // store function as 'this' and call dummy class instance method
-                // which will cast 'this' into 'func_type'
-                f.dfunc = &dummy::func_proxy;
-                obj = reinterpret_cast<void*>(function);
+                clear_bits();
+                return;
             }
-            else
-            {
-                f.fun = nullptr;
-                obj = nullptr;
-            }
-            destructor = nullptr;
-            proxy_copy = nullptr;
+        #if _MSC_VER
+            f.dfunc = &dummy::func_proxy;
+        #else
+            f.mfunc = &function_proxy;
+        #endif
+            obj = reinterpret_cast<void*>(function);
+            clear_storage();
         }
 
-    private:
+    #if !_MSC_VER
+        RPP_CORO_WRAPPER static Ret function_proxy(void* function, Args... args)
+        {
+            return reinterpret_cast<func_type>(function)(std::forward<Args>(args)...);
+        }
+    #endif
 
         ///////////////////////////////////////////////////////////////////////////
         // -------------------------- Member Functions ------------------------- //
@@ -406,18 +410,14 @@ namespace rpp
             FClass& base = *inst; // a method of a non-primary or a virtual base runs on that base subobject
             obj = &base;
             f = devirtualize(&base, method, &obj);
-            RPP_DELEGATE_DEBUG("delegate::init_method(%p,%p)", obj, f.fun);
-            destructor = nullptr;
-            proxy_copy = nullptr;
+            clear_storage();
         }
-        // adapts delegate invoke(Args) into FClass method(TArgs),
-        // this ensures `const int&` is correctly passed as `int` and vice-versa
+        // adapts invoke(Args) to method(TArgs), so a `const int&` parameter takes an `int` argument and vice versa
         template<class IClass, class FClass, class MethodType> void init_adapter(IClass* inst, MethodType FClass::*method) noexcept
         {
-            RPP_DELEGATE_DEBUG("delegate::init_adapter(%p)", inst);
-            *this = [inst, method](Args... args) -> Ret {
+            init_functor([inst, method](Args... args) -> Ret {
                 return (inst->*method)(std::forward<Args>(args)...);
-            };
+            });
         }
         template<class IClass, class FClass, class MethodType> bool equal_method(IClass* inst, MethodType FClass::*method) const noexcept
         {
@@ -477,7 +477,7 @@ namespace rpp
          * @endcode
          */
         template<class IClass, class FClass, class...TArgs> requires (!args_match<TArgs...>)
-        delegate(IClass* inst, Ret (FClass::*method)(TArgs...)) : delegate{}
+        delegate(IClass* inst, Ret (FClass::*method)(TArgs...))
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
             init_adapter(inst, method);
@@ -490,7 +490,7 @@ namespace rpp
          * @endcode
          */
         template<class IClass, class FClass, class...TArgs> requires (!args_match<TArgs...>)
-        delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const) : delegate{}
+        delegate(const IClass* inst, Ret (FClass::*method)(TArgs...) const)
         {
             if (!inst) throw std::invalid_argument{"delegate ctor: inst is nullptr"};
             using NonConstMethod = Ret (FClass::*)(TArgs...);
@@ -520,33 +520,39 @@ namespace rpp
         }
     #endif
 
+        // memcpy relocates an inline functor, so only a trivially copyable one goes there
+        template<class F> static constexpr bool fits_inline = std::is_trivially_copyable_v<F>
+            && sizeof(F) <= inline_size && alignof(F) <= alignof(void*);
+
         template<class Functor> void init_functor(Functor&& functor) noexcept
         {
-            using FunctorType = typename std::decay<Functor>::type;
+            using FunctorType = std::decay_t<Functor>;
         #if _MSC_VER
             f.dfunc = reinterpret_cast<dummy_type>( &functor_dummy<FunctorType>::functor_call );
         #else
             f.mfunc = &functor_call<FunctorType>;
         #endif
-            RPP_DELEGATE_DEBUG("delegate::init_functor(%p,%p)", &functor, f.mfunc);
-            obj = new FunctorType{ std::forward<Functor>(functor) };
-            destructor = &functor_delete<FunctorType>;
-            proxy_copy = &functor_copy<FunctorType>;
+            clear_storage(); // also zeroes the tail and the padding of an inline functor
+            if constexpr (fits_inline<FunctorType>)
+            {
+                obj = new (storage) FunctorType{ std::forward<Functor>(functor) };
+            }
+            else
+            {
+                obj = new FunctorType{ std::forward<Functor>(functor) };
+                manager = &heap_manager<FunctorType>;
+            }
         }
 
-        template<class FunctorType> static void functor_delete(void* self) noexcept
+        template<class FunctorType> static void heap_manager(void* functor, delegate* to) noexcept
         {
-            auto* instance = static_cast<FunctorType*>(self);
-            delete instance;
-        }
-
-        template<class FunctorType> static void functor_copy(void* self, delegate& dest) noexcept
-        {
-            auto* instance = static_cast<FunctorType*>(self);
-            if constexpr (std::is_copy_constructible_v<FunctorType>)
-                dest.reset(*instance);
+            auto* instance = static_cast<FunctorType*>(functor);
+            if (!to)
+                delete instance;
+            else if constexpr (std::is_copy_constructible_v<FunctorType>)
+                to->init_functor(*instance);
             else // a move-only functor cannot copy, so the copy takes its state
-                dest.reset(std::move(*instance));
+                to->init_functor(std::move(*instance));
         }
 
         template<class Functor> bool equal_functor() const noexcept
@@ -565,15 +571,6 @@ namespace rpp
         //////////////////////////////////////////////////////////////////////////////////////
 
 
-    private:
-        void init_clear()
-        {
-            f.fun = nullptr;
-            obj = nullptr;
-            destructor = nullptr;
-            proxy_copy = nullptr;
-        }
-
     public:
         void reset(const delegate& d) noexcept
         {
@@ -585,15 +582,10 @@ namespace rpp
         }
 
         /** @brief Resets the delegate to its default uninitialized state */
-        void reset() noexcept
+        DELEGATE_FINLINE void reset() noexcept
         {
-            if (destructor) {
-                destructor(obj);
-                destructor = nullptr;
-                proxy_copy = nullptr;
-            }
-            f.fun = nullptr;
-            obj = nullptr;
+            if (owns_heap()) manager(obj, nullptr);
+            clear_bits();
         }
 
 
@@ -761,22 +753,34 @@ namespace rpp
 
     private:
 
+        // an inline functor points into its own slot, so a move constructs every relocated delegate
+        static void relocate(deleg* to, deleg* from) noexcept
+        {
+            new (to) deleg{static_cast<deleg&&>(*from)};
+            from->~deleg();
+        }
+
         void grow() noexcept
         {
             if (!ptr)
             {
                 ptr = static_cast<container*>(malloc(sizeof(container)));
+                if (!ptr) { std::terminate(); }
                 ptr->size = 0;
                 ptr->capacity = 1;
             }
             else if (ptr->size == ptr->capacity)
             {
-                ptr->capacity += 3;
-                if (int rem = ptr->capacity % 4)
-                    ptr->capacity += 4 - rem;
-                auto* p = static_cast<container*>(realloc(reinterpret_cast<void*>(ptr),
-                                                  sizeof(container) + sizeof(deleg) * (ptr->capacity - 1)));
+                int capacity = ptr->capacity + 3;
+                if (int rem = capacity % 4)
+                    capacity += 4 - rem;
+                auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
                 if (!p) { std::terminate(); }
+                p->size = ptr->size;
+                p->capacity = capacity;
+                for (int i = 0; i < ptr->size; ++i)
+                    relocate(&p->data[i], &ptr->data[i]);
+                free(ptr);
                 ptr = p;
             }
         }
@@ -811,14 +815,10 @@ namespace rpp
             {
                 if (data[i] == d)
                 {
+                    data[i].~deleg();
+                    for (int j = i + 1; j < size; ++j)
+                        relocate(&data[j - 1], &data[j]);
                     --c->size;
-                    data[i] = deleg{}; // reset the delegate (dealloc if needed)
-
-                    int unshift = size - (i + 1);
-                    if (unshift > 0) { // unshift N elements from end of array if needed
-                        RPP_BUILTIN_MEMMOVE(reinterpret_cast<void*>(&data[i]),
-                                            reinterpret_cast<void*>(&data[i + 1]), sizeof(deleg)*unshift);
-                    }
                     return;
                 }
             }

@@ -1138,6 +1138,185 @@ namespace rpp
 
         ////////////////////////////////////////////////////
 
+        template<class D> static bool is_inline(const D& d)
+        {
+            const uintptr_t self = reinterpret_cast<uintptr_t>(&d);
+            const uintptr_t functor = reinterpret_cast<uintptr_t>(d.get_obj());
+            return self <= functor && functor < self + sizeof(D);
+        }
+
+        TestCase(delegate_stays_five_pointers)
+        {
+            AssertThat(sizeof(rpp::delegate<void()>), 5 * sizeof(void*));
+            AssertThat(sizeof(DataDelegate), 5 * sizeof(void*));
+        }
+
+        TestCase(small_trivially_copyable_functors_live_inline)
+        {
+            size_t a = 1, b = 2, c = 3; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t(size_t)> cap0 = [](size_t x) { return x; };
+            rpp::delegate<size_t(size_t)> cap1 = [a](size_t x) { return x + a; };
+            rpp::delegate<size_t(size_t)> cap2 = [a, b](size_t x) { return x + a + b; };
+            rpp::delegate<size_t(size_t)> cap3 = [a, b, c](size_t x) { return x + a + b + c; };
+            rpp::delegate<size_t(size_t)> refs = [&a, &b, &c](size_t x) { return x + a + b + c; };
+            AssertThat(is_inline(cap0) && is_inline(cap1) && is_inline(cap2), true);
+            AssertThat(is_inline(cap3) && is_inline(refs), true);
+            AssertThat(cap0(10) + cap1(10) + cap2(10) + cap3(10) + refs(10), size_t(10 + 11 + 13 + 16 + 16));
+
+            ConstRefAdapterClass adapted;
+            rpp::delegate<void(int)> adapter { &adapted, &ConstRefAdapterClass::cref_method };
+            AssertThat(is_inline(adapter), true); // the adapter captures the instance and the method
+            adapter(5);
+            AssertThat(adapted.result, 5);
+        }
+
+        TestCase(large_or_non_trivial_functors_live_on_the_heap)
+        {
+            size_t a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t()> cap4 = [a, b, c, d] { return a + b + c + d; };
+            rpp::delegate<size_t()> cap7 = [a, b, c, d, e, f, g] { return a + b + c + d + e + f + g; };
+            AssertThat(is_inline(cap4) || is_inline(cap7), false);
+            AssertThat(cap4() + cap7(), size_t(10 + 28));
+
+            std::string s1 = "a long string which needs a heap buffer", s2 = s1 + "!", s3 = s2 + "!"; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t()> str1 = [s1] { return s1.size(); };
+            rpp::delegate<size_t()> str3 = [s1, s2, s3] { return s1.size() + s2.size() + s3.size(); };
+            AssertThat(is_inline(str1) || is_inline(str3), false);
+            AssertThat(str1(), s1.size());
+            AssertThat(str3(), s1.size() + s2.size() + s3.size());
+
+            auto shared = std::make_shared<int>(7);
+            rpp::delegate<int()> ptr = [shared] { return *shared; }; // fits, but is not trivially copyable
+            AssertThat(is_inline(ptr), false);
+            AssertThat(ptr(), 7);
+
+            struct alignas(64) aligned { int value = 9; int operator()() const { return value; } };
+            rpp::delegate<int()> over = aligned{};
+            AssertThat(is_inline(over), false);
+            AssertThat(reinterpret_cast<uintptr_t>(over.get_obj()) % 64, uintptr_t(0));
+            AssertThat(over(), 9);
+        }
+
+        // copy_bits must point `obj` at the storage of the destination, never at the source
+        TestCase(inline_functor_moves_and_copies_into_the_destination)
+        {
+            int x = 1, y = 2; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<int()> a = [x] { return x; };
+            rpp::delegate<int()> b = [y] { return y * 10; };
+
+            rpp::delegate<int()> moved { std::move(a) };
+            AssertThat(is_inline(moved), true);
+            AssertThat(a.good(), false); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+            AssertThat(moved(), 1);
+
+            moved = std::move(b); // the move assignment swaps
+            AssertThat(is_inline(moved) && is_inline(b), true); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+            AssertThat(moved(), 20);
+            AssertThat(b(), 1); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+
+            rpp::delegate<int()> copied { moved };
+            moved = [] { return -1; };
+            AssertThat(is_inline(copied), true);
+            AssertThat(copied(), 20);
+
+            copied = b;
+            b = nullptr;
+            AssertThat(copied(), 1);
+        }
+
+        // the swap in the move assignment pairs every kind with every other kind
+        TestCase(move_assignment_swaps_every_kind)
+        {
+            Data (*function)(Data a) = [](Data a) { return validate("function", a); };
+            Derived inst;
+            int v = 4;
+            std::string big = "a long string which needs a heap buffer";
+            auto make = [&](int kind) -> rpp::delegate<Data(Data)> {
+                switch (kind) {
+                    case 0: return {};
+                    case 1: return function;
+                    case 2: return { &inst, &Derived::method };
+                    case 3: return [v](Data a) { return validate(v == 4 ? "inline" : "bad", a); };
+                    default: return [big](Data a) { return validate(big.size() > 30 ? "heap" : "bad", a); };
+                }
+            };
+            const char* names[] = { "", "function", "method", "inline", "heap" };
+            for (int i = 0; i < 5; ++i)
+            {
+                for (int j = 0; j < 5; ++j)
+                {
+                    rpp::delegate<Data(Data)> left = make(i);
+                    rpp::delegate<Data(Data)> right = make(j);
+                    left = std::move(right);
+                    AssertThat(left.good(), j != 0);
+                    AssertThat(right.good(), i != 0); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+                    if (j != 0) AssertThat(left(data), names[j]);
+                    if (i != 0) AssertThat(right(data), names[i]); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+                    if (j == 3) AssertThat(is_inline(left), true);
+                    if (i == 3) AssertThat(is_inline(right), true);
+                }
+            }
+        }
+
+        TestCase(heap_functor_lifetime_follows_the_owner)
+        {
+            auto state = std::make_shared<int>(5);
+            {
+                rpp::delegate<int()> original = [state] { return *state; };
+                AssertThat(state.use_count(), 2);
+                rpp::delegate<int()> copied { original };
+                AssertThat(state.use_count(), 3);
+                rpp::delegate<int()> moved { std::move(copied) };
+                AssertThat(state.use_count(), 3); // the move steals the heap pointer
+                copied = moved;
+                AssertThat(state.use_count(), 4);
+                moved.reset();
+                AssertThat(state.use_count(), 3);
+                original = [] { return 0; };
+                AssertThat(state.use_count(), 2);
+                AssertThat(copied(), 5);
+            }
+            AssertThat(state.use_count(), 1);
+        }
+
+        TestCase(vector_growth_relocates_inline_functors)
+        {
+            std::vector<rpp::delegate<int()>> delegates;
+            for (int i = 0; i < 33; ++i)
+                delegates.emplace_back([i] { return i; });
+            int sum = 0;
+            for (int i = 0; i < 33; ++i)
+            {
+                AssertThat(delegates[i](), i);
+                sum += is_inline(delegates[i]) ? 1 : 0;
+            }
+            AssertThat(sum, 33);
+        }
+
+        // a removal shifts the inline functors after it, and each one must keep its own state
+        TestCase(multicast_delegate_relocates_inline_functors)
+        {
+            std::vector<int> log;
+            Recorder rec { 99, &log };
+            multicast_delegate<int> evt;
+            for (int i = 0; i < 4; ++i)
+                evt += [&log, i](int x) { log.push_back(i * 100 + x); };
+            evt.add(&rec, &Recorder::on_event);
+            for (int i = 4; i < 9; ++i)
+                evt += [&log, i](int x) { log.push_back(i * 100 + x); };
+
+            evt.remove(&rec, &Recorder::on_event);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 1, 101, 201, 301, 401, 501, 601, 701, 801 }));
+
+            multicast_delegate<int> copy = evt;
+            log.clear();
+            copy(2);
+            AssertThat(log, (std::vector<int>{ 2, 102, 202, 302, 402, 502, 602, 702, 802 }));
+        }
+
+        ////////////////////////////////////////////////////
+
         struct Recorder
         {
             int id = 0;
