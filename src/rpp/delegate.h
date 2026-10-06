@@ -355,13 +355,13 @@ namespace rpp
             template<class FClass, class MethodType>
             static bool needs_adapter(MethodType FClass::*method) noexcept
             {
-                // a data member pointer outgrows an int only in the virtual and the unspecified inheritance models
-                if constexpr (sizeof(int FClass::*) == sizeof(int))
-                    return false;
-                else if constexpr (sizeof(method) == sizeof(MultiInheritThunk)) // the virtual inheritance model
-                    return reinterpret_cast<const MultiInheritThunk*>(&method)->vbindex != 0;
-                else
+                if constexpr (sizeof(method) > sizeof(MultiInheritThunk)) // the unspecified inheritance model
                     return true;
+                // a data member pointer outgrows an int only in the virtual and the unspecified inheritance models
+                else if constexpr (sizeof(method) < sizeof(MultiInheritThunk) || sizeof(int FClass::*) == sizeof(int))
+                    return false;
+                else
+                    return reinterpret_cast<const MultiInheritThunk*>(&method)->vbindex != 0;
             }
             static func devirtualize_mi(const void* inst, void** mi_pmf, void** out_inst = nullptr) noexcept
             {
@@ -432,22 +432,25 @@ namespace rpp
             clear_storage();
         }
         // adapts invoke(Args) to method(TArgs), so a `const int&` parameter takes an `int` argument and vice versa
+        template<class FClass, class MethodType> struct method_adapter
+        {
+            FClass* inst;
+            MethodType FClass::*method;
+            Ret operator()(Args... args) const { return (inst->*method)(std::forward<Args>(args)...); }
+        };
         template<class IClass, class FClass, class MethodType> void init_adapter(IClass* inst, MethodType FClass::*method) noexcept
         {
-            init_functor([inst, method](Args... args) -> Ret {
-                return (inst->*method)(std::forward<Args>(args)...);
-            });
+            init_functor(method_adapter<FClass, MethodType>{ inst, method });
         }
         template<class IClass, class FClass, class MethodType> bool equal_method(IClass* inst, MethodType FClass::*method) const noexcept
         {
             FClass& base = *inst;
         #if _MSC_VER
-            if (needs_adapter(method)) // an inline adapter matches by the bytes of its captures
+            if (needs_adapter(method)) // the adapter can live inline or on the heap, so compare its fields
             {
-                delegate adapter;
-                adapter.init_adapter(&base, method);
-                return f.fun == adapter.f.fun && is_inline() && adapter.is_inline()
-                    && memcmp(storage, adapter.storage, inline_size) == 0;
+                using Adapter = method_adapter<FClass, MethodType>;
+                const auto* adapter = static_cast<const Adapter*>(obj);
+                return equal_functor<Adapter>() && adapter->inst == &base && adapter->method == method;
             }
         #endif
             void* self = &base;
@@ -877,11 +880,11 @@ namespace rpp
 
         template<class IClass, class FClass> void remove(IClass* obj, void (FClass::*method)(Args...))
         {
-            remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
+            if (obj) remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
         }
         template<class IClass, class FClass> void remove(const IClass* obj, void (FClass::*method)(Args...) const)
         {
-            remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
+            if (obj) remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
         }
 
 
