@@ -725,6 +725,7 @@ namespace rpp
      *       Subsequential growth is amortized
      * @note A listener can add, remove or clear listeners, and move or destroy the multicast_delegate, while a dispatch runs.
      *       A removed listener stops at once. An added listener joins when the outermost dispatch ends.
+     * @note A multicast_delegate destroyed during a dispatch frees its listeners when the dispatch ends, so their destructors must not use it.
      * @note A dispatch writes a state word into the container, so dispatch from one thread at a time.
      *
      * @example
