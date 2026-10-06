@@ -32,7 +32,7 @@ no longer apply. So a suppression which holds for a header consumer reaches no i
 
 `delegate.h` hit this first, and `9c23b1b` closed that half. `init_function` cast
 `&dummy::func_proxy` to a `dummy_type` which named a different parameter list on G++, under a
-pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
+pragma pair. G++ has no `dummy_type` now, and `init_function` stores `function_proxy` with no cast.
 `run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
 
 `delegate.h` decodes the member pointer itself now, so its `devirtualize` region is gone too.

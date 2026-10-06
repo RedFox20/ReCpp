@@ -244,7 +244,7 @@ namespace rpp
         }
         DELEGATE_FINLINE void clear_storage() noexcept
         {
-            memset(words, 0, sizeof(words));
+            for (void*& word : words) word = nullptr; // clang-analyzer loses track of a malloc across a memset
         }
         DELEGATE_FINLINE void clear_bits() noexcept
         {
@@ -376,7 +376,7 @@ namespace rpp
             static func devirtualize(IClass* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
             {
                 // for MSVC we always use dfunc (dummy_type) for all delegates, which uses thiscall
-                func f; // piecewise init to supports MSVC C++17
+                func f; // piecewise init, because MSVC C++17 rejects the designated initializer
                 if constexpr (sizeof(method) == sizeof(dummy_type))
                     f.dfunc = reinterpret_cast<dummy_type>(method);
                 else if constexpr (sizeof(method) <= sizeof(MultiInheritThunk))
@@ -441,6 +441,15 @@ namespace rpp
         template<class IClass, class FClass, class MethodType> bool equal_method(IClass* inst, MethodType FClass::*method) const noexcept
         {
             FClass& base = *inst;
+        #if _MSC_VER
+            if (needs_adapter(method)) // an inline adapter matches by the bytes of its captures
+            {
+                delegate adapter;
+                adapter.init_adapter(&base, method);
+                return f.fun == adapter.f.fun && is_inline() && adapter.is_inline()
+                    && memcmp(storage, adapter.storage, inline_size) == 0;
+            }
+        #endif
             void* self = &base;
             func tmp = devirtualize(&base, method, &self);
             return f.fun == tmp.fun && obj == self;
@@ -554,7 +563,8 @@ namespace rpp
             clear_storage(); // also zeroes the tail and the padding of an inline functor
             if constexpr (fits_inline<FunctorType>)
             {
-                obj = new (storage) FunctorType{ std::forward<Functor>(functor) };
+                new (storage) FunctorType{ std::forward<Functor>(functor) };
+                obj = storage; // clang-analyzer proves is_inline() from this store, not from placement new
             }
             else
             {
@@ -805,6 +815,25 @@ namespace rpp
             ptr = p;
         }
 
+        template<class Match> void remove_first(const Match& match) noexcept
+        {
+            container* c = ptr;
+            if (!c) return;
+            int    size = c->size;
+            deleg* data = c->data;
+            for (int i = 0; i < size; ++i)
+            {
+                if (match(data[i]))
+                {
+                    data[i].~deleg();
+                    for (int j = i + 1; j < size; ++j)
+                        relocate(&data[j - 1], &data[j]);
+                    --c->size;
+                    return;
+                }
+            }
+        }
+
         // constructs the delegate in its slot, so a member function never passes through a temporary
         template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
         {
@@ -832,22 +861,7 @@ namespace rpp
          */
         void remove(const deleg& d) noexcept
         {
-            container* c = ptr;
-            if (!c) return;
-
-            int    size = c->size;
-            deleg* data = c->data;
-            for (int i = 0; i < size; ++i)
-            {
-                if (data[i] == d)
-                {
-                    data[i].~deleg();
-                    for (int j = i + 1; j < size; ++j)
-                        relocate(&data[j - 1], &data[j]);
-                    --c->size;
-                    return;
-                }
-            }
+            remove_first([&d](const deleg& listener) { return listener == d; });
         }
 
 
@@ -863,11 +877,11 @@ namespace rpp
 
         template<class IClass, class FClass> void remove(IClass* obj, void (FClass::*method)(Args...))
         {
-            remove(deleg{obj, method});
+            remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
         }
         template<class IClass, class FClass> void remove(const IClass* obj, void (FClass::*method)(Args...) const)
         {
-            remove(deleg{obj, method});
+            remove_first([&](const deleg& listener) { return listener.equals(obj, method); });
         }
 
 
