@@ -356,6 +356,7 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 | `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
+| `ubuntu-cpp20-asan-clang18`, one run of 8fedaba in #127 | `frames` reached 0, and every other test job passed |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
