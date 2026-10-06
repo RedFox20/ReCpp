@@ -94,6 +94,8 @@ Protect that number.
   change a number last.
 - Use the ReCpp timing API. Do not add `std::chrono`, `std::this_thread::sleep_for`,
   or `std::this_thread::yield` to source or tests.
+- Build a duration with `rpp::millis()`, `rpp::micros()`, `rpp::nanos()` or `rpp::seconds()`.
+  New code never calls `rpp::Duration::from_millis()` or another `from_*()` factory.
 - An assertion on a pool worker does not fail the case. `test::assert_failed()`
   records into a thread-local which only the case thread owns, so off that thread it
   prints and returns. Keep the `AssertFailed`, because it prints the file and the

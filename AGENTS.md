@@ -96,6 +96,8 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
 - **Use the ReCpp timing and readiness API.** `future.await_ready()`, `rpp::yield()`,
   `rpp::Duration`, `rpp::TimePoint`, `rpp::millis()`. Never add `std::chrono` or a
   `std::this_thread` timing helper to source or tests.
+- **Build a duration with `rpp::millis()`, `rpp::micros()`, `rpp::nanos()` or `rpp::seconds()`.**
+  Never call `rpp::Duration::from_millis()` or another `from_*()` factory in new code.
 - **Includes come before imports. Always.** A misplaced import gives about 960
   compile errors, never a link error.
 - **A header never contains an `import`.** Only a `.cpp`, a test, or a `.cppm` does.
