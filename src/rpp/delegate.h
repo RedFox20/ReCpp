@@ -347,10 +347,21 @@ namespace rpp
                 struct {
                     uintptr_t ptr; // function pointer
                     int adj; // this pointer displacement in bytes
-                    int padding;
+                    int vbindex; // the virtual base table index of a virtual inheritance member pointer
                 };
                 func f;
             };
+            // a virtual base adjustment needs the vbptr offset of the class, which only the compiler knows
+            template<class FClass, class MethodType>
+            static bool needs_adapter(MethodType FClass::*method) noexcept
+            {
+                if constexpr (sizeof(method) < sizeof(MultiInheritThunk)) // single, or 32-bit multiple inheritance
+                    return false;
+                else if constexpr (sizeof(method) == sizeof(MultiInheritThunk))
+                    return reinterpret_cast<const MultiInheritThunk*>(&method)->vbindex != 0;
+                else // the unspecified inheritance model
+                    return true;
+            }
             static func devirtualize_mi(const void* inst, void** mi_pmf, void** out_inst = nullptr) noexcept
             {
                 MultiInheritThunk* mi_thunk = reinterpret_cast<MultiInheritThunk*>(mi_pmf);
@@ -364,14 +375,14 @@ namespace rpp
             static func devirtualize(IClass* inst, MethodType FClass::*method, void** out_inst = nullptr) noexcept
             {
                 // for MSVC we always use dfunc (dummy_type) for all delegates, which uses thiscall
-                if constexpr (sizeof(method) == sizeof(uintptr_t)*2)
+                func f; // piecewise init to supports MSVC C++17
+                if constexpr (sizeof(method) == sizeof(dummy_type))
+                    f.dfunc = reinterpret_cast<dummy_type>(method);
+                else if constexpr (sizeof(method) <= sizeof(MultiInheritThunk))
                     return devirtualize_mi(inst, (void**)&method, out_inst);
                 else
-                {
-                    func f; // piecewise init to supports MSVC C++17
-                    f.dfunc = reinterpret_cast<dummy_type>(method);
-                    return f;
-                }
+                    f.pfunc = nullptr; // needs_adapter() sends the unspecified model to init_adapter
+                return f;
             }
         #else // G++ and Clang++ use the Itanium C++ ABI member pointer {ptr, adj}
             struct VTable {
@@ -379,7 +390,7 @@ namespace rpp
             };
             struct VCallThunk {
                 void* ptr;     // function address, or the vtable byte offset of a virtual
-                ptrdiff_t adj; // this adjustment in bytes
+                std::ptrdiff_t adj; // this adjustment in bytes
             };
             template<class FClass, class MethodType>
             static func devirtualize(const void* inst, MethodType FClass::*method, void** out_inst) noexcept
@@ -390,11 +401,11 @@ namespace rpp
             #if defined(__arm__) || defined(__aarch64__) || defined(__wasm__) || defined(__mips__)
                 // ARM variant: adj is (this_adjustment * 2) | is_virtual, because a function address can be odd
                 const bool is_virtual = t.adj & 1;
-                const ptrdiff_t adjust = t.adj >> 1;
+                const std::ptrdiff_t adjust = t.adj >> 1;
                 const size_t voffset = size_t(t.ptr);
             #else
                 const bool is_virtual = size_t(t.ptr) & 1u; // ptr is the vtable byte offset + 1
-                const ptrdiff_t adjust = t.adj;
+                const std::ptrdiff_t adjust = t.adj;
                 const size_t voffset = size_t(t.ptr) - 1;
             #endif
                 void* self = (void*)((const uint8_t*)inst + adjust);
@@ -408,6 +419,13 @@ namespace rpp
         template<class IClass, class FClass, class MethodType> void init_method(IClass* inst, MethodType FClass::*method) noexcept
         {
             FClass& base = *inst; // a method of a non-primary or a virtual base runs on that base subobject
+        #if _MSC_VER
+            if (needs_adapter(method))
+            {
+                init_adapter(&base, method);
+                return;
+            }
+        #endif
             obj = &base;
             f = devirtualize(&base, method, &obj);
             clear_storage();
