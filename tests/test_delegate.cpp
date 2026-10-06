@@ -4,6 +4,7 @@
 #include <cstring> // strlen, strcmp
 #include <functional>
 #include <memory> // std::make_shared
+#include <optional>
 #include <stdexcept> // std::invalid_argument
 #include <string>
 #include <vector>
@@ -946,6 +947,8 @@ namespace rpp
             AssertThat(evt.size(), 2); // nothing must change
             evt.remove(&receiver, &Receiver::unused_method);
             AssertThat(evt.size(), 2); // nothing must change
+            evt.remove(static_cast<const Receiver*>(nullptr), &Receiver::const_method);
+            AssertThat(evt.size(), 2); // a null instance matches nothing
 
             // remove final events
             evt.remove(&receiver, &Receiver::event_method);
@@ -1401,6 +1404,12 @@ namespace rpp
             evt(1); // no container, so nothing runs
             evt.invoke(1);
             evt.remove(&event_func_int);
+            evt += rpp::delegate<void(int)>{}; // an empty delegate has nothing to call, so add() ignores it
+            const rpp::delegate<void(int)> none;
+            evt.add(none);
+            AssertThat(evt.size(), 0);
+            multicast_delegate<int> copy = evt;
+            AssertThat(copy.size(), 0);
 
             evt += &event_func_int;
             AssertThat(bool(evt), true);
@@ -1416,6 +1425,201 @@ namespace rpp
             AssertThat(evt.size(), 1);
             evt.clear();
             AssertThat(evt.size(), 0);
+        }
+
+        // a removed listener stops at once, and no other listener moves, skips or runs twice
+        TestCase(multicast_delegate_listener_removes_listeners_while_it_runs)
+        {
+            std::vector<int> log;
+            Recorder first { 0, &log }, middle { 2, &log }, last { 3, &log };
+            multicast_delegate<int> evt;
+            struct Remover
+            {
+                multicast_delegate<int>* evt; Recorder* first; Recorder* last; int size_inside;
+                void on_event(int x)
+                {
+                    evt->remove(first, &Recorder::on_event); // ran before this listener
+                    evt->remove(this, &Remover::on_event);
+                    evt->remove(last, &Recorder::on_event); // runs after this listener
+                    size_inside = evt->size();
+                    first->log->push_back(900 + x);
+                }
+            };
+            Remover remover { &evt, &first, &last, 0 };
+            evt.add(&first, &Recorder::on_event);
+            evt.add(&remover, &Remover::on_event);
+            evt.add(&middle, &Recorder::on_event);
+            evt.add(&last, &Recorder::on_event);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 1, 901, 201 }));
+            AssertThat(remover.size_inside, 1);
+            AssertThat(evt.size(), 1);
+            AssertThat(int(evt.end() - evt.begin()), 1);
+
+            log.clear();
+            evt(2);
+            AssertThat(log, (std::vector<int>{ 202 }));
+        }
+
+        // an added listener joins after the dispatch, so the slot of the running inline functor never moves
+        TestCase(multicast_delegate_listener_adds_listeners_while_it_runs)
+        {
+            std::vector<int> log;
+            Recorder rec { 1, &log }, extra { 5, &log };
+            multicast_delegate<int> evt;
+            struct Context { multicast_delegate<int>* evt; Recorder* rec; Recorder* extra; int size; int copy_size; };
+            Context ctx { &evt, &rec, &extra, 0, 0 };
+            const int id = 7;
+            evt += [&ctx, id](int x)
+            {
+                if (x == 1)
+                {
+                    for (int i = 0; i < 9; ++i) // more than the capacity, so the slots would move
+                        ctx.evt->add(ctx.rec, &Recorder::on_event);
+                    ctx.evt->add(ctx.extra, &Recorder::on_event);
+                    ctx.evt->remove(ctx.extra, &Recorder::on_event); // an added listener leaves at once
+                    ctx.evt->remove(ctx.extra, &Recorder::on_event); // matches nothing
+                }
+                if (x == 3) // adds without a removal
+                {
+                    ctx.evt->add(ctx.extra, &Recorder::on_event);
+                    return;
+                }
+                ctx.evt->remove(ctx.rec, &Recorder::on_event);
+                ctx.size = ctx.evt->size();
+                ctx.copy_size = multicast_delegate<int>{ *ctx.evt }.size();
+                ctx.rec->log->push_back(id * 100 + x); // reads a capture in its own slot
+            };
+            evt.add(&rec, &Recorder::on_event);
+            AssertThat(is_inline(*evt.begin()), true);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 701 }));
+            AssertThat(ctx.size, 10);
+            AssertThat(ctx.copy_size, 10);
+            AssertThat(evt.size(), 10);
+
+            log.clear();
+            evt(2);
+            AssertThat(log.size(), size_t(9));
+            AssertThat(log.front(), 702);
+            AssertThat(evt.size(), 9);
+
+            log.clear();
+            evt(3);
+            AssertThat(log, (std::vector<int>(8, 103)));
+            AssertThat(evt.size(), 10);
+        }
+
+        // a listener which clears its multicast_delegate keeps its own functor until the dispatch ends
+        TestCase(multicast_delegate_listener_clears_while_it_runs)
+        {
+            std::vector<std::string> log;
+            multicast_delegate<int> evt;
+            const std::string name = "a capture which needs a heap buffer and a heap functor";
+            evt += [&evt, &log, name](int)
+            {
+                evt += [&log](int) { log.emplace_back("added, then cleared"); };
+                evt.clear();
+                evt.clear(); // finds every slot removed already
+                log.push_back(name);
+            };
+            evt += [&log](int) { log.emplace_back("cleared"); };
+            AssertThat(is_inline(*evt.begin()), false);
+            evt(1);
+            AssertThat(log, (std::vector<std::string>{ name }));
+            AssertThat(evt.size(), 0);
+            AssertThat(evt.empty(), true);
+
+            evt += [&log](int) { log.emplace_back("added after"); };
+            evt(2);
+            AssertThat(log.back(), std::string{"added after"});
+            AssertThat(evt.size(), 1);
+        }
+
+        // a nested dispatch must not compact the slots, because the outer dispatch still walks them
+        TestCase(multicast_delegate_nested_dispatch_keeps_the_slots)
+        {
+            std::vector<int> log;
+            Recorder first { 0, &log }, middle { 2, &log }, last { 3, &log };
+            multicast_delegate<int> evt;
+            evt.add(&first, &Recorder::on_event);
+            evt += [&evt, &first](int x)
+            {
+                if (x != 1) return;
+                evt.remove(&first, &Recorder::on_event);
+                evt(2);
+            };
+            evt.add(&middle, &Recorder::on_event);
+            evt.add(&last, &Recorder::on_event);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 1, 202, 302, 201, 301 }));
+            AssertThat(evt.size(), 3);
+            AssertThat(int(evt.end() - evt.begin()), 3);
+        }
+
+        // a listener which destroys its multicast_delegate stops the rest, and the dispatch frees the container
+        TestCase(multicast_delegate_listener_destroys_it_while_it_runs)
+        {
+            std::vector<int> log;
+            Recorder rec { 1, &log };
+            auto evt = std::make_unique<multicast_delegate<int>>();
+            evt->add(&rec, &Recorder::on_event);
+            *evt += [&evt](int) { evt.reset(); };
+            evt->add(&rec, &Recorder::on_event);
+            (*evt)(1);
+            AssertThat(log, (std::vector<int>{ 101 }));
+            AssertThat(evt == nullptr, true);
+        }
+
+        // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
+        TestCase(multicast_delegate_listener_moves_it_while_it_runs)
+        {
+            std::vector<int> log;
+            Recorder rec { 1, &log };
+            struct Owners
+            {
+                multicast_delegate<int> source, assigned;
+                std::optional<multicast_delegate<int>> constructed;
+                Recorder* rec;
+            };
+            Owners o;
+            o.rec = &rec;
+            o.source.add(&rec, &Recorder::on_event);
+            o.source += [&o](int x)
+            {
+                if (x == 1)
+                {
+                    o.constructed.emplace(std::move(o.source));
+                    o.constructed->add(o.rec, &Recorder::on_event);
+                }
+                else if (x == 2)
+                {
+                    o.assigned = std::move(*o.constructed);
+                    o.assigned.add(o.rec, &Recorder::on_event);
+                }
+            };
+            o.source(1);
+            AssertThat(o.source.size(), 0);
+            AssertThat(o.constructed->size(), 3);
+
+            (*o.constructed)(2);
+            AssertThat(o.constructed->size(), 0);
+            AssertThat(o.assigned.size(), 4);
+            AssertThat(log, (std::vector<int>{ 101, 102, 102 }));
+        }
+
+        // a listener which throws still ends the dispatch, so the removed slot goes away
+        TestCase(multicast_delegate_listener_throws_after_a_removal)
+        {
+            std::vector<int> log;
+            Recorder last { 3, &log };
+            multicast_delegate<int> evt;
+            evt += [&evt, &last](int) { evt.remove(&last, &Recorder::on_event); throw std::runtime_error{"listener failed"}; };
+            evt.add(&last, &Recorder::on_event);
+            AssertThrows(evt(1), std::runtime_error);
+            AssertThat(log.empty(), true);
+            AssertThat(evt.size(), 1);
+            AssertThat(int(evt.end() - evt.begin()), 1);
         }
 
         ////////////////////////////////////////////////////

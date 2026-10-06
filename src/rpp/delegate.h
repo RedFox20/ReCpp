@@ -106,6 +106,7 @@ namespace rpp
      * @endcode
      */
     template<class Func> class delegate;
+    template<class... Args> struct multicast_delegate;
     template<class Ret, class... Args> class delegate<Ret(Args...)>
     {
     public:
@@ -226,6 +227,35 @@ namespace rpp
         }
 
     private:
+        template<class... MArgs> friend struct multicast_delegate; // marks a removed slot while a dispatch reads it
+
+        // the call target of a slot which a multicast_delegate removed while a dispatch runs
+        struct removed_target
+        {
+            static constexpr char marker = 0; // a body no listener shares, so identical code folding never merges it
+            static void call(void* /*instance*/, Args... /*args*/) noexcept { (void)*static_cast<const volatile char*>(&marker); }
+        #if _MSC_VER
+            void member_call(Args... /*args*/) noexcept { (void)*static_cast<const volatile char*>(&marker); }
+        #endif
+        };
+        // keeps the functor, because the listener in this slot can still run
+        DELEGATE_FINLINE void mark_removed() noexcept
+        {
+        #if _MSC_VER
+            f.dfunc = reinterpret_cast<dummy_type>(&removed_target::member_call);
+        #else
+            f.mfunc = &removed_target::call;
+        #endif
+        }
+        DELEGATE_FINLINE bool is_removed() const noexcept
+        {
+        #if _MSC_VER
+            return f.dfunc == reinterpret_cast<dummy_type>(&removed_target::member_call);
+        #else
+            return f.mfunc == &removed_target::call;
+        #endif
+        }
+
         DELEGATE_FINLINE bool is_inline() const noexcept { return obj == static_cast<const void*>(storage); }
         // a null first word ends the test in one load, and an inline functor overlaps that word
         DELEGATE_FINLINE bool owns_heap() const noexcept
@@ -702,7 +732,9 @@ namespace rpp
      * @note Multicast Delegate class is optimized to have minimal overhead if no subscribers are registered
      *       First registration optimized to reserve only 1 event delegate
      *       Subsequential growth is amortized
-     * @note A listener must not add or remove listeners of the same multicast_delegate while it runs.
+     * @note A listener can add, remove or clear listeners, and move or destroy the multicast_delegate, while a dispatch runs.
+     *       A removed listener stops at once. An added listener joins when the outermost dispatch ends.
+     * @note A dispatch writes a state word into the container, so dispatch from one thread at a time.
      *
      * @example
      *       multicast_delegate<int, int> evt_mouse_move;
@@ -721,11 +753,15 @@ namespace rpp
         // dynamic data container, actual size is sizeof(container) + sizeof(T)*(capacity-1)
         struct container
         {
-            int size;
+            int size; // used slots, which include the removed slots while a dispatch runs
             int capacity;
+            int removed; // the slots a dispatch removed, which the outermost dispatch drops
+            int state; // the `pending` bit, and the count of running dispatches in the bits above it
+            container* added; // the listeners added while a dispatch runs, which join when the outermost one ends
+            const multicast_delegate* owner; // holds `ptr`, so a dispatch needs no `this` across the calls
             deleg data[1];
         };
-        container* ptr; // dynamic delegate array container
+        mutable container* ptr; // dynamic delegate array container, which the outermost dispatch can regrow
 
 
         /** @brief Creates an uninitialized event multicast delegate */
@@ -735,15 +771,19 @@ namespace rpp
         ~multicast_delegate() noexcept
         {
             clear();
+            if (ptr) ptr->owner = nullptr; // the running dispatch frees the container when it ends
         }
 
         multicast_delegate(multicast_delegate&& d) noexcept : ptr{d.ptr}
         {
             d.ptr = nullptr;
+            if (ptr) ptr->owner = this; // a running dispatch applies its changes to the new owner
         }
         multicast_delegate& operator=(multicast_delegate&& d) noexcept
         {
             std::swap(ptr, d.ptr);
+            if (ptr) ptr->owner = this;
+            if (d.ptr) d.ptr->owner = &d;
             return *this;
         }
 
@@ -757,39 +797,53 @@ namespace rpp
             {
                 clear();
                 for (const deleg& del : d)
-                    this->add(del);
+                    if (!del.is_removed()) this->add(del);
+                if (const container* added = d.ptr ? d.ptr->added : nullptr)
+                    for (int i = 0; i < added->size; ++i)
+                        this->add(added->data[i]);
             }
             return *this;
         }
 
-        /** @brief Destructs the event container and frees all used memory */
+        /** @brief Removes every listener and frees the container. While a dispatch runs, the outermost one frees it */
         void clear() noexcept
         {
-            if (ptr)
+            container* c = ptr;
+            if (!c) return;
+            if (c->state >= one_dispatch)
             {
-                int    size = ptr->size;
-                deleg* data = ptr->data;
-                for (int i = 0; i < size; ++i)
-                    data[i].~deleg();
-                free(ptr);
+                remove_all(c);
+            }
+            else
+            {
+                destroy(c);
                 ptr = nullptr;
             }
         }
 
         /** @return TRUE if there are callable delegates */
-        explicit operator bool() const noexcept { return ptr && ptr->size; }
-        bool good() const noexcept { return ptr && ptr->size; }
-        bool empty() const noexcept { return !ptr || !ptr->size; }
+        explicit operator bool() const noexcept { return size() != 0; }
+        bool good() const noexcept { return size() != 0; }
+        bool empty() const noexcept { return size() == 0; }
 
         /** @return Number of currently registered event delegates */
-        int size() const noexcept { return ptr ? ptr->size : 0; }
+        int size() const noexcept
+        {
+            const container* c = ptr;
+            if (!c) return 0;
+            return c->size - c->removed + (c->added ? c->added->size : 0);
+        }
 
+        /** @note While a dispatch runs, the range holds a removed listener as a no-op, and omits an added listener */
               deleg* begin() noexcept       { return ptr ? ptr->data : nullptr; }
         const deleg* begin() const noexcept { return ptr ? ptr->data : nullptr; }
               deleg* end() noexcept       { return ptr ? ptr->data + ptr->size : nullptr; }
         const deleg* end() const noexcept { return ptr ? ptr->data + ptr->size : nullptr; }
 
     private:
+
+        static constexpr int pending = 1; // the outermost dispatch has removed or added listeners to apply
+        static constexpr int one_dispatch = 2; // a running dispatch walks the slots, so they must not move
 
         // an inline functor points into its own slot, so a move constructs every relocated delegate
         static void relocate(deleg* to, deleg* from) noexcept
@@ -798,24 +852,63 @@ namespace rpp
             from->~deleg();
         }
 
-        void grow() noexcept
+        static void destroy(container* c) noexcept
         {
-            if (ptr && ptr->size < ptr->capacity)
+            if (!c) return;
+            for (int i = 0; i < c->size; ++i)
+                c->data[i].~deleg();
+            free(c);
+        }
+
+        // moves the slots, so it never runs on the slots of a running dispatch
+        static void grow(container*& c, const multicast_delegate* owner) noexcept
+        {
+            container* old = c;
+            if (old && old->size < old->capacity)
                 return;
             int capacity = 1; // the first registration reserves one slot
-            if (ptr) capacity = ptr->capacity < 4 ? 4 : ptr->capacity * 2;
+            if (old) capacity = old->capacity < 4 ? 4 : old->capacity * 2;
             auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
             if (!p) { std::terminate(); }
             p->size = 0;
             p->capacity = capacity;
-            if (ptr)
+            p->removed = 0;
+            p->state = 0;
+            p->added = nullptr;
+            p->owner = owner;
+            if (old)
             {
-                for (int i = 0; i < ptr->size; ++i)
-                    relocate(&p->data[i], &ptr->data[i]);
-                p->size = ptr->size;
-                free(ptr);
+                for (int i = 0; i < old->size; ++i)
+                    relocate(&p->data[i], &old->data[i]);
+                p->size = old->size;
+                free(old);
             }
-            ptr = p;
+            c = p;
+        }
+
+        static void erase(container* c, int i) noexcept
+        {
+            c->data[i].~deleg();
+            for (int j = i + 1; j < c->size; ++j)
+                relocate(&c->data[j - 1], &c->data[j]);
+            --c->size;
+        }
+
+        NOINLINE static void remove_slot(container* c, deleg& d) noexcept
+        {
+            if (d.is_removed()) return;
+            d.mark_removed();
+            ++c->removed;
+            c->state |= pending;
+        }
+
+        // the running listeners still read their slots, so the outermost dispatch frees them
+        NOINLINE static void remove_all(container* c) noexcept
+        {
+            for (int i = 0; i < c->size; ++i)
+                remove_slot(c, c->data[i]);
+            destroy(c->added); // these listeners never ran
+            c->added = nullptr;
         }
 
         template<class Match> void remove_first(const Match& match) noexcept
@@ -826,36 +919,123 @@ namespace rpp
             deleg* data = c->data;
             for (int i = 0; i < size; ++i)
             {
-                if (match(data[i]))
+                if (!match(data[i])) // a removed slot calls a target no listener has, so it never matches
+                    continue;
+                if (c->state >= one_dispatch) remove_slot(c, data[i]);
+                else erase(c, i);
+                return;
+            }
+            if (c->added) remove_added(c->added, match);
+        }
+
+        // these listeners never ran, so they leave at once
+        template<class Match> NOINLINE static void remove_added(container* added, const Match& match) noexcept
+        {
+            for (int i = 0; i < added->size; ++i)
+            {
+                if (match(added->data[i]))
                 {
-                    data[i].~deleg();
-                    for (int j = i + 1; j < size; ++j)
-                        relocate(&data[j - 1], &data[j]);
-                    --c->size;
+                    erase(added, i);
                     return;
                 }
             }
         }
 
-        // constructs the delegate in its slot, so a member function never passes through a temporary
-        template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
+        // ends the outermost dispatch, then drops the removed slots and appends the added listeners
+        NOINLINE static void finish_dispatch(container* c) noexcept
         {
-            grow();
-            new (&ptr->data[ptr->size]) deleg{std::forward<DelegateArgs>(args)...};
-            ++ptr->size;
+            if (!c->owner) // a listener destroyed the multicast_delegate
+            {
+                destroy(c);
+                return;
+            }
+            c->state = 0;
+            if (c->removed)
+            {
+                int kept = 0;
+                for (int i = 0; i < c->size; ++i)
+                {
+                    if (c->data[i].is_removed())
+                        c->data[i].~deleg();
+                    else if (kept++ != i)
+                        relocate(&c->data[kept - 1], &c->data[i]);
+                }
+                c->size = kept;
+                c->removed = 0;
+            }
+            container* added = c->added;
+            if (!added) return;
+            c->added = nullptr;
+            const multicast_delegate* owner = c->owner;
+            for (int i = 0; i < added->size; ++i)
+            {
+                container*& slots = owner->ptr;
+                grow(slots, owner); // frees `c` when it moves the slots
+                relocate(&slots->data[slots->size++], &added->data[i]);
+            }
+            free(added);
+        }
+
+        // ends a dispatch, also when a listener throws
+        struct dispatch_scope
+        {
+            container* c;
+            DELEGATE_FINLINE ~dispatch_scope() noexcept
+            {
+                if ((c->state -= one_dispatch) == pending) // the outermost dispatch ended, and has work
+                    finish_dispatch(c);
+            }
+        };
+
+        DELEGATE_FINLINE void dispatch(multicast_fwd_t<Args>... args) const
+        {
+            container* c = ptr;
+            if (!c) return;
+            const int size = c->size;
+            if (!size) return;
+            c->state += one_dispatch;
+            dispatch_scope scope { c };
+            // a listener cannot move or free the slots before the outermost dispatch ends, so `c` stays valid
+            const deleg* end = c->data + size;
+            for (const deleg* d = c->data; d != end; ++d)
+                (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
+        }
+
+        // constructs the delegate in its slot, so a member function never passes through a temporary
+        template<class... DelegateArgs>
+        DELEGATE_FINLINE static void append(container*& c, const multicast_delegate* owner, DelegateArgs&&... args)
+        {
+            grow(c, owner);
+            new (&c->data[c->size]) deleg{std::forward<DelegateArgs>(args)...};
+            ++c->size;
+        }
+
+        template<class... DelegateArgs> DELEGATE_FINLINE void emplace(DelegateArgs&&... args)
+        {
+            if (ptr && ptr->state >= one_dispatch)
+                add_while_dispatching(std::forward<DelegateArgs>(args)...);
+            else
+                append(ptr, this, std::forward<DelegateArgs>(args)...);
+        }
+
+        // the running dispatch must not move the slots, so an added listener waits for its end
+        template<class... DelegateArgs> NOINLINE void add_while_dispatching(DelegateArgs&&... args)
+        {
+            ptr->state |= pending;
+            append(ptr->added, nullptr, std::forward<DelegateArgs>(args)...);
         }
 
     public:
 
-        /** @brief Registers a new delegate to receive notifications */
+        /** @brief Registers a new delegate to receive notifications, and ignores an empty delegate */
         void add(deleg&& d) noexcept
         {
-            emplace(static_cast<deleg&&>(d));
+            if (d) emplace(static_cast<deleg&&>(d));
         }
 
         void add(const deleg& d) noexcept
         {
-            emplace(d);
+            if (d) emplace(d);
         }
 
         /**
@@ -911,20 +1091,12 @@ namespace rpp
          */
         DELEGATE_FINLINE void operator()(Args... args) const
         {
-            const container* c = ptr;
-            if (!c) return;
-            const deleg* end = c->data + c->size;
-            for (const deleg* d = c->data; d != end; ++d)
-                (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
+            dispatch(static_cast<multicast_fwd_t<Args>>(args)...);
         }
         /** @brief Invokes every registered delegate, in the order of registration */
         DELEGATE_FINLINE void invoke(Args... args) const
         {
-            const container* c = ptr;
-            if (!c) return;
-            const deleg* end = c->data + c->size;
-            for (const deleg* d = c->data; d != end; ++d)
-                (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
+            dispatch(static_cast<multicast_fwd_t<Args>>(args)...);
         }
     };
 
