@@ -280,4 +280,129 @@ TestImpl(test_condition_variable)
         for (auto& t : waiters) t.join();
         AssertEqual(notified_count.load(), NUM_WAITERS);
     }
+
+    // the first field of the class is the word its threads sleep on
+    template<class T> static rpp::uint32 word_of(const T& sync)
+    {
+        static_assert(std::is_standard_layout_v<T>);
+        return reinterpret_cast<const std::atomic_uint32_t*>(&sync)->load();
+    }
+
+    // a waiter counts itself under the lock, so this thread sees the count only after the waiter released the lock to wait
+    static void lock_once_waiting(std::unique_lock<rpp::futex_mutex>& lock, const int& waiting, int count)
+    {
+        while (waiting < count) { lock.unlock(); rpp::yield(); lock.lock(); }
+    }
+
+    TestCase(futex_mutex_excludes_concurrent_lockers)
+    {
+        rpp::futex_mutex m;
+        int counter = 0;
+        std::vector<std::thread> threads;
+        threads.reserve(4);
+        for (int t = 0; t < 4; ++t)
+            threads.emplace_back([&] { for (int i = 0; i < 10'000; ++i) { std::lock_guard guard { m }; ++counter; } });
+        for (std::thread& t : threads) t.join();
+        AssertThat(counter, 40'000);
+        AssertThat(word_of(m), 0u);
+        AssertThat(m.try_lock(), true);
+        AssertThat(m.try_lock(), false);
+        m.unlock();
+    }
+
+    // a woken waiter leaves the count only once it runs, so a notify before that has nobody new to wake
+    TestCase(a_notify_skips_the_wake_when_every_waiter_has_one)
+    {
+        for (void (rpp::condition_variable::*notify)() : { &rpp::condition_variable::notify_one,
+                                                           &rpp::condition_variable::notify_all })
+        {
+            rpp::condition_variable cv;
+            rpp::futex_mutex m;
+            int waiting = 0;
+            std::thread waiter([&] {
+                std::unique_lock lock { m };
+                ++waiting;
+                (void)cv.wait_for(lock, rpp::seconds(1)); // a hang guard, the notify below releases it
+            });
+            std::unique_lock lock { m };
+            lock_once_waiting(lock, waiting, 1);
+            rpp::sleep_ms(5); // lets the waiter fall asleep, so it leaves the wait only after a wake from the kernel
+            const rpp::uint32 seq = word_of(cv);
+            for (int i = 0; i < 100; ++i)
+                (cv.*notify)();
+            AssertThat(word_of(cv) - seq, 1u); // the waiter cannot wait again while this thread holds the lock
+            lock.unlock();
+            waiter.join();
+        }
+    }
+
+    TestCase(each_notify_one_wakes_its_own_waiter)
+    {
+        rpp::condition_variable cv;
+        rpp::futex_mutex m;
+        int waiting = 0;
+        auto wait_1s = [&] {
+            std::unique_lock lock { m };
+            ++waiting;
+            (void)cv.wait_for(lock, rpp::seconds(1)); // a hang guard, a notify below releases it
+        };
+        std::thread a { wait_1s };
+        std::thread b { wait_1s };
+        std::unique_lock lock { m };
+        lock_once_waiting(lock, waiting, 2);
+        rpp::sleep_ms(5); // lets both waiters fall asleep, so each one needs its own wake
+        rpp::Timer t;
+        cv.notify_one();
+        cv.notify_one();
+        lock.unlock();
+        a.join();
+        b.join();
+        AssertLess(t.elapsed_millis(), 500.0); // a waiter which missed its wake returns only at the hang guard
+    }
+
+    // a notify between the count and a later seq read would count the waiter, and leave seq as the waiter reads it
+    TestCase(a_notify_while_a_waiter_registers_still_wakes_it)
+    {
+        rpp::condition_variable cv;
+        rpp::futex_mutex m;
+        std::atomic_bool stop { false };
+        std::thread notifier([&] { while (!stop) cv.notify_one(); });
+        int timeouts = 0;
+        for (rpp::Timer t; t.elapsed_millis() < 20.0 && timeouts == 0; )
+        {
+            std::unique_lock lock { m };
+            if (cv.wait_for(lock, rpp::seconds(1)) == rpp::cv_status::timeout) // a hang guard, the notifier never stops
+                ++timeouts;
+        }
+        stop = true;
+        notifier.join();
+        AssertThat(timeouts, 0);
+    }
+
+    // the relock marks the word contended, so the next unlock wakes a locker which still sleeps
+    TestCase(a_wait_relocks_a_futex_mutex_as_contended)
+    {
+        for (bool timed : { false, true })
+        {
+            rpp::condition_variable cv;
+            rpp::futex_mutex m;
+            int waiting = 0;
+            rpp::uint32 word_after_wait = 0;
+            std::thread waiter([&] {
+                std::unique_lock lock { m };
+                ++waiting;
+                if (timed)
+                    (void)cv.wait_for(lock, rpp::seconds(1)); // a hang guard, the notify below releases it
+                else
+                    cv.wait(lock);
+                word_after_wait = word_of(m);
+            });
+            std::unique_lock lock { m };
+            lock_once_waiting(lock, waiting, 1);
+            lock.unlock();
+            cv.notify_one(); // after the unlock, so the waiter relocks a free mutex
+            waiter.join();
+            AssertThat(word_after_wait, 2u);
+        }
+    }
 };
