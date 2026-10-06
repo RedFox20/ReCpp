@@ -445,14 +445,6 @@ namespace rpp
         template<class IClass, class FClass, class MethodType> bool equal_method(IClass* inst, MethodType FClass::*method) const noexcept
         {
             FClass& base = *inst;
-        #if _MSC_VER
-            if (needs_adapter(method)) // the adapter can live inline or on the heap, so compare its fields
-            {
-                using Adapter = method_adapter<FClass, MethodType>;
-                const auto* adapter = static_cast<const Adapter*>(obj);
-                return equal_functor<Adapter>() && adapter->inst == &base && adapter->method == method;
-            }
-        #endif
             void* self = &base;
             func tmp = devirtualize(&base, method, &self);
             return f.fun == tmp.fun && obj == self;
