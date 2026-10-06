@@ -364,11 +364,15 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 | `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
 | `ubuntu-cpp20-asan-clang18`, one run of 8fedaba in #127 | `frames` reached 0, and every other test job passed |
+| `ubuntu-cpp23-asan-clang20`, one run of cf94437 in #128 | `frames` reached 0 |
+| the case alone under `taskset -c 0`, gcc, before the fix | `frames` reached 0 in 10 runs out of 10 |
+| the same, after the fix | 20 runs out of 20 pass, and 10 out of 10 beside a CPU hog on that core |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
-during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
-hold the storm open until the reader counts one. That pins the invariant on the reader rather
-than on the scheduler.
+during the loop. On one core the swaps finish inside one time slice, so the reader never runs.
+**Fixed in #128:** the swap loop now runs past its count until the reader counts a frame. A cap
+turns a lost frame into a failure, not a hang. A forced trip of the cap measured 0.75 s, and
+0.39 s under ASAN. A pinned run which passes takes up to about 75 ms.
 
 **The skew check fired in CI.** Under QEMU in #104, `android-cpp20-r27-clang-tidy-clang18` and
 `android-cpp20-r28b-clang-tidy-clang19` failed twice each, and `android-cpp20-r29-ninja` once. Each
