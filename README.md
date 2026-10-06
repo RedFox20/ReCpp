@@ -2061,7 +2061,7 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L74) | Platform mutex: `futex_mutex` on Linux, Android and Windows, a critical section on FreeRTOS and Cortex-M, `std::mutex` on other targets |
+| [`mutex`](src/rpp/mutex.h#L74) | Platform mutex: `futex_mutex` on MSVC, Linux and Android, a semaphore mutex on FreeRTOS, a critical section on Cortex-M, `std::mutex` on other targets |
 | [`futex_mutex`](src/rpp/mutex.h#L30) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
 | [`recursive_mutex`](src/rpp/mutex.h#L77) | Recursive mutex variant |
 | [`unlock_guard<Mutex>`](src/rpp/mutex.h#L216) | RAII unlock guard: unlocks on construction, relocks on destruction |
@@ -2267,8 +2267,8 @@ initDone.wait(); // still returns immediately
 Condition variable which takes `rpp::Duration` and `rpp::TimePoint` only. A wait sleeps in the kernel on one 32-bit
 word, through a futex on Linux and Android, and `WaitOnAddress()` on Windows. The Windows wait raises the timer
 resolution, so a timeout keeps 1ms granularity instead of the ~15.6ms default tick. It works with any lock which has
-`lock()` and `unlock()`, and takes 8 bytes. With `std::unique_lock<rpp::futex_mutex>`, which `rpp::mutex` is on Linux,
-Android and Windows, the wait relocks the mutex as contended. A thread which sleeps on the mutex then wakes at the
+`lock()` and `unlock()`, and takes 8 bytes. With `std::unique_lock<rpp::futex_mutex>`, which `rpp::mutex` is on MSVC,
+Linux and Android, the wait relocks the mutex as contended. A thread which sleeps on the mutex then wakes at the
 next unlock.
 
 | Class | Description |

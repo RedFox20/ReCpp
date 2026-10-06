@@ -68,9 +68,8 @@ namespace rpp
         }
     };
 
-    // rpp::mutex is futex_mutex on Linux, Android and Windows. The Apple and Emscripten
-    // parking lot wakes every thread of a bucket, so they keep std::mutex
 #if _MSC_VER
+    /// The platform mutex, a futex_mutex on MSVC, Linux and Android
     using mutex = rpp::futex_mutex;
     #define USE_CUSTOM_WINDOWS_MUTEX 1
     #if USE_CUSTOM_WINDOWS_MUTEX
@@ -198,9 +197,11 @@ namespace rpp
 
 #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
 #elif __linux__
+    /// The platform mutex, a futex_mutex on MSVC, Linux and Android
     using mutex = rpp::futex_mutex;
     using recursive_mutex = std::recursive_mutex;
 #else
+    // the Apple and Emscripten parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
 #endif
