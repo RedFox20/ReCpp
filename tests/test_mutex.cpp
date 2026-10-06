@@ -1,6 +1,8 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
+#include <mutex> // std::scoped_lock
 #include <thread>
+#include <type_traits> // std::is_trivially_destructible_v
 
 TestImpl(test_mutex)
 {
@@ -451,5 +453,60 @@ TestImpl(test_mutex)
         guard.unlock();
         t.join();
         AssertEqual(*str, "Second value");
+    }
+
+    // a static mutex runs no constructor and no destructor, so a static initializer or an atexit handler can lock it
+    TestCase(mutex_is_one_constant_initialized_word)
+    {
+        static constinit rpp::futex_mutex m;
+        static_assert(std::is_trivially_destructible_v<rpp::futex_mutex>);
+        AssertThat(sizeof(m), sizeof(rpp::uint32));
+    #if __linux__ || _MSC_VER
+        AssertThat((std::is_same_v<rpp::mutex, rpp::futex_mutex>), true);
+    #endif
+    }
+
+    TestCase(try_lock_fails_while_another_thread_holds_the_mutex)
+    {
+        rpp::mutex m;
+        auto try_lock_on_another_thread = [&] {
+            bool taken = false;
+            std::thread([&] { if ((taken = m.try_lock())) m.unlock(); }).join();
+            return taken;
+        };
+        m.lock();
+        AssertThat(try_lock_on_another_thread(), false);
+        m.unlock();
+        AssertThat(try_lock_on_another_thread(), true);
+    }
+
+    // std::scoped_lock backs off through try_lock(), so two threads which take the mutexes in opposite order never deadlock
+    TestCase(scoped_lock_takes_two_mutexes_in_either_order)
+    {
+        rpp::mutex a, b;
+        int counter = 0;
+        auto add = [&](rpp::mutex& first, rpp::mutex& second) {
+            for (int i = 0; i < 1'000; ++i)
+            {
+                std::scoped_lock both { first, second };
+                ++counter;
+            }
+        };
+        std::thread ab { [&] { add(a, b); } };
+        std::thread ba { [&] { add(b, a); } };
+        ab.join();
+        ba.join();
+        AssertThat(counter, 2'000);
+    }
+
+    TestCase(spin_lock_for_gives_up_on_a_held_mutex)
+    {
+        rpp::mutex m;
+        std::unique_lock held { m };
+        bool owned = true;
+        std::thread([&] { owned = rpp::spin_lock_for(m, rpp::millis(2)).owns_lock(); }).join();
+        AssertThat(owned, false);
+        held.unlock();
+        AssertThat(rpp::spin_lock_for(m, rpp::millis(2)).owns_lock(), true);
     }
 };

@@ -19,36 +19,6 @@ namespace rpp
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
     /////////////////////////////////////////////////////////////////
 
-    #define GET_SRW_LOCK() ((SRWLOCK*)&mtx)
-
-    mutex::mutex() noexcept : mtx{SRWLOCK_INIT}
-    {
-        static_assert(sizeof(SRWLOCK) == sizeof(mutex::mtx));
-    }
-    mutex::~mutex() noexcept
-    {
-        mtx = SRWLOCK_INIT;
-    }
-    bool mutex::try_lock() noexcept
-    {
-        SRWLOCK* srw = GET_SRW_LOCK();
-        return srw && TryAcquireSRWLockExclusive(srw);
-    }
-    void mutex::lock()
-    {
-        if (SRWLOCK* srw = GET_SRW_LOCK())
-            AcquireSRWLockExclusive(srw);
-        else
-            throw std::runtime_error{"rpp::mutex::lock() failed: lock destroyed"};
-    }
-    void mutex::unlock() noexcept
-    {
-        if (SRWLOCK* srw = GET_SRW_LOCK())
-            ReleaseSRWLockExclusive(srw);
-    }
-
-    /////////////////////////////////////////////////////////////////
-
     #define GET_RMUTEX() ((CRITICAL_SECTION*)mtx)
 
     recursive_mutex::recursive_mutex() noexcept

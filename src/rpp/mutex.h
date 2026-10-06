@@ -1,37 +1,79 @@
 #pragma once
 #include "config.h"
+#include "config.types.h" // rpp::uint32
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
 #include "threads.h" // rpp::yield
 #include "timepoint.h" // rpp::Duration
+#include <atomic>
 #include <mutex> // lock_guard etc
 
 namespace rpp
 {
+    /// Waits in the kernel on a 32-bit word: a futex on Linux and Android, WaitOnAddress() on Windows
+    namespace cvar
+    {
+        /// Sleeps until the 32-bit word at `addr` no longer equals `expected`
+        RPPAPI void wait(const void* addr, rpp::uint32 expected) noexcept;
+
+        /// Same as wait(), but at most for `timeout`. @returns false when the timeout elapsed first
+        RPPAPI bool wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept;
+
+        /// Wakes one thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
+        RPPAPI void wake_one(const void* addr) noexcept;
+
+        /// Wakes every thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
+        RPPAPI void wake_all(const void* addr) noexcept;
+    }
+
+    /// A mutex in one 32-bit word, which sleeps through rpp::cvar. A condition_variable wait relocks it as contended
+    class futex_mutex
+    {
+        static constexpr rpp::uint32 UNLOCKED = 0;
+        static constexpr rpp::uint32 LOCKED = 1;
+        static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
+        std::atomic_uint32_t word { UNLOCKED };
+
+    public:
+        futex_mutex() noexcept = default;
+        futex_mutex(const futex_mutex&) = delete;
+        futex_mutex& operator=(const futex_mutex&) = delete;
+
+        /// @returns true when this thread took the lock, false when another thread holds it
+        bool try_lock() noexcept
+        {
+            rpp::uint32 expected = UNLOCKED;
+            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+
+        /// Takes the lock, and sleeps while another thread holds it
+        void lock() noexcept
+        {
+            if (!try_lock())
+                lock_contended();
+        }
+
+        /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
+        void lock_contended() noexcept
+        {
+            while (word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
+                cvar::wait(&word, CONTENDED);
+        }
+
+        /// Releases the lock, and wakes one sleeping thread when the lock was contended
+        void unlock() noexcept
+        {
+            if (word.exchange(UNLOCKED, std::memory_order_release) == CONTENDED)
+                cvar::wake_one(&word);
+        }
+    };
+
+    // rpp::mutex is futex_mutex on Linux, Android and Windows. The Apple and Emscripten
+    // parking lot wakes every thread of a bucket, so they keep std::mutex
 #if _MSC_VER
+    using mutex = rpp::futex_mutex;
     #define USE_CUSTOM_WINDOWS_MUTEX 1
     #if USE_CUSTOM_WINDOWS_MUTEX
-        class mutex
-        {
-            struct { void* ctx; } mtx;
-        public:
-            mutex() noexcept;
-            ~mutex() noexcept;
-
-            mutex(mutex&&) = delete;
-            mutex& operator=(mutex&&) = delete;
-
-            mutex(const mutex&) = delete;
-            mutex& operator=(const mutex&) = delete;
-
-            bool try_lock() noexcept;
-            void lock();
-            void unlock() noexcept;
-
-            // this mutex is always valid and not copyable
-            void* native_handle() const noexcept { return (void*)&mtx; }
-        };
-
         class recursive_mutex
         {
             void* mtx;
@@ -56,7 +98,6 @@ namespace rpp
             void* native_handle() const noexcept { return mtx; }
         };
     #else // USE_CUSTOM_WINDOWS_MUTEX
-        using mutex = std::mutex;
         using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
 
@@ -156,6 +197,9 @@ namespace rpp
     using recursive_mutex = critical_section;
 
 #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
+#elif __linux__
+    using mutex = rpp::futex_mutex;
+    using recursive_mutex = std::recursive_mutex;
 #else
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
