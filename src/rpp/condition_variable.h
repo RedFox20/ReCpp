@@ -70,8 +70,8 @@ namespace rpp
      */
     class condition_variable
     {
-        std::atomic<rpp::uint32> seq { 0 }; // the word a waiter sleeps on, and a notify changes
-        std::atomic<rpp::uint32> waiters { 0 }; // lets a notify skip the wake syscall when nobody waits
+        std::atomic_uint32_t seq { 0 }; // the word a waiter sleeps on, and a notify changes
+        std::atomic_uint32_t waiters { 0 }; // lets a notify skip the wake syscall when nobody waits
 
         // a waiter registers under the lock before it reads seq, so a notify which sees no waiter
         // has nobody to wake. A waiter which registers after that check waits after this notify

@@ -372,14 +372,17 @@ TestImpl(test_semaphore)
                                                              &rpp::semaphore_once_flag::notify_all })
         {
             rpp::semaphore_once_flag flag;
+            rpp::semaphore started;
             std::atomic_int woken { 0 };
             // a hang guard, the notify releases it
-            auto wait_1s = [&] { woken += flag.wait(rpp::seconds(1)) == rpp::semaphore::notified; };
+            auto wait_1s = [&] { started.notify(); woken += flag.wait(rpp::seconds(1)) == rpp::semaphore::notified; };
             std::vector<std::thread> waiters;
             waiters.reserve(3);
             for (int i = 0; i < 3; ++i)
                 waiters.emplace_back(wait_1s);
-            rpp::sleep_ms(5); // lets the waiters block
+            for (int i = 0; i < 3; ++i)
+                (void)started.wait(rpp::seconds(1)); // a hang guard, each waiter releases it
+            rpp::sleep_ms(5); // lets the started waiters block, so none of them sees the flag set before it waits
             rpp::Timer t;
             (flag.*notify)();
             for (std::thread& w : waiters) w.join();
@@ -445,17 +448,24 @@ TestImpl(test_semaphore)
         constexpr int WAIT_MS = 10;
     #endif
         rpp::semaphore_once_flag flag;
+        rpp::semaphore started;
         rpp::semaphore::wait_result result = rpp::semaphore::timeout;
         double waiter_cpu_ms = 0.0;
+        double waited_ms = 0.0;
         std::thread waiter([&] {
+            started.notify();
+            rpp::Timer wall;
             rpp::TimePoint start = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
             result = flag.wait(rpp::seconds(1)); // a hang guard, the notify below releases it
             waiter_cpu_ms = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - start).msec();
+            waited_ms = wall.elapsed_millis();
         });
+        (void)started.wait(rpp::seconds(1)); // a hang guard, the waiter releases it
         rpp::sleep_ms(WAIT_MS);
         flag.notify();
         waiter.join();
         AssertThat(result, rpp::semaphore::notified);
+        AssertGreater(waited_ms, WAIT_MS / 2.0); // the waiter blocked, so the CPU time below measures a real wait
         AssertLess(waiter_cpu_ms, WAIT_MS / 2.0); // a spinning waiter uses about the whole wait
     }
 

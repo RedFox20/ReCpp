@@ -404,7 +404,7 @@ namespace rpp
         {
             static constexpr rpp::uint32 SET = 1;
             static constexpr rpp::uint32 WAITER = 2;
-            std::atomic<rpp::uint32> state { 0 };
+            std::atomic_uint32_t state { 0 };
 
             bool is_set() const noexcept { return (state.load(std::memory_order_acquire) & SET) != 0; }
 

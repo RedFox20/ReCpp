@@ -59,7 +59,7 @@ namespace rpp::detail
 
     static FINLINE rpp::uint32 load_word(const void* addr) noexcept
     {
-        return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
+        return static_cast<const std::atomic_uint32_t*>(addr)->load(std::memory_order_relaxed);
     }
 
     // without an RTOS, rpp::yield() sleeps in WFI, which misses an ISR that changed the word after the check
@@ -176,7 +176,7 @@ namespace rpp::detail
 
         FINLINE rpp::uint32 load_word(const void* addr) noexcept
         {
-            return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
+            return static_cast<const std::atomic_uint32_t*>(addr)->load(std::memory_order_relaxed);
         }
 
         // @returns false when the timeout elapsed. A null timeout waits forever
