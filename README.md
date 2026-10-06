@@ -2251,26 +2251,35 @@ thread which sleeps on the mutex wakes at the next unlock.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L121) | Condition variable with 1ms timeout granularity on every platform |
-| [`cv_status`](src/rpp/condition_variable.h#L38) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
-| [`futex_mutex`](src/rpp/condition_variable.h#L69) | Mutex in one 32-bit word, which a `condition_variable` wait relocks as contended |
-| [`cv_mutex`](src/rpp/condition_variable.h#L112) | The mutex for a `condition_variable`: `futex_mutex` on Linux, Android and Windows, `rpp::mutex` on other targets |
+| [`condition_variable`](src/rpp/condition_variable.h#L122) | Condition variable with 1ms timeout granularity on every platform |
+| [`cv_status`](src/rpp/condition_variable.h#L39) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
+| [`futex_mutex`](src/rpp/condition_variable.h#L70) | Mutex in one 32-bit word, which a `condition_variable` wait relocks as contended |
+| [`cv_mutex`](src/rpp/condition_variable.h#L113) | The mutex for a `condition_variable`: `futex_mutex` on Linux, Android and Windows, `rpp::mutex` on other targets |
 
 | Method | Description |
 |--------|-------------|
-| [`notify_one()`](src/rpp/condition_variable.h#L183) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
-| [`notify_all()`](src/rpp/condition_variable.h#L190) | Wakes all waiting threads |
-| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L217) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
-| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L230) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+| [`notify_one()`](src/rpp/condition_variable.h#L188) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
+| [`notify_all()`](src/rpp/condition_variable.h#L195) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L222) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L235) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+
+`futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`.
+
+| Method | Description |
+|--------|-------------|
+| [`try_lock()`](src/rpp/condition_variable.h#L83) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/condition_variable.h#L90) | Takes the lock, and sleeps while another thread holds it |
+| [`lock_contended()`](src/rpp/condition_variable.h#L97) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/condition_variable.h#L104) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under the condition variable and the semaphore flags.
 
 | Function | Description |
 |----------|-------------|
-| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/condition_variable.h#L25) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
-| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/condition_variable.h#L28) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
-| [`wake_one(const void* addr)`](src/rpp/condition_variable.h#L31) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
-| [`wake_all(const void* addr)`](src/rpp/condition_variable.h#L34) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/condition_variable.h#L26) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/condition_variable.h#L29) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/condition_variable.h#L32) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/condition_variable.h#L35) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
 
 Migration: the `std::chrono` overloads, the `clock`, `duration` and `time_point` aliases, and the MSVC
 `native_handle()` are gone. A timed wait returns `rpp::cv_status` instead of `std::cv_status`.
@@ -3923,6 +3932,8 @@ Thread-safe FIFO queue with notification support.
 | Class | Description |
 |-------|-------------|
 | [`concurrent_queue<T>`](src/rpp/concurrent_queue.h#L42) | Thread-safe queue with push/pop/wait |
+| [`mutex_t`](src/rpp/concurrent_queue.h#L54) | The mutex of the queue, `rpp::cv_mutex` |
+| [`lock_t`](src/rpp/concurrent_queue.h#L55) | The `std::unique_lock` which `spin_lock()` returns, and which the `lock_t&` overloads take |
 
 ### Methods
 

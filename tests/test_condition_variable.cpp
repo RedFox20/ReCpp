@@ -180,6 +180,28 @@ TestImpl(test_condition_variable)
         notifier.join();
     }
 
+    // a lock type which exposes a futex_mutex still gets its own lock() and unlock() calls
+    TestCase(a_wait_calls_lock_and_unlock_of_a_custom_lock)
+    {
+        struct counting_lock
+        {
+            rpp::futex_mutex& m;
+            int locks = 0;
+            int unlocks = 0;
+            rpp::futex_mutex* mutex() const noexcept { return &m; }
+            void lock() noexcept { ++locks; m.lock(); }
+            void unlock() noexcept { ++unlocks; m.unlock(); }
+        };
+        rpp::condition_variable cv;
+        rpp::futex_mutex m;
+        counting_lock lock { m };
+        m.lock();
+        (void)cv.wait_for(lock, rpp::millis(5)); // nothing notifies, so the wait times out
+        m.unlock();
+        AssertThat(lock.unlocks, 1);
+        AssertThat(lock.locks, 1);
+    }
+
     TestCase(wait_for_zero_duration_returns_immediately)
     {
         rpp::condition_variable cv;
