@@ -1350,6 +1350,34 @@ namespace rpp
             AssertThat(int(evt.end() - evt.begin()), 6);
         }
 
+        struct CopyCounter
+        {
+            int* copies = nullptr;
+            explicit CopyCounter(int* counter) noexcept : copies{counter} {}
+            CopyCounter(const CopyCounter& c) noexcept : copies{c.copies} { ++*copies; }
+            CopyCounter(CopyCounter&&) noexcept = default;
+            CopyCounter& operator=(const CopyCounter&) = default;
+            CopyCounter& operator=(CopyCounter&&) noexcept = default;
+            ~CopyCounter() = default;
+        };
+
+        TestCase(multicast_delegate_copies_a_by_value_argument_once_per_listener)
+        {
+            int copies = 0;
+            multicast_delegate<CopyCounter> evt;
+            evt += [](CopyCounter c) { (void)c; };
+            evt += [](CopyCounter c) { (void)c; };
+            CopyCounter counter { &copies };
+            evt(counter);
+            AssertThat(copies, 2);
+
+            copies = 0;
+            multicast_delegate<const CopyCounter&> by_ref;
+            by_ref += [](const CopyCounter& c) { (void)c; };
+            by_ref.invoke(counter);
+            AssertThat(copies, 0);
+        }
+
         TestCase(multicast_delegate_empty_states)
         {
             multicast_delegate<int> evt;
