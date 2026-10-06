@@ -19,6 +19,7 @@ export module rpp.threading;
 // GENERATED EXPORTS BEGIN, tools/gen_module_exports.py owns this block
 
 export namespace rpp {
+    using rpp::futex_mutex;
     using rpp::mutex;
     using rpp::recursive_mutex;
     using rpp::unlock_guard;
@@ -30,8 +31,6 @@ export namespace rpp {
     using rpp::synchronized;
     using rpp::cv_status;
     using rpp::_cv_remaining_duration;
-    using rpp::futex_mutex;
-    using rpp::cv_mutex;
     using rpp::condition_variable;
     using rpp::parallel_task_detached;
     using rpp::semaphore;

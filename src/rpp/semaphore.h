@@ -54,7 +54,7 @@ namespace rpp
     class semaphore
     {
     public:
-        using mutex_t = rpp::cv_mutex;
+        using mutex_t = rpp::mutex;
         using lock_t = std::unique_lock<mutex_t>;
 
     protected:
