@@ -1575,6 +1575,47 @@ namespace rpp
             AssertThat(evt == nullptr, true);
         }
 
+        // a removed functor can hold the last reference to its multicast_delegate, so it dies after the dispatch ends
+        TestCase(multicast_delegate_removed_listener_destroys_its_owner)
+        {
+            struct Holder { multicast_delegate<int> evt; };
+            auto holder = std::make_shared<Holder>();
+            const std::weak_ptr<Holder> alive = holder;
+            Holder* raw = holder.get();
+            raw->evt += [holder = std::move(holder), raw](int) { raw->evt.clear(); };
+            raw->evt(1);
+            AssertThat(alive.expired(), true);
+        }
+
+        // a functor destructor can edit its multicast_delegate, so the container is consistent before it runs
+        TestCase(multicast_delegate_functor_destructor_edits_it)
+        {
+            struct Clearer
+            {
+                multicast_delegate<int>* evt;
+                explicit Clearer(multicast_delegate<int>* evt) : evt{evt} {}
+                Clearer(const Clearer&) = delete;
+                Clearer& operator=(const Clearer&) = delete;
+                ~Clearer() { evt->clear(); }
+            };
+            multicast_delegate<int> evt;
+            evt += [&evt](int)
+            {
+                evt += [c = std::make_shared<Clearer>(&evt)](int) {};
+                evt.clear(); // destroys the added listener, whose capture clears again
+            };
+            evt(1);
+            AssertThat(evt.size(), 0);
+
+            evt += [c = std::make_shared<Clearer>(&evt)](int) {};
+            evt.clear(); // no dispatch runs this time
+            AssertThat(evt.size(), 0);
+
+            evt += [c = std::make_shared<Clearer>(&evt)](int) {};
+            evt.remove(*evt.begin());
+            AssertThat(evt.size(), 0);
+        }
+
         // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
         TestCase(multicast_delegate_listener_moves_it_while_it_runs)
         {

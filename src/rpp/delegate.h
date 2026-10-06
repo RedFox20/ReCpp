@@ -227,15 +227,14 @@ namespace rpp
         }
 
     private:
-        template<class... MArgs> friend struct multicast_delegate; // marks a removed slot while a dispatch reads it
+        template<class... MArgs> friend struct multicast_delegate; // removes a slot while a dispatch reads it
 
         // the call target of a slot which a multicast_delegate removed while a dispatch runs
         struct removed_target
         {
-            static constexpr char marker = 0; // a body no listener shares, so identical code folding never merges it
-            static void call(void* /*instance*/, Args... /*args*/) noexcept { (void)*static_cast<const volatile char*>(&marker); }
+            static void call(void* /*instance*/, Args... /*args*/) noexcept {}
         #if _MSC_VER
-            void member_call(Args... /*args*/) noexcept { (void)*static_cast<const volatile char*>(&marker); }
+            void member_call(Args... /*args*/) noexcept {}
         #endif
         };
         // keeps the functor, because the listener in this slot can still run
@@ -245,14 +244,6 @@ namespace rpp
             f.dfunc = reinterpret_cast<dummy_type>(&removed_target::member_call);
         #else
             f.mfunc = &removed_target::call;
-        #endif
-        }
-        DELEGATE_FINLINE bool is_removed() const noexcept
-        {
-        #if _MSC_VER
-            return f.dfunc == reinterpret_cast<dummy_type>(&removed_target::member_call);
-        #else
-            return f.mfunc == &removed_target::call;
         #endif
         }
 
@@ -759,6 +750,7 @@ namespace rpp
             int state; // the `pending` bit, and the count of running dispatches in the bits above it
             container* added; // the listeners added while a dispatch runs, which join when the outermost one ends
             const multicast_delegate* owner; // holds `ptr`, so a dispatch needs no `this` across the calls
+            uint64_t* removed_mask; // a bit for each removed slot, which the first removal of a dispatch allocates
             deleg data[1];
         };
         mutable container* ptr; // dynamic delegate array container, which the outermost dispatch can regrow
@@ -796,11 +788,11 @@ namespace rpp
             if (this != &d)
             {
                 clear();
-                for (const deleg& del : d)
-                    if (!del.is_removed()) this->add(del);
-                if (const container* added = d.ptr ? d.ptr->added : nullptr)
-                    for (int i = 0; i < added->size; ++i)
-                        this->add(added->data[i]);
+                const container* c = d.ptr;
+                for (int i = 0; c && i < c->size; ++i)
+                    if (!is_removed(c, i)) this->add(c->data[i]);
+                for (int i = 0; c && c->added && i < c->added->size; ++i)
+                    this->add(c->added->data[i]);
             }
             return *this;
         }
@@ -816,8 +808,8 @@ namespace rpp
             }
             else
             {
+                ptr = nullptr; // first, because a functor destructor can edit this multicast_delegate
                 destroy(c);
-                ptr = nullptr;
             }
         }
 
@@ -857,6 +849,7 @@ namespace rpp
             if (!c) return;
             for (int i = 0; i < c->size; ++i)
                 c->data[i].~deleg();
+            free(c->removed_mask);
             free(c);
         }
 
@@ -868,14 +861,7 @@ namespace rpp
                 return;
             int capacity = 1; // the first registration reserves one slot
             if (old) capacity = old->capacity < 4 ? 4 : old->capacity * 2;
-            auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
-            if (!p) { std::terminate(); }
-            p->size = 0;
-            p->capacity = capacity;
-            p->removed = 0;
-            p->state = 0;
-            p->added = nullptr;
-            p->owner = owner;
+            container* p = allocate(capacity, owner);
             if (old)
             {
                 for (int i = 0; i < old->size; ++i)
@@ -886,18 +872,45 @@ namespace rpp
             c = p;
         }
 
+        static container* allocate(int capacity, const multicast_delegate* owner) noexcept
+        {
+            auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
+            if (!p) { std::terminate(); }
+            p->size = 0;
+            p->capacity = capacity;
+            p->removed = 0;
+            p->state = 0;
+            p->added = nullptr;
+            p->owner = owner;
+            p->removed_mask = nullptr;
+            return p;
+        }
+
         static void erase(container* c, int i) noexcept
         {
+            deleg removed { static_cast<deleg&&>(c->data[i]) }; // dies last, since its destructor can edit `c`
             c->data[i].~deleg();
             for (int j = i + 1; j < c->size; ++j)
                 relocate(&c->data[j - 1], &c->data[j]);
             --c->size;
         }
 
-        NOINLINE static void remove_slot(container* c, deleg& d) noexcept
+        // a mask, not the call target, marks the slot, because each module has its own copy of the target
+        static bool is_removed(const container* c, int i) noexcept
         {
-            if (d.is_removed()) return;
-            d.mark_removed();
+            return c->removed_mask && ((c->removed_mask[i / 64] >> (i % 64)) & 1);
+        }
+
+        NOINLINE static void remove_slot(container* c, int i) noexcept
+        {
+            if (is_removed(c, i)) return;
+            if (!c->removed_mask) // the slots cannot grow while a dispatch runs, so the mask never does
+            {
+                c->removed_mask = static_cast<uint64_t*>(calloc((c->size + 63) / 64, sizeof(uint64_t)));
+                if (!c->removed_mask) { std::terminate(); }
+            }
+            c->removed_mask[i / 64] |= uint64_t(1) << (i % 64);
+            c->data[i].mark_removed();
             ++c->removed;
             c->state |= pending;
         }
@@ -906,9 +919,10 @@ namespace rpp
         NOINLINE static void remove_all(container* c) noexcept
         {
             for (int i = 0; i < c->size; ++i)
-                remove_slot(c, c->data[i]);
-            destroy(c->added); // these listeners never ran
-            c->added = nullptr;
+                remove_slot(c, i);
+            container* added = c->added; // these listeners never ran
+            c->added = nullptr; // first, because a functor destructor can edit `c`
+            destroy(added);
         }
 
         template<class Match> void remove_first(const Match& match) noexcept
@@ -919,9 +933,9 @@ namespace rpp
             deleg* data = c->data;
             for (int i = 0; i < size; ++i)
             {
-                if (!match(data[i])) // a removed slot calls a target no listener has, so it never matches
+                if (is_removed(c, i) || !match(data[i]))
                     continue;
-                if (c->state >= one_dispatch) remove_slot(c, data[i]);
+                if (c->state >= one_dispatch) remove_slot(c, i);
                 else erase(c, i);
                 return;
             }
@@ -950,30 +964,36 @@ namespace rpp
                 return;
             }
             c->state = 0;
+            container* removed = nullptr; // dies last, since a functor destructor can edit the multicast_delegate
             if (c->removed)
             {
+                removed = allocate(c->removed, nullptr);
                 int kept = 0;
                 for (int i = 0; i < c->size; ++i)
                 {
-                    if (c->data[i].is_removed())
-                        c->data[i].~deleg();
+                    if (is_removed(c, i))
+                        relocate(&removed->data[removed->size++], &c->data[i]);
                     else if (kept++ != i)
                         relocate(&c->data[kept - 1], &c->data[i]);
                 }
                 c->size = kept;
                 c->removed = 0;
+                free(c->removed_mask);
+                c->removed_mask = nullptr;
             }
-            container* added = c->added;
-            if (!added) return;
-            c->added = nullptr;
-            const multicast_delegate* owner = c->owner;
-            for (int i = 0; i < added->size; ++i)
+            if (container* added = c->added)
             {
-                container*& slots = owner->ptr;
-                grow(slots, owner); // frees `c` when it moves the slots
-                relocate(&slots->data[slots->size++], &added->data[i]);
+                c->added = nullptr;
+                const multicast_delegate* owner = c->owner;
+                for (int i = 0; i < added->size; ++i)
+                {
+                    container*& slots = owner->ptr;
+                    grow(slots, owner); // frees `c` when it moves the slots
+                    relocate(&slots->data[slots->size++], &added->data[i]);
+                }
+                free(added);
             }
-            free(added);
+            destroy(removed);
         }
 
         // ends a dispatch, also when a listener throws
