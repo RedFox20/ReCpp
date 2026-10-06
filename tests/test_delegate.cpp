@@ -4,7 +4,6 @@
 #include <cstring> // strlen, strcmp
 #include <functional>
 #include <memory> // std::make_shared
-#include <optional>
 #include <stdexcept> // std::invalid_argument
 #include <string>
 #include <vector>
@@ -1431,7 +1430,9 @@ namespace rpp
         TestCase(multicast_delegate_listener_removes_listeners_while_it_runs)
         {
             std::vector<int> log;
-            Recorder first { 0, &log }, middle { 2, &log }, last { 3, &log };
+            Recorder first { 0, &log };
+            Recorder middle { 2, &log };
+            Recorder last { 3, &log };
             multicast_delegate<int> evt;
             struct Remover
             {
@@ -1465,11 +1466,12 @@ namespace rpp
         TestCase(multicast_delegate_listener_adds_listeners_while_it_runs)
         {
             std::vector<int> log;
-            Recorder rec { 1, &log }, extra { 5, &log };
+            Recorder rec { 1, &log };
+            Recorder extra { 5, &log };
             multicast_delegate<int> evt;
             struct Context { multicast_delegate<int>* evt; Recorder* rec; Recorder* extra; int size; int copy_size; };
             Context ctx { &evt, &rec, &extra, 0, 0 };
-            const int id = 7;
+            int id = 7; // a capture, so the inline functor reads its own slot
             evt += [&ctx, id](int x)
             {
                 if (x == 1)
@@ -1540,7 +1542,9 @@ namespace rpp
         TestCase(multicast_delegate_nested_dispatch_keeps_the_slots)
         {
             std::vector<int> log;
-            Recorder first { 0, &log }, middle { 2, &log }, last { 3, &log };
+            Recorder first { 0, &log };
+            Recorder middle { 2, &log };
+            Recorder last { 3, &log };
             multicast_delegate<int> evt;
             evt.add(&first, &Recorder::on_event);
             evt += [&evt, &first](int x)
@@ -1579,7 +1583,7 @@ namespace rpp
             struct Owners
             {
                 multicast_delegate<int> source, assigned;
-                std::optional<multicast_delegate<int>> constructed;
+                std::unique_ptr<multicast_delegate<int>> constructed;
                 Recorder* rec;
             };
             Owners o;
@@ -1589,7 +1593,7 @@ namespace rpp
             {
                 if (x == 1)
                 {
-                    o.constructed.emplace(std::move(o.source));
+                    o.constructed = std::make_unique<multicast_delegate<int>>(std::move(o.source));
                     o.constructed->add(o.rec, &Recorder::on_event);
                 }
                 else if (x == 2)
