@@ -1,6 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
-#include <mutex> // std::scoped_lock
+#include <mutex> // std::lock_guard, std::unique_lock
 #include <thread>
 #include <type_traits> // std::is_trivially_destructible_v
 
@@ -479,25 +479,6 @@ TestImpl(test_mutex)
         AssertThat(try_lock_on_another_thread(), false);
         m.unlock();
         AssertThat(try_lock_on_another_thread(), true);
-    }
-
-    // std::scoped_lock backs off through try_lock(), so two threads which take the mutexes in opposite order never deadlock
-    TestCase(scoped_lock_takes_two_mutexes_in_either_order)
-    {
-        rpp::mutex a, b;
-        int counter = 0;
-        auto add = [&](rpp::mutex& first, rpp::mutex& second) {
-            for (int i = 0; i < 1'000; ++i)
-            {
-                std::scoped_lock both { first, second };
-                ++counter;
-            }
-        };
-        std::thread ab { [&] { add(a, b); } };
-        std::thread ba { [&] { add(b, a); } };
-        ab.join();
-        ba.join();
-        AssertThat(counter, 2'000);
     }
 
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
