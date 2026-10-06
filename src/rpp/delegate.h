@@ -355,11 +355,12 @@ namespace rpp
             template<class FClass, class MethodType>
             static bool needs_adapter(MethodType FClass::*method) noexcept
             {
-                if constexpr (sizeof(method) < sizeof(MultiInheritThunk)) // single, or 32-bit multiple inheritance
+                // a data member pointer outgrows an int only in the virtual and the unspecified inheritance models
+                if constexpr (sizeof(int FClass::*) == sizeof(int))
                     return false;
-                else if constexpr (sizeof(method) == sizeof(MultiInheritThunk))
+                else if constexpr (sizeof(method) == sizeof(MultiInheritThunk)) // the virtual inheritance model
                     return reinterpret_cast<const MultiInheritThunk*>(&method)->vbindex != 0;
-                else // the unspecified inheritance model
+                else
                     return true;
             }
             static func devirtualize_mi(const void* inst, void** mi_pmf, void** out_inst = nullptr) noexcept
