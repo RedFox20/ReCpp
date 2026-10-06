@@ -2,7 +2,6 @@
 #include "timer.h"
 #include "debugging.h"
 
-#include <chrono>
 #include <cassert>
 #include <csignal>
 #include <cmath> // round
@@ -69,11 +68,11 @@ namespace rpp
         // while we attempt to wait on it.
         if (auto strong = get())
         {
-            auto lock = strong->finished.spin_lock();
-            if (strong->finished.wait(lock, timeout) == rpp::semaphore::timeout)
+            // only a notified wait orders the read of `error` after the worker wrote it
+            if (strong->finished.wait(timeout) == rpp::semaphore::timeout)
                 result = wait_result::timeout;
-            if (auto e = strong->error; outErr != nullptr && !*outErr)
-                *outErr = e;
+            else if (outErr != nullptr && !*outErr)
+                *outErr = strong->error;
         }
         return result;
     }
@@ -92,10 +91,9 @@ namespace rpp
         wait_result result = wait_result::finished;
         if (auto strong = get())
         {
-            auto lock = strong->finished.spin_lock();
-            strong->finished.wait(lock);
-            if (auto e = strong->error; outErr != nullptr && !*outErr)
-                *outErr = e;
+            strong->finished.wait();
+            if (outErr != nullptr && !*outErr)
+                *outErr = strong->error;
         }
         return result;
     }
@@ -104,9 +102,7 @@ namespace rpp
     {
         if (auto strong = take()) // takes ownership and nulls this handle
         {
-            auto lock = strong->finished.spin_lock();
-            strong->finished.notify_all(lock);
-
+            strong->finished.notify_all();
             // cleanup (decref) at the end of this scope:
         }
     }

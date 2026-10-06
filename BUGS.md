@@ -309,6 +309,13 @@ exception, as C31 did in `rpp::future`. `rpp::future` reaches it when a caller p
 handler reads `e.what()`. 3 of 5 clang-18 TSAN runs reported it, and 0 of 5 with the exception
 built before the race. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
 
+gcc-13 with libstdc++ reports it too, in `test_future::continue_with_logs_an_error_which_no_handler_takes`.
+A pool worker runs `~logic_error` in the `async_task` body at `future.h:138` and frees the message.
+Another worker read it through `vsnprintf` under `_LogWarning`, from `run_logging_errors()` at
+`future.h:75`. The B10 recipe hit it 3 of 80 times on the commit which adds `detail::flag_word`,
+and 0 of 80 on master 5395e95. libstdc++ keeps that message in a COW string whose refcount lives in the
+uninstrumented `libstdc++.so`.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
@@ -529,23 +536,17 @@ the same creation stack. That commit edits two build files and two markdown file
 changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
 set exit 66 on its own.
 
-### B15. Seven headers do not compile on bare metal
-`condition_variable.h:62` gives every non-MSVC target a `condition_variable` which
-inherits `std::condition_variable`. That base waits on a `std::unique_lock<std::mutex>`
-only. `mutex.h:155` makes `rpp::mutex` a `critical_section` on bare metal, so every
-`cv.wait(lock)` in `semaphore.h` and `concurrent_queue.h` reports `no matching member
-function for call to 'wait'`. `thread_pool.h`, `future.h`, `async.h`, `event_loop.h` and
-`coroutines.h` reach one of those two, so they report the same.
+### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
+`rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
+changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `future.h`, `async.h` and
+`coroutines.h` pass `g++ -fsyntax-only -DRPP_FREERTOS=1` on an x86 host. No target has run them.
 
-The MSVC branch at `condition_variable.h:179` is the one which would work. It is a
-hand-rolled `condition_variable` templated on the mutex type. A fix widens the `#if` so
-bare metal takes that branch too, and it needs a target which can run the result.
+`event_loop.h` still fails there. `event_loop::on_owner_thread()` calls `rpp::get_thread_id()`,
+and `threads.h` declares that name only when `!RPP_BARE_METAL`.
 
-`event_loop.h` carries a second gap of its own. It calls `rpp::get_thread_id()` at lines
-445 and 517, and `threads.h:31` declares that name only when `!RPP_BARE_METAL`.
-
-All seven headers carry a `NO_CONFIG` entry in `tools/gen_module_exports.py` until then. A
-bare-metal build never reaches the module either, so the export list stays unguarded.
+All seven headers keep their `NO_CONFIG` entry in `tools/gen_module_exports.py` until a
+bare-metal build runs them. A bare-metal build never reaches the module either, so the export
+list stays unguarded.
 
 ### B16. gcc-14 crashes an importer which instantiates `std::promise` at `-O1` and above
 A module whose global module fragment includes `<future>` breaks every importer which

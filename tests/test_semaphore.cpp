@@ -6,6 +6,7 @@
 #include <rpp/tests.h>
 #include <thread>
 #include <deque>
+#include <vector>
 
 constexpr rpp::Duration millis(int milliseconds)
 {
@@ -357,6 +358,102 @@ TestImpl(test_semaphore)
         }
     }
 
+    TestCase(flags_and_condition_variable_keep_their_size)
+    {
+        AssertThat(sizeof(rpp::semaphore_flag), sizeof(rpp::uint32));
+        AssertThat(sizeof(rpp::semaphore_once_flag), sizeof(rpp::uint32));
+        AssertThat(sizeof(rpp::condition_variable), 2 * sizeof(rpp::uint32));
+    }
+
+    // the once flag stays set, so every waiter must wake, not only the first one
+    TestCase(once_flag_notify_wakes_every_waiter)
+    {
+        for (void (rpp::semaphore_once_flag::*notify)() : { &rpp::semaphore_once_flag::notify,
+                                                             &rpp::semaphore_once_flag::notify_all })
+        {
+            rpp::semaphore_once_flag flag;
+            std::atomic_int woken { 0 };
+            // a hang guard, the notify releases it
+            auto wait_1s = [&] { woken += flag.wait(rpp::seconds(1)) == rpp::semaphore::notified; };
+            std::vector<std::thread> waiters;
+            waiters.reserve(3);
+            for (int i = 0; i < 3; ++i)
+                waiters.emplace_back(wait_1s);
+            rpp::sleep_ms(5); // lets the waiters block
+            rpp::Timer t;
+            (flag.*notify)();
+            for (std::thread& w : waiters) w.join();
+            AssertLess(t.elapsed_millis(), 500.0); // a waiter which missed the wake sees the flag only at the hang guard
+            AssertThat(woken.load(), 3);
+            AssertThat(flag.is_set(), true);
+        }
+    }
+
+    TestCase(a_notify_before_the_wait_is_not_lost)
+    {
+        rpp::semaphore_flag flag;
+        flag.notify();
+        AssertThat(flag.wait(rpp::seconds(1)), rpp::semaphore::notified); // a hang guard, the notify above releases it
+        AssertThat(flag.is_set(), false);
+
+        rpp::semaphore_once_flag once;
+        once.notify();
+        AssertThat(once.wait(rpp::seconds(1)), rpp::semaphore::notified); // a hang guard, the notify above releases it
+        AssertThat(once.is_set(), true);
+    }
+
+    // the Windows timer ticks every ~15.6ms unless the wait raises its resolution
+    TestCase(a_1ms_wait_times_out_after_about_1ms)
+    {
+        auto measure = [](auto&& wait_1ms) {
+            return best_of_3([&] { rpp::Timer t; wait_1ms(); return t.elapsed_millis(); });
+        };
+        rpp::semaphore_flag flag;
+        rpp::semaphore_once_flag once;
+        rpp::semaphore sem;
+        rpp::condition_variable cv;
+        rpp::mutex m;
+        std::unique_lock lock { m };
+        AssertInRange(measure([&] { AssertThat(flag.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);
+        AssertInRange(measure([&] { AssertThat(once.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);
+        AssertInRange(measure([&] { AssertThat(sem.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);
+        AssertInRange(measure([&] { AssertThat(cv.wait_for(lock, millis(1)), rpp::cv_status::timeout); }), 0.5, 5.0);
+    }
+
+    // the waiter frees the flag at once, so ASAN catches a notify() which reads the flag after it sets it
+    TestCase(a_waiter_frees_the_flag_as_soon_as_wait_returns)
+    {
+        for (int i = 0; i < 100; ++i)
+        {
+            auto* once = new rpp::semaphore_once_flag{};
+            auto* flag = new rpp::semaphore_flag{};
+            std::thread notifier([=] { once->notify(); flag->notify(); });
+            once->wait();
+            delete once;
+            flag->wait();
+            delete flag;
+            notifier.join();
+        }
+    }
+
+    // a waiter sleeps in the kernel, so it uses almost no CPU time while it waits
+    TestCase(a_flag_wait_sleeps_instead_of_spinning)
+    {
+        rpp::semaphore_once_flag flag;
+        rpp::semaphore::wait_result result = rpp::semaphore::timeout;
+        double waiter_cpu_ms = 0.0;
+        std::thread waiter([&] {
+            rpp::TimePoint start = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
+            result = flag.wait(rpp::seconds(1)); // a hang guard, the notify below releases it
+            waiter_cpu_ms = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - start).msec();
+        });
+        rpp::sleep_ms(10);
+        flag.notify();
+        waiter.join();
+        AssertThat(result, rpp::semaphore::notified);
+        AssertLess(waiter_cpu_ms, 5.0);
+    }
+
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
     // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
     // resume on a background thread, which conflicts with the default test
@@ -404,6 +501,19 @@ TestImpl(test_semaphore)
         coro().get();
         // try_wait in await_ready should have consumed the signal
         AssertEqual(sem.count(), 0);
+    }
+
+    TestCase(co_await_once_flag_keeps_it_set)
+    {
+        rpp::semaphore_once_flag flag;
+        flag.notify();
+        auto coro = [&]() -> rpp::cfuture<void>
+        {
+            AssertEqual(co_await flag.await(millis(100)), rpp::semaphore::notified);
+            AssertEqual(co_await flag.await(millis(100)), rpp::semaphore::notified);
+        };
+        coro().get();
+        AssertThat(flag.is_set(), true);
     }
 
     // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)

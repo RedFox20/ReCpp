@@ -212,7 +212,7 @@ TestImpl(test_atomic_shared_ptr)
             {
                 if (auto s = asp.load())
                 {
-                    (void)s->finished.is_set(); // locks finished.m briefly
+                    (void)s->finished.is_set(); // reads the flag word of a state which may reuse freed memory
                     checks.fetch_add(1, std::memory_order_relaxed);
                 }
             }
@@ -223,12 +223,9 @@ TestImpl(test_atomic_shared_ptr)
         {
             asp.store(std::make_shared<task_state>()); // new state (may reuse freed memory)
             std::this_thread::yield();
-            // signal_finish_and_cleanup pattern: take → lock finished → notify → destroy
+            // signal_finish_and_cleanup pattern: take → notify → destroy
             if (auto taken = asp.exchange(nullptr))
-            {
-                auto lock = taken->finished.spin_lock();
-                taken->finished.notify_all(lock);
-            }
+                taken->finished.notify_all();
         }
 
         stop.store(true, std::memory_order_release);

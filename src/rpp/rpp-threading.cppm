@@ -28,6 +28,7 @@ export namespace rpp {
     using rpp::synchronize_guard;
     using rpp::synchronizable;
     using rpp::synchronized;
+    using rpp::cv_status;
     using rpp::_cv_remaining_duration;
     using rpp::condition_variable;
     using rpp::parallel_task_detached;
@@ -36,11 +37,6 @@ export namespace rpp {
     using rpp::semaphore_once_flag;
     using rpp::atomic_test_and_set;
     using rpp::concurrent_queue;
-    using rpp::seconds_t;
-    using rpp::fseconds_t;
-    using rpp::dseconds_t;
-    using rpp::milliseconds_t;
-    using rpp::duration_t;
     using rpp::action;
     using rpp::task_delegate;
     using rpp::pool_signal_handler;

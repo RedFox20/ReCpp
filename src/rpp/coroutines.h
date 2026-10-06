@@ -306,7 +306,7 @@ namespace rpp
         }
 
         /**
-         * @brief Allows to co_await on a std::chrono::duration
+         * @brief Allows to co_await on an rpp::Duration
          * @code
          *     using namespace rpp::coro_operators;
          *     co_await rpp::millis(100);
