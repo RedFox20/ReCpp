@@ -1616,6 +1616,26 @@ namespace rpp
             AssertThat(evt.size(), 0);
         }
 
+        // a functor destructor can add a listener while its multicast_delegate dies, so the destructor clears again
+        TestCase(multicast_delegate_destructor_frees_a_listener_which_a_functor_adds)
+        {
+            struct Adder
+            {
+                multicast_delegate<int>* evt;
+                explicit Adder(multicast_delegate<int>* evt) : evt{evt} {}
+                Adder(const Adder&) = delete;
+                Adder& operator=(const Adder&) = delete;
+                ~Adder() { *evt += [name = std::string(40, 'x')](int) {}; }
+            };
+            int calls = 0;
+            {
+                multicast_delegate<int> evt;
+                evt += [a = std::make_shared<Adder>(&evt), &calls](int) { ++calls; };
+                evt(1);
+            }
+            AssertThat(calls, 1); // LeakSanitizer reports the added listener if the destructor misses it
+        }
+
         // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
         TestCase(multicast_delegate_listener_moves_it_while_it_runs)
         {

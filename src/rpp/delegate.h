@@ -763,6 +763,8 @@ namespace rpp
         ~multicast_delegate() noexcept
         {
             clear();
+            while (ptr && ptr->state < one_dispatch) // a functor destructor added a listener
+                clear();
             if (ptr) ptr->owner = nullptr; // the running dispatch frees the container when it ends
         }
 
@@ -849,7 +851,7 @@ namespace rpp
             if (!c) return;
             for (int i = 0; i < c->size; ++i)
                 c->data[i].~deleg();
-            free(c->removed_mask);
+            if (c->removed_mask) free(c->removed_mask);
             free(c);
         }
 
@@ -888,7 +890,12 @@ namespace rpp
 
         static void erase(container* c, int i) noexcept
         {
-            deleg removed { static_cast<deleg&&>(c->data[i]) }; // dies last, since its destructor can edit `c`
+            if (c->data[i].owns_heap()) // a functor destructor can edit `c`, so the functor dies after the shift
+            {
+                deleg removed { static_cast<deleg&&>(c->data[i]) };
+                erase(c, i); // the moved-from slot owns nothing now
+                return;
+            }
             c->data[i].~deleg();
             for (int j = i + 1; j < c->size; ++j)
                 relocate(&c->data[j - 1], &c->data[j]);
@@ -1048,12 +1055,12 @@ namespace rpp
     public:
 
         /** @brief Registers a new delegate to receive notifications, and ignores an empty delegate */
-        void add(deleg&& d) noexcept
+        DELEGATE_FINLINE void add(deleg&& d) noexcept
         {
             if (d) emplace(static_cast<deleg&&>(d));
         }
 
-        void add(const deleg& d) noexcept
+        DELEGATE_FINLINE void add(const deleg& d) noexcept
         {
             if (d) emplace(d);
         }
@@ -1068,11 +1075,12 @@ namespace rpp
         }
 
 
-        template<class IClass, class FClass> void add(IClass* obj, void (FClass::*method)(Args...))
+        template<class IClass, class FClass> DELEGATE_FINLINE void add(IClass* obj, void (FClass::*method)(Args...))
         {
             emplace(obj, method);
         }
-        template<class IClass, class FClass> void add(const IClass* obj, void (FClass::*method)(Args...) const)
+        template<class IClass, class FClass>
+        DELEGATE_FINLINE void add(const IClass* obj, void (FClass::*method)(Args...) const)
         {
             emplace(obj, method);
         }
