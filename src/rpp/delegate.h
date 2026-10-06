@@ -43,7 +43,7 @@
  *
  *  Multicast Events:
  *  @code
- *     multicast_delegate<void(int,int)> onMouseMove;
+ *     multicast_delegate<int,int> onMouseMove;
  *     onMouseMove += &scene_mousemove;   // register events
  *     onMouseMove.add(gui, &Gui::MouseMove);
  *     onMouseMove(deltaX, deltaY);       // invoke multicast delegate (event)
@@ -679,11 +679,17 @@ namespace rpp
 
 
 
+    template<class T> struct multicast_fwd      { using type = const T&; };
+    template<class T> struct multicast_fwd<T&>  { using type = T&;       };
+    template<class T> struct multicast_fwd<T&&> { using type = T&&;      };
+    template<class T> using multicast_fwd_t = typename multicast_fwd<T>::type;
+
     /**
      * @brief A delegate container object
      * @note Multicast Delegate class is optimized to have minimal overhead if no subscribers are registered
      *       First registration optimized to reserve only 1 event delegate
      *       Subsequential growth is amortized
+     * @note A listener must not add or remove listeners of the same multicast_delegate while it runs.
      *
      * @example
      *       multicast_delegate<int, int> evt_mouse_move;
@@ -781,27 +787,30 @@ namespace rpp
 
         void grow() noexcept
         {
-            if (!ptr)
+            if (ptr && ptr->size < ptr->capacity)
+                return;
+            int capacity = 1; // the first registration reserves one slot
+            if (ptr) capacity = ptr->capacity < 4 ? 4 : ptr->capacity * 2;
+            auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
+            if (!p) { std::terminate(); }
+            p->size = 0;
+            p->capacity = capacity;
+            if (ptr)
             {
-                ptr = static_cast<container*>(malloc(sizeof(container)));
-                if (!ptr) { std::terminate(); }
-                ptr->size = 0;
-                ptr->capacity = 1;
-            }
-            else if (ptr->size == ptr->capacity)
-            {
-                int capacity = ptr->capacity + 3;
-                if (int rem = capacity % 4)
-                    capacity += 4 - rem;
-                auto* p = static_cast<container*>(malloc(sizeof(container) + sizeof(deleg) * (capacity - 1)));
-                if (!p) { std::terminate(); }
-                p->size = ptr->size;
-                p->capacity = capacity;
                 for (int i = 0; i < ptr->size; ++i)
                     relocate(&p->data[i], &ptr->data[i]);
+                p->size = ptr->size;
                 free(ptr);
-                ptr = p;
             }
+            ptr = p;
+        }
+
+        // constructs the delegate in its slot, so a member function never passes through a temporary
+        template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
+        {
+            grow();
+            new (&ptr->data[ptr->size]) deleg{std::forward<DelegateArgs>(args)...};
+            ++ptr->size;
         }
 
     public:
@@ -809,14 +818,12 @@ namespace rpp
         /** @brief Registers a new delegate to receive notifications */
         void add(deleg&& d) noexcept
         {
-            grow();
-            new (&ptr->data[ptr->size++]) deleg{static_cast<deleg&&>(d)};
+            emplace(static_cast<deleg&&>(d));
         }
 
         void add(const deleg& d) noexcept
         {
-            grow();
-            new (&ptr->data[ptr->size++]) deleg{d};
+            emplace(d);
         }
 
         /**
@@ -846,11 +853,11 @@ namespace rpp
 
         template<class IClass, class FClass> void add(IClass* obj, void (FClass::*method)(Args...))
         {
-            add(deleg{obj, method});
+            emplace(obj, method);
         }
         template<class IClass, class FClass> void add(const IClass* obj, void (FClass::*method)(Args...) const)
         {
-            add(deleg{obj, method});
+            emplace(obj, method);
         }
 
 
@@ -882,41 +889,22 @@ namespace rpp
 
 
         /**
-         * @brief Invoke all subscribed event delegates.
+         * @brief Invokes every registered delegate, in the order of registration
+         * @note A by-value argument arrives by const reference, so each delegate makes the only copy
          */
-        void operator()(Args... args) const;
-        void invoke(Args... args) const;
+        DELEGATE_FINLINE void operator()(multicast_fwd_t<Args>... args) const
+        {
+            const container* c = ptr;
+            if (!c) return;
+            const deleg* end = c->data + c->size;
+            for (const deleg* d = c->data; d != end; ++d)
+                (*d)(static_cast<multicast_fwd_t<Args>>(args)...);
+        }
+        /** @brief Invokes every registered delegate, in the order of registration */
+        DELEGATE_FINLINE void invoke(multicast_fwd_t<Args>... args) const
+        {
+            operator()(static_cast<multicast_fwd_t<Args>>(args)...);
+        }
     };
-
-    template<class T> struct multicast_fwd      { using type = const T&; };
-    template<class T> struct multicast_fwd<T&>  { using type = T&;       };
-    template<class T> struct multicast_fwd<T&&> { using type = T&&;      };
-    template<class T> using multicast_fwd_t = typename multicast_fwd<T>::type;
-
-    template<class... Args>
-    void multicast_delegate<Args...>::operator()(Args... args) const
-    {
-        container* c = ptr;
-        if (!c) return;
-        int    size = c->size;
-        deleg* data = c->data;
-        for (int i = 0; i < size; ++i)
-        {
-            data[i](static_cast<multicast_fwd_t<Args>>(args)...);
-        }
-    }
-
-    template<class... Args>
-    void multicast_delegate<Args...>::invoke(Args... args) const
-    {
-        container* c = ptr;
-        if (!c) return;
-        int    size = c->size;
-        deleg* data = c->data;
-        for (int i = 0; i < size; ++i)
-        {
-            data[i](static_cast<multicast_fwd_t<Args>>(args)...);
-        }
-    }
 
 } // namespace

@@ -1438,26 +1438,26 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 | Class | Description |
 |-------|-------------|
 | [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L165) | Single-target function delegate |
-| [`multicast_delegate<Ret(Args...)>`](src/rpp/delegate.h#L712) | Multi-target event delegate (`event<>` alias) |
+| [`multicast_delegate<Args...>`](src/rpp/delegate.h#L703) | Multi-target event delegate, with one pointer of overhead when empty |
 
 ### delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`operator()(Args... args)`](src/rpp/delegate.h#L641) | Invoke the delegate |
-| [`operator bool()`](src/rpp/delegate.h#L596) | True if delegate is bound |
-| [`reset()`](src/rpp/delegate.h#L585) | Unbind the delegate |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L653) | Invoke the delegate |
+| [`operator bool()`](src/rpp/delegate.h#L614) | True if delegate is bound |
+| [`reset()`](src/rpp/delegate.h#L603) | Unbind the delegate |
 
 ### multicast_delegate Methods
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L828) / [`operator+=`](src/rpp/delegate.h#L853) | Register a callback |
-| [`operator-=`](src/rpp/delegate.h#L858) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L878) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L728) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L747) | Number of registered callbacks |
-| [`multicast_fwd<T>`](src/rpp/delegate.h#L874) | Trait to deduce forwarding reference type for multicast args |
+| [`add(delegate)`](src/rpp/delegate.h#L823) / [`operator+=`](src/rpp/delegate.h#L873) | Register a callback |
+| [`operator-=`](src/rpp/delegate.h#L883) | Unregister a callback |
+| [`operator()(multicast_fwd_t<Args>... args)`](src/rpp/delegate.h#L894) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L752) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L771) | Number of registered callbacks |
+| [`multicast_fwd<T>`](src/rpp/delegate.h#L681) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
 
@@ -1465,7 +1465,7 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 rpp::delegate<void(int)> fn = [](int a) { LogInfo("lambda %d!", a); };
 fn(42);
 
-rpp::event<void(int,int)> onMouseMove;
+rpp::multicast_delegate<int,int> onMouseMove;
 onMouseMove += [](int x, int y) { LogInfo("mx %d, my %d", x, y); };
 onMouseMove(22, 34);
 ```
