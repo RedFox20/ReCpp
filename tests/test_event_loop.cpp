@@ -1388,9 +1388,11 @@ TestImpl(test_event_loop)
         }};
         spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
 
-        // a starved reader counts no frame, so the swaps run until it counts one
-        for (int i = 0; i < 20000 || (frames.load() == 0 && i < 2'000'000); ++i)
+        int i = 0;
+        for (; i < 20000; ++i)
             loop->set_time_source(clocks[i % NUM_CLOCKS].get());
+        // a starved reader counts no frame, so the swaps continue with a yield each until it counts one
+        spin_until([&]{ loop->set_time_source(clocks[i++ % NUM_CLOCKS].get()); return frames.load() != 0; });
         stop = true;
         reader.join();
         loop->set_time_source(nullptr); // the scope frees `clocks` next

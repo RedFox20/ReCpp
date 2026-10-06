@@ -191,6 +191,14 @@ TestImpl(test_condition_variable)
         AssertLess(t.elapsed_millis(), 10.0);
     }
 
+    // WaitOnAddress() takes whole milliseconds, and a truncated timeout ends the wait early
+    TestCase(a_millisecond_wait_rounds_a_partial_millisecond_up)
+    {
+        AssertEqual(rpp::detail::wait_millis(rpp::Duration{1}), 1);
+        AssertEqual(rpp::detail::wait_millis(rpp::Duration::from_millis(1.9)), 2);
+        AssertEqual(rpp::detail::wait_millis(ms(2)), 2);
+    }
+
     TestCase(multiple_waiters_all_notified)
     {
         rpp::condition_variable cv;

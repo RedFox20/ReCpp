@@ -43,8 +43,8 @@ namespace rpp::detail
             return false;
         // the default timer tick is ~15.6ms, so a short wait raises the timer resolution
         MMRESULT mmStatus = timeBeginPeriod(1);
-        rpp::int64 ms = timeout.nsec / 1'000'000;
-        DWORD wait_ms = ms <= 0 ? 1 : ms >= INFINITE ? INFINITE - 1 : static_cast<DWORD>(ms);
+        rpp::int64 ms = wait_millis(timeout);
+        DWORD wait_ms = ms >= INFINITE ? INFINITE - 1 : static_cast<DWORD>(ms);
         BOOL woken = WaitOnAddress(const_cast<void*>(addr), &expected, sizeof(expected), wait_ms);
         bool timed_out = !woken && GetLastError() == ERROR_TIMEOUT;
         if (mmStatus == TIMERR_NOERROR)

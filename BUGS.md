@@ -370,9 +370,9 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. On one core the swaps finish inside one time slice, so the reader never runs.
-**Fixed in #128:** the swap loop now runs past its count until the reader counts a frame. A cap
-turns a lost frame into a failure, not a hang. A forced trip of the cap measured 0.75 s, and
-0.39 s under ASAN. A pinned run which passes takes up to about 75 ms.
+**Fixed in #128:** after the storm, `spin_until` continues with one swap and one yield per check
+until the reader counts a frame. The yield gives the reader the CPU, so a pinned run passes in
+8 to 17 ms. A lost frame fails at the `spin_until` bound of the file, not as a hang.
 
 **The skew check fired in CI.** Under QEMU in #104, `android-cpp20-r27-clang-tidy-clang18` and
 `android-cpp20-r28b-clang-tidy-clang19` failed twice each, and `android-cpp20-r29-ninja` once. Each

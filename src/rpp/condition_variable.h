@@ -31,6 +31,12 @@ namespace rpp
 
         /// Wakes every thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
         RPPAPI void address_wake_all(const void* addr) noexcept;
+
+        /// @returns `timeout` in whole milliseconds, rounded up, so a millisecond wait never ends before it
+        constexpr rpp::int64 wait_millis(rpp::Duration timeout) noexcept
+        {
+            return timeout.nsec / NANOS_PER_MILLI + (timeout.nsec % NANOS_PER_MILLI > 0 ? 1 : 0);
+        }
     }
 
     /// The result of a timed condition_variable wait without a predicate
