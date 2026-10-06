@@ -205,6 +205,52 @@ TestImpl(test_condition_variable)
         }
     }
 
+    TestCase(wait_for_negative_duration_returns_immediately)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        rpp::Timer t;
+        AssertEqual(cv.wait_for(lock, rpp::millis(-20)), rpp::cv_status::timeout);
+        AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    // a notify with no waiter makes no RMW, so a wait which starts after it must still sleep
+    TestCase(a_notify_without_waiters_does_not_wake_a_later_wait)
+    {
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        cv.notify_one();
+        cv.notify_all();
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        rpp::Timer t;
+        AssertEqual(cv.wait_for(lock, rpp::millis(3)), rpp::cv_status::timeout);
+        AssertGreaterOrEqual(t.elapsed_millis(), 3.0);
+    }
+
+    TestCase(cvar_wait_returns_at_once_when_the_word_already_changed)
+    {
+        std::atomic_uint32_t word { 1 };
+        rpp::cvar::wake_one(&word); // no thread sleeps on it
+        rpp::cvar::wake_all(&word);
+        rpp::Timer t;
+        rpp::cvar::wait(&word, 0);
+        AssertTrue(rpp::cvar::wait_for(&word, 0, rpp::seconds(1)));
+        AssertFalse(rpp::cvar::wait_for(&word, 1, rpp::Duration::zero()));
+        AssertFalse(rpp::cvar::wait_for(&word, 1, rpp::millis(-20)));
+        AssertLess(t.elapsed_millis(), 10.0);
+    }
+
+    TestCase(cvar_wait_for_returns_true_when_another_thread_changes_the_word)
+    {
+        std::atomic_uint32_t word { 0 };
+        std::thread changer([&] { rpp::sleep_ms(3); word.store(1); rpp::cvar::wake_all(&word); });
+        rpp::Timer t;
+        AssertTrue(rpp::cvar::wait_for(&word, 0, rpp::seconds(1)));
+        AssertLess(t.elapsed_millis(), 200.0);
+        changer.join();
+    }
+
     TestCase(multiple_waiters_all_notified)
     {
         rpp::condition_variable cv;

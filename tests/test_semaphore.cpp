@@ -469,6 +469,68 @@ TestImpl(test_semaphore)
         AssertLess(waiter_cpu_ms, WAIT_MS / 2.0); // a spinning waiter uses about the whole wait
     }
 
+    // the flag is not a counter, so a second notify before the wait adds nothing
+    TestCase(two_notifies_set_the_flag_once)
+    {
+        rpp::semaphore_flag flag;
+        AssertTrue(flag.notify_once());
+        AssertFalse(flag.notify_once());
+        flag.notify();
+        AssertTrue(flag.try_wait());
+        AssertFalse(flag.try_wait());
+        AssertEqual(flag.wait(rpp::millis(1)), rpp::semaphore::timeout);
+    }
+
+    TestCase(wait_no_unset_leaves_the_flag_for_the_next_waiter)
+    {
+        rpp::semaphore_flag flag;
+        flag.notify();
+        AssertEqual(flag.wait_no_unset(rpp::millis(1)), rpp::semaphore::notified);
+        flag.wait_no_unset();
+        AssertTrue(flag.is_set());
+        AssertEqual(flag.wait(rpp::millis(1)), rpp::semaphore::notified);
+        AssertFalse(flag.is_set());
+    }
+
+    TestCase(unset_clears_a_flag_nobody_consumed)
+    {
+        rpp::semaphore_flag flag;
+        flag.notify();
+        flag.unset();
+        AssertFalse(flag.is_set());
+        AssertEqual(flag.wait(rpp::millis(1)), rpp::semaphore::timeout);
+    }
+
+    // a waiter which timed out leaves the word, so it cannot take a notify which comes later
+    TestCase(timed_out_waiters_do_not_consume_a_later_notify)
+    {
+        rpp::semaphore_flag flag;
+        constexpr int NUM_WAITERS = 4;
+        std::vector<std::thread> waiters;
+        waiters.reserve(NUM_WAITERS);
+        std::atomic_int timeouts { 0 };
+        for (int i = 0; i < NUM_WAITERS; ++i)
+            waiters.emplace_back([&] { if (flag.wait(rpp::millis(1)) == rpp::semaphore::timeout) ++timeouts; });
+        for (std::thread& w : waiters) w.join();
+        AssertEqual(timeouts.load(), NUM_WAITERS);
+        flag.notify();
+        AssertTrue(flag.is_set());
+        AssertTrue(flag.try_wait());
+    }
+
+    TestCase(once_flag_stays_set_through_every_wait)
+    {
+        rpp::semaphore_once_flag flag;
+        AssertEqual(flag.wait(rpp::millis(1)), rpp::semaphore::timeout);
+        flag.notify();
+        flag.notify(); // a second notify on a set flag changes nothing
+        for (int i = 0; i < 3; ++i)
+            AssertEqual(flag.wait(rpp::millis(1)), rpp::semaphore::notified);
+        flag.wait();
+        AssertTrue(flag.try_wait());
+        AssertTrue(flag.is_set());
+    }
+
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
     // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
     // resume on a background thread, which conflicts with the default test
