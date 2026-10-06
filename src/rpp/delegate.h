@@ -55,7 +55,7 @@
 #include "config.h"
 #include <cstddef> // size_t, ptrdiff_t
 #include <cstdlib> // malloc/free for multicast_delegate
-#include <cstring> // memcpy
+#include <cstring> // memcpy, which RPP_BUILTIN_MEMCPY names where no builtin exists
 #include <new> // placement new
 #include <type_traits> // std::decay_t<>
 #include <utility> // std::forward
@@ -212,10 +212,10 @@ namespace rpp
                 for (size_t i = 0; i < inline_size; i += sizeof(uintptr_t))
                 {
                     uintptr_t this_word, d_word; // NOLINT(readability-isolate-declaration)
-                    memcpy(&this_word, storage + i, sizeof(this_word));
-                    memcpy(&d_word, d.storage + i, sizeof(d_word));
-                    memcpy(storage + i, &d_word, sizeof(d_word));
-                    memcpy(d.storage + i, &this_word, sizeof(this_word));
+                    RPP_BUILTIN_MEMCPY(&this_word, storage + i, sizeof(this_word));
+                    RPP_BUILTIN_MEMCPY(&d_word, d.storage + i, sizeof(d_word));
+                    RPP_BUILTIN_MEMCPY(storage + i, &d_word, sizeof(d_word));
+                    RPP_BUILTIN_MEMCPY(d.storage + i, &this_word, sizeof(this_word));
                 }
                 f = d_f;
                 obj = d_obj;
@@ -231,7 +231,7 @@ namespace rpp
         DELEGATE_FINLINE bool owns_heap() const noexcept
         {
             manager_type first_word;
-            memcpy(&first_word, storage, sizeof(first_word));
+            RPP_BUILTIN_MEMCPY(&first_word, storage, sizeof(first_word));
             return first_word && !is_inline();
         }
 
@@ -239,7 +239,7 @@ namespace rpp
         DELEGATE_FINLINE void copy_bits(const delegate& d) noexcept
         {
             f = d.f;
-            memcpy(storage, d.storage, inline_size);
+            RPP_BUILTIN_MEMCPY(storage, d.storage, inline_size);
             obj = d.is_inline() ? storage : d.obj;
         }
         DELEGATE_FINLINE void clear_storage() noexcept
@@ -398,7 +398,7 @@ namespace rpp
             {
                 static_assert(sizeof(method) == sizeof(VCallThunk));
                 VCallThunk t;
-                memcpy(&t, &method, sizeof(t));
+                RPP_BUILTIN_MEMCPY(&t, &method, sizeof(t));
             #if defined(__arm__) || defined(__aarch64__) || defined(__wasm__) || defined(__mips__)
                 // ARM variant: adj is (this_adjustment * 2) | is_virtual, because a function address can be odd
                 const bool is_virtual = t.adj & 1;
