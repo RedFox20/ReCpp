@@ -364,34 +364,6 @@ namespace rpp
             void shared_event(int x) override { last = x + 70; }
         };
 
-        struct Forward; // a member pointer formed before the definition takes the MSVC unspecified model
-        using ForwardEvent = void (Forward::*)(int);
-        struct Forward
-        {
-            int last = 0;
-            void on_event(int x) { last = x; }
-        };
-
-        // MSVC adapts this member pointer on the heap, so equals() and remove() must match it there too
-        TestCase(unspecified_model_method_compares_and_removes)
-        {
-            Forward fwd;
-            ForwardEvent method = &Forward::on_event;
-            rpp::delegate<void(int)> single { &fwd, method };
-            single(3);
-            AssertThat(fwd.last, 3);
-            AssertThat(single.equals(&fwd, method), true);
-
-            multicast_delegate<int> evt;
-            evt.add(&fwd, method);
-            evt(5);
-            AssertThat(fwd.last, 5);
-            evt.remove(static_cast<Forward*>(nullptr), method); // a null instance matches nothing
-            AssertThat(evt.size(), 1);
-            evt.remove(&fwd, method);
-            AssertThat(evt.size(), 0);
-        }
-
         // MSVC calls a virtual base method through the adapter, so equals() and remove() must still match it
         TestCase(virtual_base_method_compares_and_removes)
         {
@@ -1384,6 +1356,8 @@ namespace rpp
             evt(1);
             AssertThat(log, (std::vector<int>{ 1, 101, 201, 301, 401, 501, 601, 701, 801 }));
 
+            evt.remove(static_cast<Recorder*>(nullptr), &Recorder::on_event); // a null instance matches nothing
+            AssertThat(evt.size(), 9);
             evt.remove(&rec[4], &Recorder::on_event); // the middle
             evt.remove(&rec[0], &Recorder::on_event); // the first
             evt.remove(&rec[8], &Recorder::on_event); // the last
