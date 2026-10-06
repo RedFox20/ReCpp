@@ -352,14 +352,32 @@ namespace rpp
         struct Shared
         {
             int shared = 7;
+            int last = 0;
             virtual ~Shared() = default;
             int shared_method(int x) { return x + shared; }
             virtual int shared_virtual(int x) { return x + shared; }
+            virtual void shared_event(int x) { last = x + shared; }
         };
         struct VirtualChild : Left, virtual Shared
         {
             int shared_virtual(int x) override { return x + 70; }
+            void shared_event(int x) override { last = x + 70; }
         };
+
+        // MSVC calls a virtual base method through the adapter, so equals() and remove() must still match it
+        TestCase(virtual_base_method_compares_and_removes)
+        {
+            VirtualChild child;
+            rpp::delegate<int(int)> method { &child, &VirtualChild::shared_virtual };
+            AssertThat(method.equals(&child, &VirtualChild::shared_virtual), true);
+
+            multicast_delegate<int> evt;
+            evt.add(&child, &VirtualChild::shared_event);
+            evt(1);
+            AssertThat(child.last, 71);
+            evt.remove(&child, &VirtualChild::shared_event);
+            AssertThat(evt.size(), 0);
+        }
 
         TestCase(virtual_base_method_binds_the_base_subobject)
         {
@@ -889,7 +907,7 @@ namespace rpp
         {
             (void)validate("event_func", a);
         }
-        static void event_func_int(int) {}
+        static void event_func_int(int /*value*/) {}
 
         TestCase(multicast_delegates)
         {
@@ -1355,7 +1373,7 @@ namespace rpp
             int* copies = nullptr;
             explicit CopyCounter(int* counter) noexcept : copies{counter} {}
             CopyCounter(const CopyCounter& c) noexcept : copies{c.copies} { ++*copies; }
-            CopyCounter(CopyCounter&&) noexcept = default;
+            CopyCounter(CopyCounter&& c) noexcept = default;
             CopyCounter& operator=(const CopyCounter&) = default;
             CopyCounter& operator=(CopyCounter&&) noexcept = default;
             ~CopyCounter() = default;
