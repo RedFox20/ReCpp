@@ -1456,11 +1456,11 @@ A listener can add, remove or clear listeners, and move or destroy the `multicas
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L1034) / [`operator+=`](src/rpp/delegate.h#L1032) | Register a callback, and ignore an empty delegate |
-| [`operator-=`](src/rpp/delegate.h#L1042) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L1053) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L809) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L830) | Number of registered callbacks |
+| [`add(delegate)`](src/rpp/delegate.h#L1036) / [`operator+=`](src/rpp/delegate.h#L1034) | Register a callback, and ignore an empty delegate |
+| [`operator-=`](src/rpp/delegate.h#L1044) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L1055) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L811) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L832) | Number of registered callbacks |
 | [`multicast_fwd<T>`](src/rpp/delegate.h#L700) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example

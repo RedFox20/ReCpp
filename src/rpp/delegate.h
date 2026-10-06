@@ -724,7 +724,9 @@ namespace rpp
     template<class... Args> struct multicast_delegate
     {
         using deleg = delegate<void(Args...)>; // delegate type
+    private:
         struct dispatch_edits;
+    public:
 
         // dynamic data container, actual size is sizeof(container) + sizeof(T)*(capacity-1)
         struct container
@@ -736,6 +738,8 @@ namespace rpp
         };
         container* ptr; // dynamic delegate array container
 
+    private:
+
         // the edits of the listeners, which the first edit allocates and the outermost dispatch applies
         struct dispatch_edits
         {
@@ -743,8 +747,6 @@ namespace rpp
             container* added; // the listeners which join when the outermost dispatch ends
             int removed; // the slots which a removal emptied
         };
-
-    private:
 
         // ends the outermost dispatch, also when a listener throws
         struct dispatch_scope
