@@ -32,14 +32,14 @@ no longer apply. So a suppression which holds for a header consumer reaches no i
 
 `delegate.h` hit this first, and `9c23b1b` closed that half. `init_function` cast
 `&dummy::func_proxy` to a `dummy_type` which named a different parameter list on G++, under a
-pragma pair. `dummy_type` names the same list on every compiler now, so the cast is gone.
+pragma pair. G++ has no `dummy_type` now, and `init_function` stores `function_proxy` with no cast.
 `run_test.py --warn-free` pins it, and the probe fails against the old header 3 of 3.
 
-Three regions remain, and each one sits in a template a module exports:
+`delegate.h` decodes the member pointer itself now, so its `devirtualize` region is gone too.
+Two regions remain, and each one sits in a template a module exports:
 
 | Where | Suppresses | An importer at `-Wall -Wextra` |
 |---|---|---|
-| `delegate.h`, `devirtualize` | `-Wpmf-conversions` and `-Wpedantic` | warns at `delegate.h:433` |
 | `tests.h`, `add_test_func` | `-Wpmf-conversions` and `-Wpedantic` | warns at `tests.h:413` |
 | `tests.h`, `add_coro_test_func` | `-Wpmf-conversions` and `-Wpedantic` | no probe has run |
 
@@ -356,6 +356,7 @@ swap storm reads only the base generation, so it counts no frame and asserts not
 | `ubuntu-cpp26-clang-tidy-gcc14`, one run of 59a95d2 in #109 | `frames` reached 0 |
 | `test_event_loop` locally, gcc, 090e214 in #109 | `frames` reached 0 in 1 run out of 5 |
 | `ubuntu-cpp20-asan-clang18`, one run of 8ab95ab in #124 | `frames` reached 0, and 27 other jobs passed |
+| `ubuntu-cpp20-asan-clang18`, one run of 8fedaba in #127 | `frames` reached 0, and every other test job passed |
 
 `spin_until` proves the reader is live before the first swap. It gives the reader no CPU
 during the loop. A `spin_until([&]{ return frames.load() != 0; })` before `stop = true` would
@@ -786,6 +787,11 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 `write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
+
+### C34. A delegate bound to a method of a non-primary or a virtual base called it with the wrong `this`
+`init_method` kept the derived pointer and ignored the member pointer this adjustment, so the method
+read the fields of another subobject. It converts to the declaring class first and applies the adjustment
+now, which `non_primary_base_method_binds_the_base_subobject` and two sibling cases pin.
 
 ### C33. Copying an `rpp::delegate` moved the functor out of its source (was B34)
 `delegate(const delegate&)` move-constructed its functor from the source, so a copy emptied the

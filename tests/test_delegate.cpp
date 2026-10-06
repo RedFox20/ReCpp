@@ -1,8 +1,12 @@
 //#define _DEBUG_FUNCTIONAL_MACHINERY
 #include <rpp/delegate.h>
 #include <rpp/stack_trace.h>
+#include <cstring> // strlen, strcmp
 #include <functional>
 #include <memory> // std::make_shared
+#include <stdexcept> // std::invalid_argument
+#include <string>
+#include <vector>
 #include <rpp/tests.h>
 
 namespace rpp
@@ -279,6 +283,110 @@ namespace rpp
             Base& erased = inst;
             DataDelegate func2(&erased, &Base::virtual_method);
             AssertThat(func2(data), "derived_method");
+        }
+
+        struct Left
+        {
+            int left = 1;
+            virtual ~Left() = default;
+            virtual int left_virtual(int x) { return x + left; }
+        };
+        struct Right
+        {
+            int right = 100;
+            virtual ~Right() = default;
+            int right_method(int x) { return x + right; }
+            int right_const(int x) const { return x + right; }
+            virtual int right_virtual(int x) { return x + right; }
+        };
+        struct Overrides : Left, Right
+        {
+            int own = 1000;
+            int right_virtual(int x) override { return x + own; }
+        };
+        struct Inherits : Left, Right {};
+
+        // Right sits at a non-zero offset, so every call needs the Right subobject as `this`
+        TestCase(non_primary_base_method_binds_the_base_subobject)
+        {
+            Inherits inh;
+            Overrides over;
+            AssertThat(rpp::delegate<int(int)>(&inh, &Inherits::right_method)(1), 101);
+            AssertThat(rpp::delegate<int(int)>(&inh, &Inherits::right_virtual)(1), 101);
+            AssertThat(rpp::delegate<int(int)>(&inh, &Inherits::left_virtual)(1), 2);
+            AssertThat(rpp::delegate<int(int)>(&over, &Overrides::right_virtual)(1), 1001);
+            AssertThat(rpp::delegate<int(int)>(&over, &Right::right_virtual)(1), 1001);
+            Right* erased = &over;
+            AssertThat(rpp::delegate<int(int)>(erased, &Right::right_virtual)(1), 1001);
+
+            const Inherits cinh;
+            AssertThat(rpp::delegate<int(int)>(&cinh, &Inherits::right_const)(1), 101);
+            AssertThat(rpp::delegate<int(const int&)>(&inh, &Inherits::right_method)(1), 101); // the adapter
+
+            rpp::delegate<int(int)> reset;
+            reset.reset(&inh, &Inherits::right_method);
+            AssertThat(reset(1), 101);
+            AssertThat(reset.equals(&inh, &Inherits::right_method), true);
+            reset.reset(&cinh, &Inherits::right_const);
+            AssertThat(reset(1), 101);
+            AssertThat(reset.equals(&cinh, &Inherits::right_const), true);
+        }
+
+        // a derived member pointer to a base method carries the this adjustment inside it
+        TestCase(member_pointer_with_this_adjustment)
+        {
+            Inherits inh;
+            Overrides over;
+            int (Inherits::*method)(int) = &Right::right_method;
+            int (Inherits::*virt)(int) = &Right::right_virtual;
+            int (Overrides::*over_virt)(int) = &Right::right_virtual;
+            AssertThat(rpp::delegate<int(int)>(&inh, method)(1), 101);
+            AssertThat(rpp::delegate<int(int)>(&inh, virt)(1), 101);
+            AssertThat(rpp::delegate<int(int)>(&over, over_virt)(1), 1001);
+
+            rpp::delegate<int(int)> d { &inh, method };
+            AssertThat(d.equals(&inh, method), true);
+            AssertThat(d.equals(&inh, virt), false);
+        }
+
+        struct Shared
+        {
+            int shared = 7;
+            int last = 0;
+            virtual ~Shared() = default;
+            int shared_method(int x) { return x + shared; }
+            virtual int shared_virtual(int x) { return x + shared; }
+            virtual void shared_event(int x) { last = x + shared; }
+        };
+        struct VirtualChild : Left, virtual Shared
+        {
+            int shared_virtual(int x) override { return x + 70; }
+            void shared_event(int x) override { last = x + 70; }
+        };
+
+        // MSVC calls a virtual base method through the adapter, so equals() and remove() must still match it
+        TestCase(virtual_base_method_compares_and_removes)
+        {
+            VirtualChild child;
+            rpp::delegate<int(int)> method { &child, &VirtualChild::shared_virtual };
+            AssertThat(method.equals(&child, &VirtualChild::shared_virtual), true);
+
+            multicast_delegate<int> evt;
+            evt.add(&child, &VirtualChild::shared_event);
+            evt(1);
+            AssertThat(child.last, 71);
+            evt.remove(&child, &VirtualChild::shared_event);
+            AssertThat(evt.size(), 0);
+        }
+
+        TestCase(virtual_base_method_binds_the_base_subobject)
+        {
+            VirtualChild child;
+            AssertThat(rpp::delegate<int(int)>(&child, &VirtualChild::shared_method)(1), 8);
+            AssertThat(rpp::delegate<int(int)>(&child, &Shared::shared_virtual)(1), 71);
+            AssertThat(rpp::delegate<int(int)>(&child, &VirtualChild::shared_virtual)(1), 71);
+            Shared* erased = &child;
+            AssertThat(rpp::delegate<int(int)>(erased, &Shared::shared_virtual)(1), 71);
         }
 
         ////////////////////////////////////////////////////
@@ -799,6 +907,7 @@ namespace rpp
         {
             (void)validate("event_func", a);
         }
+        static void event_func_int(int /*value*/) {}
 
         TestCase(multicast_delegates)
         {
@@ -952,6 +1061,361 @@ namespace rpp
             functor.copy(functor);
             AssertThat(functor.good(), true);
             functor(); // the functor is still callable, not freed
+        }
+
+        ////////////////////////////////////////////////////
+
+        TestCase(null_function_pointer_makes_an_empty_delegate)
+        {
+            Data (*function)(Data a) = nullptr;
+            DataDelegate func = function;
+            AssertThat(func.good(), false);
+            AssertThat(func.get_obj(), nullptr);
+
+            func = [](Data a) { return validate("lambda", a); };
+            func.reset(function);
+            AssertThat(func.good(), false);
+        }
+
+        TestCase(null_instance_throws_or_resets)
+        {
+            Derived* none = nullptr;
+            const Derived* cnone = nullptr;
+            ConstRefAdapterClass* anone = nullptr;
+            const ConstRefAdapterClass* canone = nullptr;
+            AssertThrows(DataDelegate(none, &Derived::method), std::invalid_argument);
+            AssertThrows(DataDelegate(cnone, &Derived::const_method), std::invalid_argument);
+            AssertThrows(rpp::delegate<void(int)>(anone, &ConstRefAdapterClass::cref_method), std::invalid_argument);
+            AssertThrows(rpp::delegate<void(int)>(canone, &ConstRefAdapterClass::cref_const_method), std::invalid_argument);
+
+            Derived inst;
+            DataDelegate func { &inst, &Derived::method };
+            func.reset(none, &Derived::method);
+            AssertThat(func.good(), false);
+            func.reset(&inst, &Derived::const_method);
+            func.reset(cnone, &Derived::const_method);
+            AssertThat(func.good(), false);
+            AssertThat(func.equals(none, &Derived::method), true); // an empty delegate equals a null instance
+            AssertThat(func.equals(cnone, &Derived::const_method), true);
+        }
+
+        TestCase(self_assignment_keeps_the_target)
+        {
+            DataDelegate func = [x=data](Data a) { return validate("self", a, x); };
+            DataDelegate& alias = func;
+            func = alias;
+            AssertThat(func(data), "self");
+            func = std::move(alias);
+            AssertThat(func(data), "self");
+        }
+
+        TestCase(reset_from_another_delegate)
+        {
+            const DataDelegate lambda = [x=data](Data a) { return validate("lambda", a, x); };
+            DataDelegate func;
+            func.reset(lambda);
+            AssertThat(func(data), "lambda");
+            AssertThat(lambda(data), "lambda");
+
+            DataDelegate moved = lambda;
+            func.reset(std::move(moved));
+            AssertThat(func(data), "lambda");
+        }
+
+        TestCase(equals_compares_the_target_and_the_instance)
+        {
+            struct Functor { Data operator()(Data a) const { return validate("functor", a); } };
+            Derived inst, inst2; // NOLINT(readability-isolate-declaration)
+            DataDelegate method { &inst, &Derived::method };
+            AssertThat(method.equals(&inst, &Derived::method), true);
+            AssertThat(method.equals(&inst2, &Derived::method), false);
+            AssertThat(method.equals(&inst, &Derived::virtual_method), false);
+            AssertThat(method.equals(DataDelegate{ &inst, &Derived::method }), true);
+            AssertThat(method.get_obj(), static_cast<void*>(&inst));
+
+            const Derived& cinst = inst;
+            DataDelegate cmethod { &cinst, &Derived::const_method };
+            AssertThat(cmethod.equals(&cinst, &Derived::const_method), true);
+            AssertThat(cmethod.equals(&inst, &Derived::method), false);
+
+            DataDelegate functor = Functor{};
+            AssertThat(functor.equals<Functor>(), true);
+            AssertThat(method.equals<Functor>(), false);
+            AssertThat(functor(data), "functor");
+        }
+
+        // a move-only functor cannot copy, so a copy takes the state of the source
+        TestCase(copy_of_a_move_only_functor_takes_the_state)
+        {
+            auto value = std::make_unique<int>(42);
+            rpp::delegate<int()> source = [value=std::move(value)] { return value ? *value : -1; };
+            rpp::delegate<int()> copied { source };
+            AssertThat(copied(), 42);
+            AssertThat(source(), -1);
+        }
+
+        ////////////////////////////////////////////////////
+
+        template<class D> static bool is_inline(const D& d)
+        {
+            const uintptr_t self = reinterpret_cast<uintptr_t>(&d);
+            const uintptr_t functor = reinterpret_cast<uintptr_t>(d.get_obj());
+            return self <= functor && functor < self + sizeof(D);
+        }
+
+        TestCase(delegate_stays_five_pointers)
+        {
+            AssertThat(sizeof(rpp::delegate<void()>), 5 * sizeof(void*));
+            AssertThat(sizeof(DataDelegate), 5 * sizeof(void*));
+        }
+
+        TestCase(small_trivially_copyable_functors_live_inline)
+        {
+            size_t a = 1, b = 2, c = 3; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t(size_t)> cap0 = [](size_t x) { return x; };
+            rpp::delegate<size_t(size_t)> cap1 = [a](size_t x) { return x + a; };
+            rpp::delegate<size_t(size_t)> cap2 = [a, b](size_t x) { return x + a + b; };
+            rpp::delegate<size_t(size_t)> cap3 = [a, b, c](size_t x) { return x + a + b + c; };
+            rpp::delegate<size_t(size_t)> refs = [&a, &b, &c](size_t x) { return x + a + b + c; };
+            AssertThat(is_inline(cap0) && is_inline(cap1) && is_inline(cap2), true);
+            AssertThat(is_inline(cap3) && is_inline(refs), true);
+            AssertThat(cap0(10) + cap1(10) + cap2(10) + cap3(10) + refs(10), size_t(10 + 11 + 13 + 16 + 16));
+
+            ConstRefAdapterClass adapted;
+            rpp::delegate<void(int)> adapter { &adapted, &ConstRefAdapterClass::cref_method };
+            AssertThat(is_inline(adapter), true); // the adapter captures the instance and the method
+            adapter(5);
+            AssertThat(adapted.result, 5);
+        }
+
+        TestCase(large_or_non_trivial_functors_live_on_the_heap)
+        {
+            size_t a = 1, b = 2, c = 3, d = 4, e = 5, f = 6, g = 7; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t()> cap4 = [a, b, c, d] { return a + b + c + d; };
+            rpp::delegate<size_t()> cap7 = [a, b, c, d, e, f, g] { return a + b + c + d + e + f + g; };
+            AssertThat(is_inline(cap4) || is_inline(cap7), false);
+            AssertThat(cap4() + cap7(), size_t(10 + 28));
+
+            std::string s1 = "a long string which needs a heap buffer", s2 = s1 + "!", s3 = s2 + "!"; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<size_t()> str1 = [s1] { return s1.size(); };
+            rpp::delegate<size_t()> str3 = [s1, s2, s3] { return s1.size() + s2.size() + s3.size(); };
+            AssertThat(is_inline(str1) || is_inline(str3), false);
+            AssertThat(str1(), s1.size());
+            AssertThat(str3(), s1.size() + s2.size() + s3.size());
+
+            auto shared = std::make_shared<int>(7);
+            rpp::delegate<int()> ptr = [shared] { return *shared; }; // fits, but is not trivially copyable
+            AssertThat(is_inline(ptr), false);
+            AssertThat(ptr(), 7);
+
+            struct alignas(64) aligned { int value = 9; int operator()() const { return value; } };
+            rpp::delegate<int()> over = aligned{};
+            AssertThat(is_inline(over), false);
+            AssertThat(reinterpret_cast<uintptr_t>(over.get_obj()) % 64, uintptr_t(0));
+            AssertThat(over(), 9);
+        }
+
+        // copy_bits must point `obj` at the storage of the destination, never at the source
+        TestCase(inline_functor_moves_and_copies_into_the_destination)
+        {
+            int x = 1, y = 2; // NOLINT(readability-isolate-declaration)
+            rpp::delegate<int()> a = [x] { return x; };
+            rpp::delegate<int()> b = [y] { return y * 10; };
+
+            rpp::delegate<int()> moved { std::move(a) };
+            AssertThat(is_inline(moved), true);
+            AssertThat(a.good(), false); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+            AssertThat(moved(), 1);
+
+            moved = std::move(b); // the move assignment swaps
+            AssertThat(is_inline(moved) && is_inline(b), true); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+            AssertThat(moved(), 20);
+            AssertThat(b(), 1); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+
+            rpp::delegate<int()> copied { moved };
+            moved = [] { return -1; };
+            AssertThat(is_inline(copied), true);
+            AssertThat(copied(), 20);
+
+            copied = b;
+            b = nullptr;
+            AssertThat(copied(), 1);
+        }
+
+        // the swap in the move assignment pairs every kind with every other kind
+        TestCase(move_assignment_swaps_every_kind)
+        {
+            Data (*function)(Data a) = [](Data a) { return validate("function", a); };
+            Derived inst;
+            int v = 4;
+            std::string big = "a long string which needs a heap buffer";
+            auto make = [&](int kind) -> rpp::delegate<Data(Data)> {
+                switch (kind) {
+                    case 0: return {};
+                    case 1: return function;
+                    case 2: return { &inst, &Derived::method };
+                    case 3: return [v](Data a) { return validate(v == 4 ? "inline" : "bad", a); };
+                    default: return [big](Data a) { return validate(big.size() > 30 ? "heap" : "bad", a); };
+                }
+            };
+            const char* names[] = { "", "function", "method", "inline", "heap" };
+            for (int i = 0; i < 5; ++i)
+            {
+                for (int j = 0; j < 5; ++j)
+                {
+                    rpp::delegate<Data(Data)> left = make(i);
+                    rpp::delegate<Data(Data)> right = make(j);
+                    left = std::move(right);
+                    AssertThat(left.good(), j != 0);
+                    AssertThat(right.good(), i != 0); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+                    if (j != 0) AssertThat(left(data), names[j]);
+                    if (i != 0) AssertThat(right(data), names[i]); // NOLINT(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+                    if (j == 3) AssertThat(is_inline(left), true);
+                    if (i == 3) AssertThat(is_inline(right), true);
+                }
+            }
+        }
+
+        TestCase(heap_functor_lifetime_follows_the_owner)
+        {
+            auto state = std::make_shared<int>(5);
+            {
+                rpp::delegate<int()> original = [state] { return *state; };
+                AssertThat(state.use_count(), 2);
+                rpp::delegate<int()> copied { original };
+                AssertThat(state.use_count(), 3);
+                rpp::delegate<int()> moved { std::move(copied) };
+                AssertThat(state.use_count(), 3); // the move steals the heap pointer
+                copied = moved;
+                AssertThat(state.use_count(), 4);
+                moved.reset();
+                AssertThat(state.use_count(), 3);
+                original = [] { return 0; };
+                AssertThat(state.use_count(), 2);
+                AssertThat(copied(), 5);
+            }
+            AssertThat(state.use_count(), 1);
+        }
+
+        TestCase(vector_growth_relocates_inline_functors)
+        {
+            std::vector<rpp::delegate<int()>> delegates;
+            for (int i = 0; i < 33; ++i)
+                delegates.emplace_back([i] { return i; });
+            int sum = 0;
+            for (int i = 0; i < 33; ++i)
+            {
+                AssertThat(delegates[i](), i);
+                sum += is_inline(delegates[i]) ? 1 : 0;
+            }
+            AssertThat(sum, 33);
+        }
+
+        // a removal shifts the inline functors after it, and each one must keep its own state
+        TestCase(multicast_delegate_relocates_inline_functors)
+        {
+            std::vector<int> log;
+            Recorder rec { 99, &log };
+            multicast_delegate<int> evt;
+            for (int i = 0; i < 4; ++i)
+                evt += [&log, i](int x) { log.push_back(i * 100 + x); };
+            evt.add(&rec, &Recorder::on_event);
+            for (int i = 4; i < 9; ++i)
+                evt += [&log, i](int x) { log.push_back(i * 100 + x); };
+
+            evt.remove(&rec, &Recorder::on_event);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 1, 101, 201, 301, 401, 501, 601, 701, 801 }));
+
+            multicast_delegate<int> copy = evt;
+            log.clear();
+            copy(2);
+            AssertThat(log, (std::vector<int>{ 2, 102, 202, 302, 402, 502, 602, 702, 802 }));
+        }
+
+        ////////////////////////////////////////////////////
+
+        struct Recorder
+        {
+            int id = 0;
+            std::vector<int>* log = nullptr;
+            void on_event(int x) { log->push_back(id * 100 + x); }
+        };
+
+        TestCase(multicast_delegate_grows_and_removes_in_order)
+        {
+            std::vector<int> log;
+            Recorder rec[9];
+            multicast_delegate<int> evt;
+            for (int i = 0; i < 9; ++i)
+            {
+                rec[i] = Recorder{ i, &log };
+                evt.add(&rec[i], &Recorder::on_event);
+            }
+            AssertThat(evt.size(), 9);
+            evt(1);
+            AssertThat(log, (std::vector<int>{ 1, 101, 201, 301, 401, 501, 601, 701, 801 }));
+
+            evt.remove(static_cast<Recorder*>(nullptr), &Recorder::on_event); // a null instance matches nothing
+            AssertThat(evt.size(), 9);
+            evt.remove(&rec[4], &Recorder::on_event); // the middle
+            evt.remove(&rec[0], &Recorder::on_event); // the first
+            evt.remove(&rec[8], &Recorder::on_event); // the last
+            log.clear();
+            evt.invoke(2);
+            AssertThat(log, (std::vector<int>{ 102, 202, 302, 502, 602, 702 }));
+
+            const multicast_delegate<int>& cevt = evt;
+            AssertThat(int(cevt.end() - cevt.begin()), 6);
+            AssertThat(int(evt.end() - evt.begin()), 6);
+        }
+
+        // a listener can change or free the argument of the caller, so every listener reads one snapshot
+        TestCase(multicast_delegate_passes_one_snapshot_of_a_by_value_argument)
+        {
+            std::string source = "a long string which needs a heap buffer";
+            std::vector<std::string> seen;
+            multicast_delegate<std::string> evt;
+            evt += [&](std::string s) { seen.push_back(s); source = "changed by the first listener"; };
+            evt += [&](std::string s) { seen.push_back(s); };
+            evt(source);
+            AssertThat(seen.size(), size_t(2));
+            AssertThat(seen[1], seen[0]);
+
+            seen.clear();
+            source = "a long string which needs a heap buffer";
+            evt.invoke(source);
+            AssertThat(seen.size(), size_t(2));
+            AssertThat(seen[1], seen[0]);
+        }
+
+        TestCase(multicast_delegate_empty_states)
+        {
+            multicast_delegate<int> evt;
+            const multicast_delegate<int>& cevt = evt;
+            AssertThat(evt.good(), false);
+            AssertThat(evt.empty(), true);
+            AssertThat(bool(evt), false);
+            AssertThat(cevt.begin() == cevt.end(), true);
+            AssertThat(evt.begin() == evt.end(), true);
+            evt(1); // no container, so nothing runs
+            evt.invoke(1);
+            evt.remove(&event_func_int);
+
+            evt += &event_func_int;
+            AssertThat(bool(evt), true);
+            evt -= &event_func_int;
+            AssertThat(evt.empty(), true); // the container stays, but holds nothing
+            AssertThat(evt.good(), false);
+            AssertThat(bool(evt), false);
+            evt(1);
+
+            evt += &event_func_int;
+            multicast_delegate<int>& alias = evt;
+            evt = alias;
+            AssertThat(evt.size(), 1);
+            evt.clear();
+            AssertThat(evt.size(), 0);
         }
 
         ////////////////////////////////////////////////////
