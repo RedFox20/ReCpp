@@ -66,6 +66,8 @@ namespace rpp::detail
     {
     #if RPP_FREERTOS
         rpp::yield();
+    #elif RPP_CORTEX_M_ARCH
+        asm volatile("wfe"); // an exception return sets the event register, so WFE after the notifying ISR returns at once
     #endif
     }
 

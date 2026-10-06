@@ -439,6 +439,11 @@ TestImpl(test_semaphore)
     // a waiter sleeps in the kernel, so it uses almost no CPU time while it waits
     TestCase(a_flag_wait_sleeps_instead_of_spinning)
     {
+    #if _MSC_VER
+        constexpr int WAIT_MS = 50; // ThreadCPU ticks every ~15.6ms on Windows, so a shorter wait cannot show a spin
+    #else
+        constexpr int WAIT_MS = 10;
+    #endif
         rpp::semaphore_once_flag flag;
         rpp::semaphore::wait_result result = rpp::semaphore::timeout;
         double waiter_cpu_ms = 0.0;
@@ -447,11 +452,11 @@ TestImpl(test_semaphore)
             result = flag.wait(rpp::seconds(1)); // a hang guard, the notify below releases it
             waiter_cpu_ms = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - start).msec();
         });
-        rpp::sleep_ms(10);
+        rpp::sleep_ms(WAIT_MS);
         flag.notify();
         waiter.join();
         AssertThat(result, rpp::semaphore::notified);
-        AssertLess(waiter_cpu_ms, 5.0);
+        AssertLess(waiter_cpu_ms, WAIT_MS / 2.0); // a spinning waiter uses about the whole wait
     }
 
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
