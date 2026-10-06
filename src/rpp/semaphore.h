@@ -15,7 +15,7 @@ namespace rpp
     // forward declaration: avoids circular include with thread_pool.h
     void parallel_task_detached(rpp::delegate<void()>&& genericTask) noexcept;
 
-    namespace detail
+    namespace sem
     {
         /// Awaits a semaphore or a semaphore flag on a pool thread, then resumes the coroutine on that thread
         template<class Waitable, class WaitResult>
@@ -393,11 +393,11 @@ namespace rpp
          *     if (result == rpp::semaphore::notified) { // signaled }
          * @endcode
          */
-        using co_await_handle = detail::wait_awaiter<semaphore, wait_result>;
+        using co_await_handle = sem::wait_awaiter<semaphore, wait_result>;
         RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
     };
 
-    namespace detail
+    namespace sem
     {
         /// The word of a semaphore flag: bit 0 is the flag, and the bits above count the threads which wait on it
         struct flag_word
@@ -418,8 +418,8 @@ namespace rpp
                 const rpp::uint32 prev = state.fetch_or(SET, std::memory_order_release);
                 if (prev >= WAITER)
                 {
-                    if (wake_all) address_wake_all(&state);
-                    else          address_wake_one(&state);
+                    if (wake_all) cvar::wake_all(&state);
+                    else          cvar::wake_one(&state);
                 }
                 return (prev & SET) == 0;
             }
@@ -460,12 +460,12 @@ namespace rpp
                     }
                     if (!timeout)
                     {
-                        address_wait(&state, s);
+                        cvar::wait(&state, s);
                     }
                     else
                     {
                         rpp::Duration remaining = deadline - rpp::TimePoint::monotonic_now();
-                        waiting = remaining.nsec > 0 && address_wait_for(&state, s, remaining);
+                        waiting = remaining.nsec > 0 && cvar::wait_for(&state, s, remaining);
                     }
                     s = state.load(std::memory_order_relaxed);
                 }
@@ -483,7 +483,7 @@ namespace rpp
      */
     class semaphore_flag
     {
-        detail::flag_word word;
+        sem::flag_word word;
 
     public:
         using wait_result = rpp::semaphore::wait_result;
@@ -534,7 +534,7 @@ namespace rpp
         }
 
         /// Awaits the flag on a pool thread, and unsets it, as wait(timeout) does
-        using co_await_handle = detail::wait_awaiter<semaphore_flag, wait_result>;
+        using co_await_handle = sem::wait_awaiter<semaphore_flag, wait_result>;
         RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
     };
 
@@ -547,7 +547,7 @@ namespace rpp
      */
     class semaphore_once_flag
     {
-        detail::flag_word word;
+        sem::flag_word word;
 
     public:
         using wait_result = rpp::semaphore::wait_result;
@@ -576,7 +576,7 @@ namespace rpp
         }
 
         /// Awaits the flag on a pool thread, and keeps it set
-        using co_await_handle = detail::wait_awaiter<semaphore_once_flag, wait_result>;
+        using co_await_handle = sem::wait_awaiter<semaphore_once_flag, wait_result>;
         RPP_CORO_WRAPPER co_await_handle await(rpp::Duration timeout) noexcept { return { *this, timeout }; }
     };
 

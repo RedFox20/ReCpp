@@ -191,12 +191,18 @@ TestImpl(test_condition_variable)
         AssertLess(t.elapsed_millis(), 10.0);
     }
 
-    // WaitOnAddress() takes whole milliseconds, and a truncated timeout ends the wait early
-    TestCase(a_millisecond_wait_rounds_a_partial_millisecond_up)
+    // WaitOnAddress() takes whole milliseconds and can wake a timer tick early
+    TestCase(a_timed_wait_never_ends_before_its_timeout)
     {
-        AssertEqual(rpp::detail::wait_millis(rpp::nanos(1)), 1);
-        AssertEqual(rpp::detail::wait_millis(rpp::micros(1900)), 2);
-        AssertEqual(rpp::detail::wait_millis(rpp::millis(2)), 2);
+        rpp::condition_variable cv;
+        rpp::mutex mtx;
+        auto lock = std::unique_lock<rpp::mutex>{mtx};
+        for (int i = 0; i < 3; ++i)
+        {
+            rpp::Timer t;
+            AssertEqual(cv.wait_for(lock, rpp::micros(1900)), rpp::cv_status::timeout);
+            AssertGreaterOrEqual(t.elapsed_millis(), 1.9);
+        }
     }
 
     TestCase(multiple_waiters_all_notified)

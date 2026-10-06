@@ -2248,15 +2248,24 @@ resolution, so a timeout keeps 1ms granularity instead of the ~15.6ms default ti
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L77) | Condition variable with 1ms timeout granularity on every platform |
-| [`cv_status`](src/rpp/condition_variable.h#L43) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
+| [`condition_variable`](src/rpp/condition_variable.h#L71) | Condition variable with 1ms timeout granularity on every platform |
+| [`cv_status`](src/rpp/condition_variable.h#L37) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
 
 | Method | Description |
 |--------|-------------|
-| [`notify_one()`](src/rpp/condition_variable.h#L103) | Wakes one waiting thread, and makes no syscall when no thread waits |
-| [`notify_all()`](src/rpp/condition_variable.h#L110) | Wakes all waiting threads |
-| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L137) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
-| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L150) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+| [`notify_one()`](src/rpp/condition_variable.h#L97) | Wakes one waiting thread, and makes no syscall when no thread waits |
+| [`notify_all()`](src/rpp/condition_variable.h#L104) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L131) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L144) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+
+`rpp::cvar` holds the word wait under the condition variable and the semaphore flags.
+
+| Function | Description |
+|----------|-------------|
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/condition_variable.h#L24) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/condition_variable.h#L27) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/condition_variable.h#L30) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/condition_variable.h#L33) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
 
 Migration: the `std::chrono` overloads, the `clock`, `duration` and `time_point` aliases, and the MSVC
 `native_handle()` are gone. A timed wait returns `rpp::cv_status` instead of `std::cv_status`.

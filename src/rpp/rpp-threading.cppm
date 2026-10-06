@@ -83,4 +83,16 @@ export namespace rpp {
     using rpp::synchronized_critical;
 #endif
 }
+
+export namespace rpp::cvar {
+    using rpp::cvar::wait;
+    using rpp::cvar::wait_for;
+    using rpp::cvar::wake_one;
+    using rpp::cvar::wake_all;
+}
+
+export namespace rpp::sem {
+    using rpp::sem::wait_awaiter;
+    using rpp::sem::flag_word;
+}
 // GENERATED EXPORTS END

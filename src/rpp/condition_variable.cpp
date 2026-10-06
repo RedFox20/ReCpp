@@ -18,7 +18,6 @@
     #include <linux/futex.h>
     #include <sys/syscall.h>
     #include <unistd.h>
-    #include <cerrno>
     #include <climits>
 #else
     #include <pthread.h>
@@ -28,39 +27,42 @@
     #include <type_traits>
 #endif
 
-namespace rpp::detail
+namespace rpp::cvar
 {
-#if _MSC_VER
-
-    void address_wait(const void* addr, rpp::uint32 expected) noexcept
-    {
-        WaitOnAddress(const_cast<void*>(addr), &expected, sizeof(expected), INFINITE);
-    }
-
-    bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
-    {
-        if (timeout.nsec <= 0)
-            return false;
-        // the default timer tick is ~15.6ms, so a short wait raises the timer resolution
-        MMRESULT mmStatus = timeBeginPeriod(1);
-        rpp::int64 ms = wait_millis(timeout);
-        DWORD wait_ms = ms >= INFINITE ? INFINITE - 1 : static_cast<DWORD>(ms);
-        BOOL woken = WaitOnAddress(const_cast<void*>(addr), &expected, sizeof(expected), wait_ms);
-        bool timed_out = !woken && GetLastError() == ERROR_TIMEOUT;
-        if (mmStatus == TIMERR_NOERROR)
-            timeEndPeriod(1);
-        return !timed_out;
-    }
-
-    void address_wake_one(const void* addr) noexcept { WakeByAddressSingle(const_cast<void*>(addr)); }
-    void address_wake_all(const void* addr) noexcept { WakeByAddressAll(const_cast<void*>(addr)); }
-
-#elif RPP_BARE_METAL
-
     static FINLINE rpp::uint32 load_word(const void* addr) noexcept
     {
         return static_cast<const std::atomic_uint32_t*>(addr)->load(std::memory_order_relaxed);
     }
+
+    // os_wait() sleeps once while the word equals `expected`, and a null timeout waits forever.
+    // It can return early or without a wake, so wait() and wait_for() check the word again.
+#if _MSC_VER
+
+    // WaitOnAddress() takes whole milliseconds, so a partial millisecond rounds up
+    static FINLINE DWORD wait_millis(rpp::Duration timeout) noexcept
+    {
+        rpp::int64 ms = timeout.nsec / NANOS_PER_MILLI + (timeout.nsec % NANOS_PER_MILLI > 0 ? 1 : 0);
+        return ms >= INFINITE ? INFINITE - 1 : static_cast<DWORD>(ms);
+    }
+
+    static void os_wait(const void* addr, rpp::uint32 expected, const rpp::Duration* timeout) noexcept
+    {
+        if (!timeout)
+        {
+            WaitOnAddress(const_cast<void*>(addr), &expected, sizeof(expected), INFINITE);
+            return;
+        }
+        // the default timer tick is ~15.6ms, so a short wait raises the timer resolution
+        MMRESULT mmStatus = timeBeginPeriod(1);
+        WaitOnAddress(const_cast<void*>(addr), &expected, sizeof(expected), wait_millis(*timeout));
+        if (mmStatus == TIMERR_NOERROR)
+            timeEndPeriod(1);
+    }
+
+    void wake_one(const void* addr) noexcept { WakeByAddressSingle(const_cast<void*>(addr)); }
+    void wake_all(const void* addr) noexcept { WakeByAddressAll(const_cast<void*>(addr)); }
+
+#elif RPP_BARE_METAL
 
     // without an RTOS, rpp::yield() sleeps in WFI, which misses an ISR that changed the word after the check
     static FINLINE void relax() noexcept
@@ -73,26 +75,15 @@ namespace rpp::detail
     }
 
     // no kernel wait queue here, so a waiter polls until the word changes
-    void address_wait(const void* addr, rpp::uint32 expected) noexcept
+    static void os_wait(const void* addr, rpp::uint32 expected, const rpp::Duration* timeout) noexcept
     {
-        while (load_word(addr) == expected)
+        const rpp::TimePoint deadline = timeout ? rpp::TimePoint::monotonic_now() + *timeout : rpp::TimePoint{};
+        while (load_word(addr) == expected && (!timeout || rpp::TimePoint::monotonic_now() < deadline))
             relax();
     }
 
-    bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
-    {
-        const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + timeout;
-        while (load_word(addr) == expected)
-        {
-            if (rpp::TimePoint::monotonic_now() >= deadline)
-                return false;
-            relax();
-        }
-        return true;
-    }
-
-    void address_wake_one(const void*) noexcept {}
-    void address_wake_all(const void*) noexcept {}
+    void wake_one(const void*) noexcept {}
+    void wake_all(const void*) noexcept {}
 
 #elif __linux__ && !RPP_ADDRESS_WAIT_PARKING_LOT
 
@@ -109,22 +100,20 @@ namespace rpp::detail
         return syscall(FUTEX_SYSCALL, addr, op, value, timeout, nullptr, 0);
     }
 
-    void address_wait(const void* addr, rpp::uint32 expected) noexcept
+    static void os_wait(const void* addr, rpp::uint32 expected, const rpp::Duration* timeout) noexcept
     {
-        (void)futex(addr, FUTEX_WAIT_PRIVATE, expected, nullptr);
-    }
-
-    bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
-    {
-        if (timeout.nsec <= 0)
-            return false;
+        if (!timeout)
+        {
+            (void)futex(addr, FUTEX_WAIT_PRIVATE, expected, nullptr);
+            return;
+        }
         // a relative FUTEX_WAIT timeout runs on CLOCK_MONOTONIC
-        futex_timeout ts { static_cast<long>(timeout.nsec / NANOS_PER_SEC), static_cast<long>(timeout.nsec % NANOS_PER_SEC) };
-        return futex(addr, FUTEX_WAIT_PRIVATE, expected, &ts) == 0 || errno != ETIMEDOUT;
+        futex_timeout ts { static_cast<long>(timeout->nsec / NANOS_PER_SEC), static_cast<long>(timeout->nsec % NANOS_PER_SEC) };
+        (void)futex(addr, FUTEX_WAIT_PRIVATE, expected, &ts);
     }
 
-    void address_wake_one(const void* addr) noexcept { (void)futex(addr, FUTEX_WAKE_PRIVATE, 1, nullptr); }
-    void address_wake_all(const void* addr) noexcept { (void)futex(addr, FUTEX_WAKE_PRIVATE, INT_MAX, nullptr); }
+    void wake_one(const void* addr) noexcept { (void)futex(addr, FUTEX_WAKE_PRIVATE, 1, nullptr); }
+    void wake_all(const void* addr) noexcept { (void)futex(addr, FUTEX_WAKE_PRIVATE, INT_MAX, nullptr); }
 
 #else
 
@@ -174,46 +163,6 @@ namespace rpp::detail
             return instance;
         }
 
-        FINLINE rpp::uint32 load_word(const void* addr) noexcept
-        {
-            return static_cast<const std::atomic_uint32_t*>(addr)->load(std::memory_order_relaxed);
-        }
-
-        // @returns false when the timeout elapsed. A null timeout waits forever
-        bool park(const void* addr, rpp::uint32 expected, const rpp::Duration* timeout) noexcept
-        {
-            parking_bucket& b = lot().bucket(addr);
-            bool woken = true;
-            pthread_mutex_lock(&b.mutex);
-            // the waker locks this mutex after it changed the word, so the check and the sleep are atomic for it
-            if (load_word(addr) == expected)
-            {
-                ++b.waiters;
-                if (!timeout)
-                {
-                    pthread_cond_wait(&b.cond, &b.mutex);
-                }
-                else
-                {
-                    rpp::int64 ns = timeout->nsec;
-                #if __APPLE__
-                    timespec rel { static_cast<time_t>(ns / NANOS_PER_SEC), static_cast<long>(ns % NANOS_PER_SEC) };
-                    woken = pthread_cond_timedwait_relative_np(&b.cond, &b.mutex, &rel) != ETIMEDOUT;
-                #else
-                    timespec abs {};
-                    clock_gettime(CLOCK_MONOTONIC, &abs);
-                    ns += abs.tv_nsec;
-                    abs.tv_sec += static_cast<time_t>(ns / NANOS_PER_SEC);
-                    abs.tv_nsec = static_cast<long>(ns % NANOS_PER_SEC);
-                    woken = pthread_cond_timedwait(&b.cond, &b.mutex, &abs) != ETIMEDOUT;
-                #endif
-                }
-                --b.waiters;
-            }
-            pthread_mutex_unlock(&b.mutex);
-            return woken;
-        }
-
         void unpark_all(const void* addr) noexcept
         {
             parking_bucket& b = lot().bucket(addr);
@@ -224,18 +173,60 @@ namespace rpp::detail
         }
     }
 
-    void address_wait(const void* addr, rpp::uint32 expected) noexcept
+    static void os_wait(const void* addr, rpp::uint32 expected, const rpp::Duration* timeout) noexcept
     {
-        (void)park(addr, expected, nullptr);
+        parking_bucket& b = lot().bucket(addr);
+        pthread_mutex_lock(&b.mutex);
+        // the waker locks this mutex after it changed the word, so the check and the sleep are atomic for it
+        if (load_word(addr) == expected)
+        {
+            ++b.waiters;
+            if (!timeout)
+            {
+                pthread_cond_wait(&b.cond, &b.mutex);
+            }
+            else
+            {
+                rpp::int64 ns = timeout->nsec;
+            #if __APPLE__
+                timespec rel { static_cast<time_t>(ns / NANOS_PER_SEC), static_cast<long>(ns % NANOS_PER_SEC) };
+                pthread_cond_timedwait_relative_np(&b.cond, &b.mutex, &rel);
+            #else
+                timespec abs {};
+                clock_gettime(CLOCK_MONOTONIC, &abs);
+                ns += abs.tv_nsec;
+                abs.tv_sec += static_cast<time_t>(ns / NANOS_PER_SEC);
+                abs.tv_nsec = static_cast<long>(ns % NANOS_PER_SEC);
+                pthread_cond_timedwait(&b.cond, &b.mutex, &abs);
+            #endif
+            }
+            --b.waiters;
+        }
+        pthread_mutex_unlock(&b.mutex);
     }
 
-    bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
-    {
-        return timeout.nsec > 0 && park(addr, expected, &timeout);
-    }
-
-    void address_wake_one(const void* addr) noexcept { unpark_all(addr); }
-    void address_wake_all(const void* addr) noexcept { unpark_all(addr); }
+    void wake_one(const void* addr) noexcept { unpark_all(addr); }
+    void wake_all(const void* addr) noexcept { unpark_all(addr); }
 
 #endif
+
+    void wait(const void* addr, rpp::uint32 expected) noexcept
+    {
+        while (load_word(addr) == expected)
+            os_wait(addr, expected, nullptr);
+    }
+
+    bool wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
+    {
+        // a Windows wait can end one timer tick early, so the deadline decides the timeout
+        const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + timeout;
+        while (load_word(addr) == expected)
+        {
+            rpp::Duration left = deadline - rpp::TimePoint::monotonic_now();
+            if (left.nsec <= 0)
+                return false;
+            os_wait(addr, expected, &left);
+        }
+        return true;
+    }
 }

@@ -17,26 +17,20 @@
 
 namespace rpp
 {
-    namespace detail
+    /// Waits in the kernel on a 32-bit word: a futex on Linux and Android, WaitOnAddress() on Windows
+    namespace cvar
     {
-        /// Sleeps while the 32-bit word at `addr` equals `expected`.
-        /// It can return without a wake, so the caller checks its state again.
-        RPPAPI void address_wait(const void* addr, rpp::uint32 expected) noexcept;
+        /// Sleeps until the 32-bit word at `addr` no longer equals `expected`
+        RPPAPI void wait(const void* addr, rpp::uint32 expected) noexcept;
 
-        /// Same as address_wait(), with a timeout. @returns false when the timeout elapsed
-        RPPAPI bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept;
+        /// Same as wait(), but at most for `timeout`. @returns false when the timeout elapsed first
+        RPPAPI bool wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept;
 
         /// Wakes one thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
-        RPPAPI void address_wake_one(const void* addr) noexcept;
+        RPPAPI void wake_one(const void* addr) noexcept;
 
         /// Wakes every thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
-        RPPAPI void address_wake_all(const void* addr) noexcept;
-
-        /// @returns `timeout` in whole milliseconds, rounded up, so a millisecond wait never ends before it
-        constexpr rpp::int64 wait_millis(rpp::Duration timeout) noexcept
-        {
-            return timeout.nsec / NANOS_PER_MILLI + (timeout.nsec % NANOS_PER_MILLI > 0 ? 1 : 0);
-        }
+        RPPAPI void wake_all(const void* addr) noexcept;
     }
 
     /// The result of a timed condition_variable wait without a predicate
@@ -103,23 +97,23 @@ namespace rpp
         void notify_one() noexcept
         {
             if (begin_notify())
-                detail::address_wake_one(&seq);
+                cvar::wake_one(&seq);
         }
 
         /// Wakes all waiting threads
         void notify_all() noexcept
         {
             if (begin_notify())
-                detail::address_wake_all(&seq);
+                cvar::wake_all(&seq);
         }
 
-        /// Releases `lock`, sleeps until a notify or a spurious wakeup, then locks `lock` again
+        /// Releases `lock`, sleeps until a notify, then locks `lock` again
         template<class Lock>
         void wait(Lock& lock) noexcept
         {
             const rpp::uint32 s = begin_wait(); // under the lock, so a notify after the unlock changes seq
             lock.unlock();
-            detail::address_wait(&seq, s);
+            cvar::wait(&seq, s);
             waiters.fetch_sub(1, std::memory_order_relaxed);
             lock.lock();
         }
@@ -138,7 +132,7 @@ namespace rpp
         {
             const rpp::uint32 s = begin_wait();
             lock.unlock();
-            const bool woken = detail::address_wait_for(&seq, s, rel_time);
+            const bool woken = cvar::wait_for(&seq, s, rel_time);
             waiters.fetch_sub(1, std::memory_order_relaxed);
             lock.lock();
             return woken ? cv_status::no_timeout : cv_status::timeout;

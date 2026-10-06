@@ -312,7 +312,7 @@ built before the race. `test_sanitizers.cpp:23-24` suppresses the destructor fra
 gcc-13 with libstdc++ reports it too, in `test_future::continue_with_logs_an_error_which_no_handler_takes`.
 A pool worker runs `~logic_error` in the `async_task` body at `future.h:138` and frees the message.
 Another worker read it through `vsnprintf` under `_LogWarning`, from `run_logging_errors()` at
-`future.h:75`. The B10 recipe hit it 3 of 80 times on the commit which adds `detail::flag_word`,
+`future.h:75`. The B10 recipe hit it 3 of 80 times on the commit which adds `sem::flag_word`,
 and 0 of 80 on master 5395e95. libstdc++ keeps that message in a COW string whose refcount lives in the
 uninstrumented `libstdc++.so`.
 
@@ -530,6 +530,9 @@ still far below one run.
 Fifth sighting on c5a9d9b, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two lines, and
 the same creation stack under `test_sockets::test_udp_poll_nonblocking_select`. All 557 cases
 passed, and three other TSAN jobs passed on the same commit.
+
+Sixth sighting on b065e68 in #128, on `ubuntu-cpp26-tsan-gcc14`. The two lines are now
+`thread_pool.cpp:355` and `tests.cpp:733`, with the same creation stack. All 695 cases passed.
 
 Sixth sighting on 8dc779d, on `ubuntu-cpp20-tsan-gcc13`, and again the same two lines. That
 commit edits three markdown files, so the rate alone moved it, not the code. All 556 cases
