@@ -3,8 +3,8 @@
 #include <rpp/future.h>
 #include <rpp/timer.h>
 #include <rpp/scope_guard.h>
+#include <rpp/semaphore.h>
 #include <rpp/tests.h>
-#include <barrier>
 #include <string> // std::string
 using namespace rpp;
 using namespace std::string_literals;
@@ -287,20 +287,20 @@ TestImpl(test_concurrent_queue)
     TestCase(wait_pop_2_producer_consumer)
     {
         concurrent_queue<std::string> queue;
-        std::barrier final_wait_gate{2};
+        rpp::semaphore_flag popped_all; // the producer pushed everything first, so only the consumer signals
 
-        cfuture<> producer = rpp::async_task([&queue,&final_wait_gate] {
+        cfuture<> producer = rpp::async_task([&queue,&popped_all] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
-            final_wait_gate.arrive_and_wait();
+            popped_all.wait();
             // this sleep must be much larger to try and defeat the race condition
             // between notify_one() and final wait_pop() in the consumer
             rpp::sleep_ms(15);
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<> consumer = rpp::async_task([&queue,&final_wait_gate] {
+        cfuture<> consumer = rpp::async_task([&queue,&popped_all] {
             std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
@@ -311,7 +311,7 @@ TestImpl(test_concurrent_queue)
 
             // enter infinite wait, but we should be notified by the producer
             std::string item4;
-            final_wait_gate.arrive_and_wait();
+            popped_all.notify();
             AssertFalse(queue.wait_pop(item4));
             AssertThat(item4, "");
         });
@@ -364,17 +364,20 @@ TestImpl(test_concurrent_queue)
     struct producer_queue : public rpp::concurrent_queue<std::string>
     {
         Timer t;
-        std::barrier<> barrier{2};
+        // a two-sided barrier: each side signals, then waits for the other, so the delay starts as both leave
+        rpp::semaphore producer_at_barrier, consumer_at_barrier;
         void barrier_push_after_delay_ms(const std::string& item, int delay_ms)
         {
-            barrier.arrive_and_wait();
+            producer_at_barrier.notify();
+            consumer_at_barrier.wait();
             spin_sleep_for_ms(delay_ms);
             print_info("[%5.2fms] <== Producer is pushing: %s\n", t.elapsed_millis(), item.c_str());
             this->push(item);
         }
         void barrier_consumer_ready()
         {
-            barrier.arrive_and_wait();
+            consumer_at_barrier.notify();
+            producer_at_barrier.wait();
         }
     };
 
