@@ -458,11 +458,12 @@ TestImpl(test_mutex)
     // a static mutex runs no constructor and no destructor, so a static initializer or an atexit handler can lock it
     TestCase(mutex_is_one_constant_initialized_word)
     {
-        static constinit rpp::futex_mutex m;
-        static_assert(std::is_trivially_destructible_v<rpp::futex_mutex>);
-        AssertThat(sizeof(m), sizeof(rpp::uint32));
+        static constinit rpp::mutex m;
+        std::lock_guard guard { m };
+        AssertThat(m.try_lock(), false);
     #if __linux__ || _MSC_VER
-        AssertThat((std::is_same_v<rpp::mutex, rpp::futex_mutex>), true);
+        AssertThat(std::is_trivially_destructible_v<rpp::mutex>, true);
+        AssertThat(sizeof(m), sizeof(rpp::uint32));
     #endif
     }
 
