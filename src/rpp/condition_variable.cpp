@@ -61,11 +61,19 @@ namespace rpp::detail
         return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
     }
 
-    // no kernel wait queue here, so a waiter yields until the word changes
+    // without an RTOS, rpp::yield() sleeps in WFI, which misses an ISR that changed the word after the check
+    static void relax() noexcept
+    {
+    #if RPP_FREERTOS
+        rpp::yield();
+    #endif
+    }
+
+    // no kernel wait queue here, so a waiter polls until the word changes
     void address_wait(const void* addr, rpp::uint32 expected) noexcept
     {
         while (load_word(addr) == expected)
-            rpp::yield();
+            relax();
     }
 
     bool address_wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept
@@ -75,7 +83,7 @@ namespace rpp::detail
         {
             if (rpp::TimePoint::monotonic_now() >= deadline)
                 return false;
-            rpp::yield();
+            relax();
         }
         return true;
     }
