@@ -316,6 +316,11 @@ Another worker read it through `vsnprintf` under `_LogWarning`, from `run_loggin
 and 0 of 80 on master 5395e95. libstdc++ keeps that message in a COW string whose refcount lives in the
 uninstrumented `libstdc++.so`.
 
+The suppressed report also stalls the case. On PR #131, 3 of 12 gcc TSAN jobs in `ci.yml` saw no
+warning within one second. A dump at the timeout showed one worker in the libtsan demangler, in
+state D. A second worker waited on a libtsan lock, and the warning arrived after the case ended.
+So `warning_capture` waits longer in a TSAN build.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and
