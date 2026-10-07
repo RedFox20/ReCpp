@@ -260,7 +260,7 @@ namespace rpp
     void event_loop::post_resume(rpp::coro_handle<> handle) noexcept
     {
         // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
-        std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
+        rpp::concurrent_queue<resume_event>::lock_t lock = resume_queue.spin_lock();
         resume_queue.push(lock, resume_event{handle});
         poller.wake();
     }
@@ -277,7 +277,7 @@ namespace rpp
     void event_loop::post(rpp::delegate<void()>&& callback) noexcept
     {
         // the wake runs under the queue lock, so the loop cannot pop the event and die under this thread
-        std::unique_lock<rpp::mutex> lock = resume_queue.spin_lock();
+        rpp::concurrent_queue<resume_event>::lock_t lock = resume_queue.spin_lock();
         resume_queue.push(lock, resume_event{std::move(callback)});
         poller.wake();
     }

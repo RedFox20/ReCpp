@@ -13,7 +13,10 @@
 #include "timepoint.h" // rpp::Duration, rpp::TimePoint
 #include "predicates.h" // rpp::IsPredicate
 #include "debugging.h" // LogError
+#include "mutex.h" // rpp::mutex
 #include <atomic>
+#include <mutex> // std::unique_lock
+#include <type_traits> // std::is_same_v
 
 namespace rpp
 {
@@ -64,28 +67,114 @@ namespace rpp
         return remaining;
     }
 
+    /// A mutex in one 32-bit word, which sleeps through rpp::cvar. A condition_variable wait relocks it as contended
+    class futex_mutex
+    {
+        static constexpr rpp::uint32 UNLOCKED = 0;
+        static constexpr rpp::uint32 LOCKED = 1;
+        static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
+        std::atomic_uint32_t word { UNLOCKED };
+
+    public:
+        futex_mutex() noexcept = default;
+        futex_mutex(const futex_mutex&) = delete;
+        futex_mutex& operator=(const futex_mutex&) = delete;
+
+        /// @returns true when this thread took the lock, false when another thread holds it
+        bool try_lock() noexcept
+        {
+            rpp::uint32 expected = UNLOCKED;
+            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+
+        /// Takes the lock, and sleeps while another thread holds it
+        void lock() noexcept
+        {
+            if (!try_lock())
+                lock_contended();
+        }
+
+        /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
+        void lock_contended() noexcept
+        {
+            while (word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
+                cvar::wait(&word, CONTENDED);
+        }
+
+        /// Releases the lock, and wakes one sleeping thread when the lock was contended
+        void unlock() noexcept
+        {
+            if (word.exchange(UNLOCKED, std::memory_order_release) == CONTENDED)
+                cvar::wake_one(&word);
+        }
+    };
+
+#if _MSC_VER || __linux__
+    /// The mutex which suits rpp::condition_variable best on this target
+    using cv_mutex = rpp::futex_mutex;
+#else
+    using cv_mutex = rpp::mutex; // the parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
+#endif
+
     /**
      * @brief Blocks a thread until a notify, and works with any lock which has lock() and unlock().
      *        A notify changes the sequence word, so a waiter which released its lock never misses it.
      */
     class condition_variable
     {
+        static constexpr rpp::uint32 WAITER = 1u << 16; // the high half of state counts the waiters
+        static constexpr rpp::uint32 WAKES = WAITER - 1; // the low half counts the wakes which no waiter took yet
         std::atomic_uint32_t seq { 0 }; // the word a waiter sleeps on, and a notify changes
-        std::atomic_uint32_t waiters { 0 }; // lets a notify skip the wake syscall when nobody waits
+        std::atomic_uint32_t state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
 
-        // a waiter registers under the lock before it reads seq, so a notify which sees no waiter
-        // has nobody to wake. A waiter which registers after that check waits after this notify
+        // only the exact type, because another lock or a derived mutex can add its own work to lock() and unlock()
+        template<class Lock>
+        static constexpr bool marks_contended = std::is_same_v<Lock, std::unique_lock<rpp::futex_mutex>>;
+
+        // a waiter reads seq before it registers, so a notify which counts it also changes the seq it sleeps on
         rpp::uint32 begin_wait() noexcept
         {
-            waiters.fetch_add(1, std::memory_order_seq_cst);
-            return seq.load(std::memory_order_seq_cst);
+            const rpp::uint32 s = seq.load(std::memory_order_seq_cst);
+            state.fetch_add(WAITER, std::memory_order_seq_cst);
+            return s;
         }
-        bool begin_notify() noexcept
+        // a waiter takes one wake when it leaves, whichever waiter the kernel woke
+        void end_wait() noexcept
         {
-            if (waiters.load(std::memory_order_seq_cst) == 0)
-                return false;
+            rpp::uint32 s = state.load(std::memory_order_relaxed);
+            while (!state.compare_exchange_weak(s, s - WAITER - ((s & WAKES) ? 1 : 0), std::memory_order_relaxed)) {}
+        }
+        bool begin_notify(bool all) noexcept
+        {
+            rpp::uint32 s = state.load(std::memory_order_seq_cst);
+            for (;;)
+            {
+                const rpp::uint32 waiters = s / WAITER;
+                if ((s & WAKES) >= waiters)
+                    return false; // every waiter wakes already, and checks its predicate after the relock
+                const rpp::uint32 next = all ? (s & ~WAKES) | waiters : s + 1;
+                if (state.compare_exchange_weak(s, next, std::memory_order_seq_cst))
+                    break;
+            }
             seq.fetch_add(1, std::memory_order_seq_cst);
             return true;
+        }
+
+        // relock() takes the mutex without the unique_lock, so the release bypasses it too
+        template<class Lock> static void release(Lock& lock) noexcept
+        {
+            if constexpr (marks_contended<Lock>)
+                lock.mutex()->unlock();
+            else
+                lock.unlock();
+        }
+        // a woken locker marks the word again only once it runs, so the relock marks it for the lockers still asleep
+        template<class Lock> static void relock(Lock& lock) noexcept
+        {
+            if constexpr (marks_contended<Lock>)
+                lock.mutex()->lock_contended();
+            else
+                lock.lock();
         }
 
     public:
@@ -96,14 +185,14 @@ namespace rpp
         /// Wakes one waiting thread, if any
         void notify_one() noexcept
         {
-            if (begin_notify())
+            if (begin_notify(false))
                 cvar::wake_one(&seq);
         }
 
         /// Wakes all waiting threads
         void notify_all() noexcept
         {
-            if (begin_notify())
+            if (begin_notify(true))
                 cvar::wake_all(&seq);
         }
 
@@ -112,10 +201,10 @@ namespace rpp
         void wait(Lock& lock) noexcept
         {
             const rpp::uint32 s = begin_wait(); // under the lock, so a notify after the unlock changes seq
-            lock.unlock();
+            release(lock);
             cvar::wait(&seq, s);
-            waiters.fetch_sub(1, std::memory_order_relaxed);
-            lock.lock();
+            end_wait();
+            relock(lock);
         }
 
         /// Waits until `stop_waiting()` returns true. It ignores spurious wakeups
@@ -131,10 +220,10 @@ namespace rpp
         [[nodiscard]] cv_status wait_for(Lock& lock, const rpp::Duration& rel_time) noexcept
         {
             const rpp::uint32 s = begin_wait();
-            lock.unlock();
+            release(lock);
             const bool woken = cvar::wait_for(&seq, s, rel_time);
-            waiters.fetch_sub(1, std::memory_order_relaxed);
-            lock.lock();
+            end_wait();
+            relock(lock);
             return woken ? cv_status::no_timeout : cv_status::timeout;
         }
 
