@@ -258,7 +258,11 @@ TestImpl(test_file_io)
         file f { TestFile, file::READWRITE }; // the DELETE access of CREATENEW on Windows denies the second open
         AssertTrue(f.good());
         AssertThat(f.write(strview{"synced"}), 6);
+    #if __EMSCRIPTEN__
+        AssertFalse(f.sync()); // no storage device holds the data
+    #else
         AssertTrue(f.sync());
+    #endif
         AssertThat(file::read_all_text(TestFile), std::string{"synced"}); // a second handle sees the bytes
         f.close();
         AssertFalse(f.sync());

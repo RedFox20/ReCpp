@@ -513,6 +513,9 @@ namespace rpp /* ReCpp */
         return FlushFileBuffers(reinterpret_cast<HANDLE>(Handle)) != 0;
     #elif __APPLE__ // fsync leaves the data in the drive cache there
         return fflush((FILE*)Handle) == 0 && fcntl(fileno((FILE*)Handle), F_FULLFSYNC) != -1;
+    #elif __EMSCRIPTEN__ // MEMFS holds the file in memory, and only the async FS.syncfs() persists IDBFS
+        fflush((FILE*)Handle);
+        return false;
     #else
         return fflush((FILE*)Handle) == 0 && fsync(fileno((FILE*)Handle)) == 0;
     #endif
