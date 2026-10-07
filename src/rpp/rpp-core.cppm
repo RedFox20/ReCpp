@@ -79,9 +79,9 @@ export namespace rpp {
     using rpp::scope_finalizer;
     using rpp::make_scope_guard;
     using rpp::delegate;
+    using rpp::multicast_delegate;
     using rpp::multicast_fwd;
     using rpp::multicast_fwd_t;
-    using rpp::multicast_delegate;
     using rpp::proc_mem_info;
     using rpp::proc_current_mem_used;
     using rpp::cpu_usage_info;
