@@ -268,7 +268,7 @@ namespace rpp
             return state;
         };
         rpp::uint32 state = spin();
-        if (state == UNLOCKED && try_lock())
+        if (state == UNLOCKED && try_take())
             return;
         // a woken locker cannot know if more lockers sleep, so it takes the lock as CONTENDED
         while (state == CONTENDED || word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)

@@ -8,6 +8,14 @@
 #include <atomic>
 #include <mutex> // lock_guard etc
 
+/// @brief expands to `call` in a TSAN build, so a futex lock can tell TSAN about itself
+#if RPP_TSAN
+#  include <sanitizer/tsan_interface.h>
+#  define RPP_TSAN_ANNOTATE(call) call
+#else
+#  define RPP_TSAN_ANNOTATE(call)
+#endif
+
 namespace rpp
 {
     /// Waits in the kernel on a 32-bit word: a futex on Linux and Android, WaitOnAddress() on Windows
@@ -34,6 +42,13 @@ namespace rpp
         static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
         std::atomic_uint32_t word { UNLOCKED };
 
+        // try_lock() without its TSAN annotation, because lock() annotates once, and a nested one counts the lock twice
+        bool try_take() noexcept
+        {
+            rpp::uint32 expected = UNLOCKED;
+            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+
         // spins while the holder runs, then sleeps until the lock is free
         RPPAPI void lock_slow() noexcept;
 
@@ -45,29 +60,37 @@ namespace rpp
         /// @returns true when this thread took the lock, false when another thread holds it
         bool try_lock() noexcept
         {
-            rpp::uint32 expected = UNLOCKED;
-            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
+            RPP_TSAN_ANNOTATE(__tsan_mutex_pre_lock(&word, __tsan_mutex_try_lock));
+            const bool taken = try_take();
+            RPP_TSAN_ANNOTATE(__tsan_mutex_post_lock(&word, taken ? __tsan_mutex_try_lock : __tsan_mutex_try_lock_failed, 0));
+            return taken;
         }
 
         /// Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps
         void lock() noexcept
         {
-            if (!try_lock())
+            RPP_TSAN_ANNOTATE(__tsan_mutex_pre_lock(&word, 0));
+            if (!try_take())
                 lock_slow();
+            RPP_TSAN_ANNOTATE(__tsan_mutex_post_lock(&word, 0, 0));
         }
 
         /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
         void lock_contended() noexcept
         {
+            RPP_TSAN_ANNOTATE(__tsan_mutex_pre_lock(&word, 0));
             while (word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
                 cvar::wait(&word, CONTENDED);
+            RPP_TSAN_ANNOTATE(__tsan_mutex_post_lock(&word, 0, 0));
         }
 
         /// Releases the lock, and wakes one sleeping thread when the lock was contended
         void unlock() noexcept
         {
+            RPP_TSAN_ANNOTATE(__tsan_mutex_pre_unlock(&word, 0));
             if (word.exchange(UNLOCKED, std::memory_order_release) == CONTENDED)
                 cvar::wake_one(&word);
+            RPP_TSAN_ANNOTATE(__tsan_mutex_post_unlock(&word, 0));
         }
     };
 
