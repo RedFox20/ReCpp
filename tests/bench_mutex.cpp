@@ -25,6 +25,13 @@ namespace
         void lock() noexcept { AcquireSRWLockExclusive(&l); }
         void unlock() noexcept { ReleaseSRWLockExclusive(&l); }
     };
+    unsigned long release_unheld_srw_lock() noexcept
+    {
+        SRWLOCK unheld = SRWLOCK_INIT;
+        __try { ReleaseSRWLockExclusive(&unheld); }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return GetExceptionCode(); }
+        return 0;
+    }
     struct win_critical_section
     {
         CRITICAL_SECTION cs;
@@ -142,6 +149,9 @@ TestImpl(bench_mutex)
     {
         std::printf("BENCH cpus %u, sizeof rpp::mutex %zu, std::mutex %zu\n",
                     std::thread::hardware_concurrency(), sizeof(rpp::mutex), sizeof(std::mutex));
+    #if _WIN32
+        std::printf("BENCH release of an unheld SRWLOCK raises 0x%08lX\n", release_unheld_srw_lock());
+    #endif
         std::vector<contender> all {
             { "futex_mutex", &run_once<rpp::futex_mutex>, {} },
             { "std::mutex", &run_once<std::mutex>, {} },
