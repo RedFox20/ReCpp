@@ -707,7 +707,7 @@ namespace rpp
      *       Subsequential growth is amortized
      * @note A listener can add, remove or clear listeners while a dispatch runs.
      *       A removed listener stops at once. An added listener joins when the outermost dispatch ends.
-     * @note A listener must not move or destroy the multicast_delegate which runs it.
+     * @note A listener call must not move or destroy the multicast_delegate which runs it.
      * @note A dispatch writes into the container, so dispatch from one thread at a time.
      *
      * @example
@@ -801,7 +801,7 @@ namespace rpp
                     c->data[i].f.fun = nullptr; // a running listener keeps its functor until the dispatch ends
                 container* added = added_of(c);
                 c->added = running();
-                pending(); // an empty list still tells the dispatch to drop the empty slots
+                begin_edits(); // an empty list still tells the dispatch to drop the empty slots
                 destroy(added); // an added listener never ran, so it leaves at once
                 return;
             }
@@ -858,7 +858,7 @@ namespace rpp
         }
 
         // the first edit allocates the list, which tells the outermost dispatch to apply the edits
-        container*& pending() noexcept
+        container*& begin_edits() noexcept
         {
             container*& added = ptr->added;
             if (added == running()) { added = nullptr; grow(added); }
@@ -895,7 +895,7 @@ namespace rpp
             {
                 if (!match(c->data[i])) continue;
                 if (!c->added) { erase(c, i); return; }
-                pending(); // the dispatch drops the empty slot when it ends
+                begin_edits(); // the dispatch drops the empty slot when it ends
                 c->data[i].f.fun = nullptr; // the listener can still run, so its functor lives until then
                 return;
             }
@@ -945,7 +945,7 @@ namespace rpp
         // constructs the delegate in its slot, so a member function never passes through a temporary
         template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
         {
-            container*& slots = ptr && ptr->added ? pending() : ptr; // a running dispatch keeps its slots in place
+            container*& slots = ptr && ptr->added ? begin_edits() : ptr; // a running dispatch keeps its slots in place
             grow(slots);
             new (&slots->data[slots->size]) deleg{std::forward<DelegateArgs>(args)...};
             ++slots->size;
