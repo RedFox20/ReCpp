@@ -40,7 +40,7 @@ one above it passes.
    code rests on a false premise, and it pins nothing. See `recpp-review` R1.
 2. **Fix it, and make the tests pass.** Change the smallest thing which works.
    Remove the race first, correct an unprovable assertion second, change a number
-   last.
+   last. Bump `self.version` per [Versioning](#versioning).
 3. **Document new API.** Run `python3 update_doc_linerefs.py` and
    `python3 update_doc_linerefs.py --check-undocumented`. Both must come back
    clean. A header README.md never mentions is a blind spot, and the check reports
@@ -113,6 +113,18 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
    `| [\`name(params)\`](src/rpp/header.h#L123) | Description |`. The display text must
    match the declaration, or `update_doc_linerefs.py` loses track of it.
 3. `python3 update_doc_linerefs.py --check-undocumented` lists what README.md misses.
+
+## Versioning
+
+`self.version` in `mamafile.py` is a semver. It names the ReCpp artifactory package in
+place of the commit, so two commits with one version share one package. A change which
+alters the built library bumps the version. A change to docs or tests alone does not bump it.
+
+Mama 0.14.13 and later rebuild a dependent package when the ReCpp `MAJOR.MINOR` changes.
+
+1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, or a regenerated `.cppm` file.
+2. Bump MINOR when the ABI changes: a class layout, an inline function, a template, or an ABI flag.
+3. Bump MAJOR when the change breaks the API.
 
 ## Reference
 

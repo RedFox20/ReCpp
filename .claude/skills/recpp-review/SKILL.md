@@ -371,6 +371,12 @@ after the call then reads freed memory.
 Report a retained borrowed pointer as blocking. ASAN catches it, so the case which
 proves it runs under ASAN and reports the rate, per R1.
 
+### R14. A library change bumps the version
+
+A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built library
+bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
+Report a missing bump, or a bump below that level, as blocking.
+
 ## Report format
 
 Order the findings by severity. Keep one line per finding where possible.
@@ -385,7 +391,7 @@ Gates: gcc PASS 512/512 5.5s | clang PASS | clang-tidy PASS | android NOT RUN | 
 Verdict: BLOCK, 2 findings
 ```
 
-- `BLOCK` breaks R1, R2, R3, R8, R9, R12, or R13.
+- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, or R14.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
