@@ -1,0 +1,159 @@
+#include <rpp/tests.h>
+#include <rpp/mutex.h>
+#include <rpp/timepoint.h>
+#include <algorithm>
+#include <atomic>
+#include <cstdio>
+#include <mutex>
+#include <thread>
+#include <vector>
+#if _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <Windows.h>
+#else
+    #include <pthread.h>
+    #include <sys/resource.h>
+#endif
+
+namespace
+{
+#if _WIN32
+    struct srw_lock
+    {
+        SRWLOCK l = SRWLOCK_INIT;
+        void lock() noexcept { AcquireSRWLockExclusive(&l); }
+        void unlock() noexcept { ReleaseSRWLockExclusive(&l); }
+    };
+    struct win_critical_section
+    {
+        CRITICAL_SECTION cs;
+        win_critical_section() noexcept { InitializeCriticalSection(&cs); }
+        ~win_critical_section() noexcept { DeleteCriticalSection(&cs); }
+        void lock() noexcept { EnterCriticalSection(&cs); }
+        void unlock() noexcept { LeaveCriticalSection(&cs); }
+    };
+#elif __linux__ && !__ANDROID__
+    struct adaptive_mutex
+    {
+        pthread_mutex_t m = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP;
+        void lock() noexcept { pthread_mutex_lock(&m); }
+        void unlock() noexcept { pthread_mutex_unlock(&m); }
+    };
+#endif
+
+    double cpu_seconds() noexcept
+    {
+    #if _WIN32
+        FILETIME c, e, k, u;
+        GetProcessTimes(GetCurrentProcess(), &c, &e, &k, &u);
+        auto secs = [](FILETIME f) { return (double(f.dwHighDateTime) * 4294967296.0 + f.dwLowDateTime) * 1e-7; };
+        return secs(k) + secs(u);
+    #else
+        rusage r {};
+        getrusage(RUSAGE_SELF, &r);
+        return double(r.ru_utime.tv_sec + r.ru_stime.tv_sec) + double(r.ru_utime.tv_usec + r.ru_stime.tv_usec) * 1e-6;
+    #endif
+    }
+
+    struct sample { double wall_ns; double cpu_ns; double fairness; };
+    struct scenario { int threads; int cs_work; int out_work; };
+
+    unsigned spin_work(unsigned x, int n) noexcept
+    {
+        for (int i = 0; i < n; ++i) x = x * 1103515245u + 12345u;
+        return x;
+    }
+
+    template<class Mutex>
+    sample run_once(scenario sc, int duration_ms)
+    {
+        alignas(64) Mutex m;
+        alignas(64) unsigned shared[16] = {};
+        std::atomic_int ready { 0 };
+        std::atomic_bool go { false }, stop { false };
+        std::vector<long long> ops(static_cast<size_t>(sc.threads), 0);
+        std::vector<std::thread> pool;
+        for (int t = 0; t < sc.threads; ++t)
+        {
+            pool.emplace_back([&, t] {
+                unsigned x = unsigned(t) + 1;
+                long long n = 0;
+                ready.fetch_add(1);
+                while (!go.load(std::memory_order_acquire)) {}
+                while (!stop.load(std::memory_order_relaxed))
+                {
+                    m.lock();
+                    shared[n & 15] = spin_work(shared[n & 15] + x, sc.cs_work);
+                    m.unlock();
+                    x = spin_work(x, sc.out_work);
+                    ++n;
+                }
+                ops[size_t(t)] = n + (x == 0xdeadbeef);
+            });
+        }
+        while (ready.load() != sc.threads) {}
+        double c0 = cpu_seconds();
+        rpp::TimePoint t0 = rpp::TimePoint::monotonic_now();
+        go.store(true, std::memory_order_release);
+        rpp::sleep_ms(duration_ms);
+        stop.store(true);
+        for (std::thread& th : pool) th.join();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
+        double c1 = cpu_seconds();
+        long long total = 0, lo = ops[0], hi = ops[0];
+        for (long long n : ops) { total += n; lo = std::min(lo, n); hi = std::max(hi, n); }
+        return { double((t1 - t0).nsec) / double(total), (c1 - c0) * 1e9 / double(total), hi ? double(lo) / double(hi) : 0.0 };
+    }
+
+    struct contender
+    {
+        const char* name;
+        sample (*run)(scenario, int);
+        std::vector<sample> samples;
+    };
+
+    void run_scenario(std::vector<contender>& all, scenario sc)
+    {
+        for (contender& c : all) c.samples.clear();
+        for (int rep = 0; rep < 7; ++rep)
+            for (contender& c : all) c.samples.push_back(c.run(sc, 200));
+        for (contender& c : all)
+        {
+            std::vector<sample>& s = c.samples;
+            std::sort(s.begin(), s.end(), [](const sample& a, const sample& b) { return a.wall_ns < b.wall_ns; });
+            const sample& med = s[s.size() / 2];
+            std::printf("BENCH %-14s threads %2d cs %4d out %4d  wall %8.1f ns/op  cpu %8.1f ns/op  fair %.2f  (min %.1f max %.1f)\n",
+                        c.name, sc.threads, sc.cs_work, sc.out_work, med.wall_ns, med.cpu_ns, med.fairness,
+                        s.front().wall_ns, s.back().wall_ns);
+        }
+        std::printf("BENCH\n");
+        std::fflush(stdout);
+    }
+}
+
+TestImpl(bench_mutex)
+{
+    TestInit(bench_mutex)
+    {
+    }
+
+    TestCase(compare)
+    {
+        std::printf("BENCH cpus %u, sizeof rpp::mutex %zu, std::mutex %zu\n",
+                    std::thread::hardware_concurrency(), sizeof(rpp::mutex), sizeof(std::mutex));
+        std::vector<contender> all {
+            { "futex_mutex", &run_once<rpp::futex_mutex>, {} },
+            { "std::mutex", &run_once<std::mutex>, {} },
+        #if _WIN32
+            { "SRWLOCK", &run_once<srw_lock>, {} },
+            { "CRITICAL_SEC", &run_once<win_critical_section>, {} },
+        #elif __linux__ && !__ANDROID__
+            { "pthread_adapt", &run_once<adaptive_mutex>, {} },
+        #endif
+        };
+        run_scenario(all, { 1, 0, 0 });
+        for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 0, 0 });
+        for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 20, 100 });
+        for (int threads : { 4, 16 }) run_scenario(all, { threads, 1000, 1000 });
+    }
+};
