@@ -66,13 +66,16 @@ def headers() -> list[str]:
     return sorted(f for f in os.listdir(SRC) if f.endswith('.h') and f not in SKIP)
 
 
-def compile_header(header: str, include_root: str) -> tuple[bool, str]:
-    """Compiles a translation unit that includes the header twice and nothing else."""
+QT_KEYWORDS = '#define slots\n#define signals public\n#define emit\n'
+
+
+def compile_header(header: str, include_root: str, prefix: str = '') -> tuple[bool, str]:
+    """Compiles a translation unit that includes the header twice, after `prefix` and nothing else."""
     with tempfile.TemporaryDirectory() as td:
         tu = os.path.join(td, 'tu.cpp')
         # the second include proves the include guard works
         with open(tu, 'w') as f:
-            f.write(f'#include <rpp/{header}>\n#include <rpp/{header}>\n')
+            f.write(f'{prefix}#include <rpp/{header}>\n#include <rpp/{header}>\n')
         cmd = [CXX, f'-std={STD}', '-fsyntax-only', '-I', include_root, tu]
         p = subprocess.run(cmd, capture_output=True, text=True)
         return p.returncode == 0, p.stderr
@@ -96,8 +99,9 @@ def strip_comments(src: str) -> str:
 def check_self_contained() -> list[str]:
     root = os.path.abspath('src')
     bad = []
+    jobs = [(h, p) for h in headers() for p in ('', QT_KEYWORDS)] # a Qt consumer defines these keywords as macros
     with ThreadPoolExecutor(max_workers=os.cpu_count()) as ex:
-        for h, (ok, err) in zip(headers(), ex.map(lambda h: compile_header(h, root), headers())):
+        for (h, _), (ok, err) in zip(jobs, ex.map(lambda j: compile_header(j[0], root, j[1]), jobs)):
             if not ok:
                 bad.append(describe_failure(h, err))
     return bad
