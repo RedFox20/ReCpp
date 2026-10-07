@@ -347,10 +347,18 @@ namespace rpp /* ReCpp */
         bool preallocate(int64 preallocSize, int64 seekPos = 0, int seekMode = SEEK_SET) noexcept;
 
         /**
-         * Forcefully flushes any OS file buffers to send all data to the storage device
-         * @warning Don't call this too haphazardly, or you will ruin your IO performance!
+         * Flushes the buffered writes to the OS. On POSIX the data then waits in the page cache, see sync().
+         * On Windows it also waits for the storage device, the same as sync().
+         * @warning Do not call this often, because it reduces the IO speed
          */
         void flush() noexcept;
+
+        /**
+         * Flushes the buffered writes and waits until the storage device holds the file data.
+         * @returns TRUE if the device holds the data, FALSE if the file is not open or the sync failed
+         * @warning It waits for the device, so call it seldom and only on a writer thread
+         */
+        bool sync() noexcept;
 
         /**
          * Creates a new file and fills it with the provided data.

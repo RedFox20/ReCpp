@@ -1008,8 +1008,8 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 |-------|-------------|
 | [`load_buffer`](src/rpp/file_io.h#L31) | RAII buffer for loading file contents into memory |
 | [`file`](src/rpp/file_io.h#L94) | Random-access file with read, write, seek, and truncate |
-| [`file_lock`](src/rpp/file_io.h#L462) | Exclusive OS file lock, which the OS releases when the process ends |
-| [`buffer_parser`](src/rpp/file_io.h#L506) | Generic file-backed parser (line, bracket, keyval variants) |
+| [`file_lock`](src/rpp/file_io.h#L470) | Exclusive OS file lock, which the OS releases when the process ends |
+| [`buffer_parser`](src/rpp/file_io.h#L514) | Generic file-backed parser (line, bracket, keyval variants) |
 
 ### file::mode Enum
 
@@ -1047,19 +1047,20 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 | [`write(const void* buffer, int bytesToWrite)`](src/rpp/file_io.h#L249) | Write bytes from buffer |
 | [`writef(const char* format, ...)`](src/rpp/file_io.h#L281) | Printf-style write |
 | [`writeln(strview str)`](src/rpp/file_io.h#L286) | Write line with newline |
-| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L410) | Seek to filepos |
-| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L411) | Seek to 64-bit filepos |
-| [`tell()`](src/rpp/file_io.h#L416) | Tell file position |
-| [`tell64()`](src/rpp/file_io.h#L421) | Tell 64-bit file position |
-| [`flush()`](src/rpp/file_io.h#L353) | Flush buffered writes |
+| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L418) | Seek to filepos |
+| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L419) | Seek to 64-bit filepos |
+| [`tell()`](src/rpp/file_io.h#L424) | Tell file position |
+| [`tell64()`](src/rpp/file_io.h#L429) | Tell 64-bit file position |
+| [`flush()`](src/rpp/file_io.h#L354) | Flush buffered writes |
+| [`sync()`](src/rpp/file_io.h#L361) | Flush buffered writes and wait for the storage device |
 | [`truncate(int64 size)`](src/rpp/file_io.h#L338) | Truncate file to size |
 | [`truncate_front(int64 bytes)`](src/rpp/file_io.h#L324) | Remove bytes from front |
 | [`truncate_end(int64 bytes)`](src/rpp/file_io.h#L332) | Remove bytes from end |
 | [`preallocate(int64 size)`](src/rpp/file_io.h#L347) | Preallocate file space |
 | [`save_as(const char* newPath)`](src/rpp/file_io.h#L209) | Copy contents to a new file |
-| [`time_created()`](src/rpp/file_io.h#L431) | File creation time |
-| [`time_accessed()`](src/rpp/file_io.h#L436) | Last access time |
-| [`time_modified()`](src/rpp/file_io.h#L441) | Last modification time |
+| [`time_created()`](src/rpp/file_io.h#L439) | File creation time |
+| [`time_accessed()`](src/rpp/file_io.h#L444) | Last access time |
+| [`time_modified()`](src/rpp/file_io.h#L449) | Last modification time |
 
 ### file Static Methods
 
@@ -1069,17 +1070,17 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 | [`file::read_all(ustrview filename)`](src/rpp/file_io.h#L220) | Read entire file into `load_buffer` |
 | [`file::read_all_text(strview filename)`](src/rpp/file_io.h#L230) | Read entire file as `std::string` |
 | [`file::read_all_text(ustrview filename)`](src/rpp/file_io.h#L235) | Read entire file as `std::string` |
-| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L366) | Create/overwrite file with data |
-| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L380) | Create/overwrite file with data |
+| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L374) | Create/overwrite file with data |
+| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L388) | Create/overwrite file with data |
 
 ### file_lock Methods
 
 | Method | Description |
 |--------|-------------|
-| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L478) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed. A `fork()` child without `exec()` shares the lock |
-| [`file_lock::try_lock(ustrview filename)`](src/rpp/file_io.h#L480) | Same as above, with an UTF-16 path |
-| [`is_locked()`](src/rpp/file_io.h#L484) / [`operator bool()`](src/rpp/file_io.h#L485) | True if this object holds the lock |
-| [`unlock()`](src/rpp/file_io.h#L488) | Release the lock and close the file. The destructor calls it |
+| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L486) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed. A `fork()` child without `exec()` shares the lock |
+| [`file_lock::try_lock(ustrview filename)`](src/rpp/file_io.h#L488) | Same as above, with an UTF-16 path |
+| [`is_locked()`](src/rpp/file_io.h#L492) / [`operator bool()`](src/rpp/file_io.h#L493) | True if this object holds the lock |
+| [`unlock()`](src/rpp/file_io.h#L496) | Release the lock and close the file. The destructor calls it |
 
 ```cpp
 // one instance per home folder: stop if another process holds the lock
