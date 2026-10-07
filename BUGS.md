@@ -548,6 +548,10 @@ the same creation stack. That commit edits two build files and two markdown file
 changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
 set exit 66 on its own.
 
+Eighth sighting on 74c5a71 in #131, on `ubuntu-cpp20-tsan-clang18`, so libc++ reports it too.
+The worker frees through `__cxa_end_catch` in the thread lambda at `thread_pool.cpp:122`. The
+main thread read at `tests.cpp:744`, with the same creation stack. All 711 cases passed.
+
 ### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
 `rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
 changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `future.h`, `async.h` and
