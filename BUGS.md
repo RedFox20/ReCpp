@@ -503,7 +503,7 @@ and `std::make_exception_ptr` all export cleanly from the same file.
 No module exports a std name now, so nothing in ReCpp reaches this. A consumer which catches
 through a pointer includes `<exception>`.
 
-### B17. A pool worker frees the generic task a test still reads (C18 recurred)
+### B17. A pool worker frees the exception a test still reads (C18 recurred)
 `ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
 A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
 thread read the same address in `rpp::test::run_test_func()` at `tests.cpp:726`. All
@@ -549,8 +549,17 @@ changed. All 574 cases passed, the four other TSAN jobs passed on the same commi
 set exit 66 on its own.
 
 Eighth sighting on 74c5a71 in #131, on `ubuntu-cpp20-tsan-clang18`, so libc++ reports it too.
-The worker frees through `__cxa_end_catch` in the thread lambda at `thread_pool.cpp:122`. The
-main thread read at `tests.cpp:744`, with the same creation stack. All 711 cases passed.
+A ninth came on 0d1bc06, on `ubuntu-cpp23-tsan-gcc13`, with the two lines above.
+
+The libc++ stack names the freed object. The worker frees the exception of
+`parallel_task_exception` in `__cxa_end_catch`, at the end of its catch block in
+`pool_worker::run()`. The main thread read that exception at `tests.cpp:733`, in the
+`typeid(e)` of the expected exception check. The worker signals the waiter from inside the
+catch block, so it can drop the last reference after the waiter is done. libstdc++ and
+libc++abi count that reference in uninstrumented code, so TSAN sees no order between the read
+and the free. This is the C25 class, not `generic.reset()`. The creation stack under
+`test_sockets` only shows that the pool reuses its threads. A signal after the catch block is
+not enough, because the worker can still free the copy in the task state.
 
 ### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
 `rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
