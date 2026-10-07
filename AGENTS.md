@@ -123,8 +123,8 @@ alters the built library bumps the version. A change to docs or tests alone does
 Mama 0.14.13 and later treat a `MAJOR.MINOR` change as an ABI break, and rebuild each dependent package.
 Only a PATCH bump keeps the ABI.
 
-1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, or a regenerated `.cppm` file.
-2. Bump MINOR when the ABI or the API changes: a class layout, an inline function, a template, an ABI flag, or a removed symbol.
+1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, a changed inline body, or a regenerated `.cppm` file.
+2. Bump MINOR when the ABI or the API changes: a class layout, an inline signature, a template, an ABI flag, or a removed symbol.
 3. Bump MAJOR only for a new major release, such as the C++20 modules refactor in 2.0.0.
 
 ## Reference
