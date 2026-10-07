@@ -607,22 +607,22 @@ TestImpl(test_concurrent_queue)
         // this should timeout because producer pushes later
         AssertFalse(queue.wait_pop(item, Millis(1), cancelCondition));
 
+        // a push releases each wait, so each timeout is a hang guard, far above a scheduler stall
         queue.barrier_consumer_ready(); // item1 is coming after 10ms
-        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
+        AssertTrue(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
         AssertThat(item, "item1");
 
-        // 15 ms leaves no room over the 10 ms producer delay under a sanitizer, and a
-        // single timeout there shifts every later item and cascades through the test.
         queue.barrier_consumer_ready(); // item2 is coming after 10ms
-        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
+        AssertTrue(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
         AssertThat(item, "item2");
         queue.barrier_consumer_ready(); // item3 is coming after 10ms
-        AssertTrue(queue.wait_pop(item, Millis(50), cancelCondition));
+        AssertTrue(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
+        // wait_pop polls the cancel condition every tenth of its timeout, so a return before that proves the notify woke it
         rpp::Timer t;
-        AssertFalse(queue.wait_pop(item, Millis(200), cancelCondition));
-        AssertLess(t.elapsed_millis(), 20);
+        AssertFalse(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
+        AssertLess(t.elapsed_millis(), 100);
     }
 
     // Regression: wait_pop_until with past deadline must not deadlock
