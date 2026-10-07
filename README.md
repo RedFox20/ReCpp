@@ -1452,7 +1452,7 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 
 ### multicast_delegate Methods
 
-A listener can add, remove or clear listeners, and move or destroy the `multicast_delegate`, while a dispatch runs. A removed listener stops at once. An added listener joins when the outermost dispatch ends. A dispatch writes into the container, so dispatch one `multicast_delegate` from one thread at a time.
+A listener can add, remove or clear listeners while a dispatch runs. It must not move or destroy the `multicast_delegate` which runs it. A removed listener stops at once. An added listener joins when the outermost dispatch ends. A dispatch writes into the container, so dispatch one `multicast_delegate` from one thread at a time.
 
 | Method | Description |
 |--------|-------------|
