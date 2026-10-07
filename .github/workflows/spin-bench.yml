@@ -1,0 +1,22 @@
+# Runs bench/spin_bench.sh on an ARM64 and an x86 runner, to choose the futex_mutex spin length
+name: spin bench
+
+on:
+  push:
+    branches: ["feat/rpp-mutex-condvar-dr11hh"]
+  workflow_dispatch:
+
+jobs:
+  bench:
+    name: spin-bench-${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bench spin 100, 20 and 0 against std::mutex
+        shell: bash
+        run: bash bench/spin_bench.sh 2>&1 | grep -vE "^(-- |Detected|Configure|Using|DISABLED|ReCpp |RPP )"
