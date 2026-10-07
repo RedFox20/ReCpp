@@ -2061,30 +2061,30 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L75) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, `std::mutex` elsewhere |
+| [`mutex`](src/rpp/mutex.h#L78) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, `std::mutex` elsewhere |
 | [`futex_mutex`](src/rpp/mutex.h#L30) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
-| [`recursive_mutex`](src/rpp/mutex.h#L96) | Recursive mutex variant |
-| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L238) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L508) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`recursive_mutex`](src/rpp/mutex.h#L99) | Recursive mutex variant |
+| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L241) | RAII unlock guard: unlocks on construction, relocks on destruction |
+| [`synchronized<T>`](src/rpp/mutex.h#L511) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L262) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L298) | Spin-lock with timeout |
-| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L188) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L340) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L265) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L301) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L191) | Indicates platform provides native critical_section mutex |
+| [`SyncableType`](src/rpp/mutex.h#L343) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
 call, and has a trivial destructor, so a static instance is safe before and after `main()`.
 
 | Method | Description |
 |--------|-------------|
-| [`try_lock()`](src/rpp/mutex.h#L43) | Takes the lock without a wait, and returns false when another thread holds it |
-| [`lock()`](src/rpp/mutex.h#L50) | Takes the lock, and sleeps while another thread holds it |
-| [`lock_contended()`](src/rpp/mutex.h#L57) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
-| [`unlock()`](src/rpp/mutex.h#L64) | Releases the lock, and wakes one sleeping thread when the lock was contended |
+| [`try_lock()`](src/rpp/mutex.h#L46) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/mutex.h#L53) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
+| [`lock_contended()`](src/rpp/mutex.h#L60) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/mutex.h#L67) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under `futex_mutex`, the condition variable and the semaphore flags.
 

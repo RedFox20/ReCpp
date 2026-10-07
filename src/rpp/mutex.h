@@ -34,6 +34,9 @@ namespace rpp
         static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
         std::atomic_uint32_t word { UNLOCKED };
 
+        // spins while the holder runs, then sleeps until the lock is free
+        RPPAPI void lock_slow() noexcept;
+
     public:
         futex_mutex() noexcept = default;
         futex_mutex(const futex_mutex&) = delete;
@@ -46,11 +49,11 @@ namespace rpp
             return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
         }
 
-        /// Takes the lock, and sleeps while another thread holds it
+        /// Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps
         void lock() noexcept
         {
             if (!try_lock())
-                lock_contended();
+                lock_slow();
         }
 
         /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
