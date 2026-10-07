@@ -1,6 +1,7 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
 #include <rpp/timepoint.h>
+#include <rpp/threads.h>
 #include <algorithm>
 #include <atomic>
 #include <cstdio>
@@ -11,6 +12,7 @@
     #define WIN32_LEAN_AND_MEAN
     #define NOMINMAX
     #include <Windows.h>
+    #include <intrin.h>
 #else
     #include <pthread.h>
     #include <sys/resource.h>
@@ -48,6 +50,47 @@ namespace
         void unlock() noexcept { pthread_mutex_unlock(&m); }
     };
 #endif
+
+    inline void cpu_pause() noexcept
+    {
+    #if _MSC_VER && (_M_X64 || _M_IX86)
+        _mm_pause();
+    #elif _MSC_VER && _M_ARM64
+        __yield();
+    #elif __x86_64__ || __i386__
+        __builtin_ia32_pause();
+    #elif __aarch64__
+        asm volatile("yield");
+    #endif
+    }
+
+    // futex_mutex with a bounded spin before the first sleep
+    template<int SPINS>
+    struct spin_futex_mutex
+    {
+        std::atomic_uint32_t word { 0 };
+        bool try_lock() noexcept
+        {
+            rpp::uint32 e = 0;
+            return word.compare_exchange_strong(e, 1, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+        void lock() noexcept
+        {
+            if (try_lock()) return;
+            for (int i = 0; i < SPINS; ++i)
+            {
+                cpu_pause();
+                if (word.load(std::memory_order_relaxed) == 0 && try_lock()) return;
+            }
+            while (word.exchange(2, std::memory_order_acquire) != 0)
+                rpp::cvar::wait(&word, 2);
+        }
+        void unlock() noexcept
+        {
+            if (word.exchange(0, std::memory_order_release) == 2)
+                rpp::cvar::wake_one(&word);
+        }
+    };
 
     double cpu_seconds() noexcept
     {
@@ -87,7 +130,7 @@ namespace
                 unsigned x = unsigned(t) + 1;
                 long long n = 0;
                 ready.fetch_add(1);
-                while (!go.load(std::memory_order_acquire)) {}
+                while (!go.load(std::memory_order_acquire)) rpp::yield();
                 while (!stop.load(std::memory_order_relaxed))
                 {
                     m.lock();
@@ -99,7 +142,7 @@ namespace
                 ops[size_t(t)] = n + (x == 0xdeadbeef);
             });
         }
-        while (ready.load() != sc.threads) {}
+        while (ready.load() != sc.threads) rpp::yield();
         double c0 = cpu_seconds();
         rpp::TimePoint t0 = rpp::TimePoint::monotonic_now();
         go.store(true, std::memory_order_release);
@@ -157,10 +200,12 @@ TestImpl(bench_mutex)
             { "std::mutex", &run_once<std::mutex>, {} },
         #if _WIN32
             { "SRWLOCK", &run_once<srw_lock>, {} },
-            { "CRITICAL_SEC", &run_once<win_critical_section>, {} },
         #elif __linux__ && !__ANDROID__
             { "pthread_adapt", &run_once<adaptive_mutex>, {} },
         #endif
+            { "spin40", &run_once<spin_futex_mutex<40>>, {} },
+            { "spin200", &run_once<spin_futex_mutex<200>>, {} },
+            { "spin1000", &run_once<spin_futex_mutex<1000>>, {} },
         };
         run_scenario(all, { 1, 0, 0 });
         for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 0, 0 });
