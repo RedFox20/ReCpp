@@ -92,6 +92,44 @@ namespace
         }
     };
 
+    // the Rust std futex mutex spin: load only, stop once a locker sleeps, and spin again after a wake
+    template<int SPINS, bool RESPIN>
+    struct polite_spin_mutex
+    {
+        std::atomic_uint32_t word { 0 };
+        bool try_lock() noexcept
+        {
+            rpp::uint32 e = 0;
+            return word.compare_exchange_strong(e, 1, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+        rpp::uint32 spin() noexcept
+        {
+            rpp::uint32 s;
+            for (int i = 0; (s = word.load(std::memory_order_relaxed)) == 1 && i < SPINS; ++i) cpu_pause();
+            return s;
+        }
+        void lock() noexcept
+        {
+            if (try_lock()) return;
+            rpp::uint32 s = spin();
+            if (s == 0)
+            {
+                if (word.compare_exchange_strong(s, 1, std::memory_order_acquire, std::memory_order_relaxed)) return;
+            }
+            for (;;)
+            {
+                if (s != 2 && word.exchange(2, std::memory_order_acquire) == 0) return;
+                rpp::cvar::wait(&word, 2);
+                s = RESPIN ? spin() : word.load(std::memory_order_relaxed);
+            }
+        }
+        void unlock() noexcept
+        {
+            if (word.exchange(0, std::memory_order_release) == 2)
+                rpp::cvar::wake_one(&word);
+        }
+    };
+
     double cpu_seconds() noexcept
     {
     #if _WIN32
@@ -204,8 +242,9 @@ TestImpl(bench_mutex)
             { "pthread_adapt", &run_once<adaptive_mutex>, {} },
         #endif
             { "spin40", &run_once<spin_futex_mutex<40>>, {} },
-            { "spin200", &run_once<spin_futex_mutex<200>>, {} },
-            { "spin1000", &run_once<spin_futex_mutex<1000>>, {} },
+            { "polite100", &run_once<polite_spin_mutex<100, true>>, {} },
+            { "polite1000", &run_once<polite_spin_mutex<1000, true>>, {} },
+            { "polite100_1x", &run_once<polite_spin_mutex<100, false>>, {} },
         };
         run_scenario(all, { 1, 0, 0 });
         for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 0, 0 });
