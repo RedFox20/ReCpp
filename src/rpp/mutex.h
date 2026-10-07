@@ -69,10 +69,30 @@ namespace rpp
     };
 
 #if _MSC_VER
-    /// The platform mutex, a futex_mutex on MSVC, Linux and Android
-    using mutex = rpp::futex_mutex;
     #define USE_CUSTOM_WINDOWS_MUTEX 1
     #if USE_CUSTOM_WINDOWS_MUTEX
+        /// The platform mutex on MSVC, an SRWLOCK
+        class mutex
+        {
+            void* srw = nullptr; // SRWLOCK_INIT
+        public:
+            constexpr mutex() noexcept = default;
+            mutex(const mutex&) = delete;
+            mutex& operator=(const mutex&) = delete;
+
+            /// @returns true when this thread took the lock, false when another thread holds it
+            RPPAPI bool try_lock() noexcept;
+
+            /// Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps
+            RPPAPI void lock() noexcept;
+
+            /// Releases the lock. Only the thread which took the lock can release it
+            RPPAPI void unlock() noexcept;
+
+            /// @returns the SRWLOCK
+            void* native_handle() const noexcept { return (void*)&srw; }
+        };
+
         class recursive_mutex
         {
             void* mtx;
@@ -97,6 +117,7 @@ namespace rpp
             void* native_handle() const noexcept { return mtx; }
         };
     #else // USE_CUSTOM_WINDOWS_MUTEX
+        using mutex = std::mutex;
         using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
 
@@ -197,7 +218,7 @@ namespace rpp
 
 #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
 #elif __linux__
-    /// The platform mutex, a futex_mutex on MSVC, Linux and Android
+    /// The platform mutex, a futex_mutex on Linux and Android
     using mutex = rpp::futex_mutex;
     using recursive_mutex = std::recursive_mutex;
 #else

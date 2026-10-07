@@ -2,6 +2,7 @@
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #include <type_traits> // std::is_trivially_destructible_v
 #endif
 #if RPP_FREERTOS
     #include "debugging.h"
@@ -17,6 +18,14 @@
 namespace rpp
 {
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
+    /////////////////////////////////////////////////////////////////
+
+    static_assert(sizeof(SRWLOCK) == sizeof(mutex) && std::is_trivially_destructible_v<mutex>);
+
+    bool mutex::try_lock() noexcept { return TryAcquireSRWLockExclusive((SRWLOCK*)&srw); }
+    void mutex::lock() noexcept { AcquireSRWLockExclusive((SRWLOCK*)&srw); }
+    void mutex::unlock() noexcept { ReleaseSRWLockExclusive((SRWLOCK*)&srw); }
+
     /////////////////////////////////////////////////////////////////
 
     #define GET_RMUTEX() ((CRITICAL_SECTION*)mtx)
