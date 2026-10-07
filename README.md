@@ -1440,7 +1440,7 @@ Fast function delegates as an optimized alternative to `std::function`. Supports
 | Class | Description |
 |-------|-------------|
 | [`delegate<Ret(Args...)>`](src/rpp/delegate.h#L166) | Single-target function delegate |
-| [`multicast_delegate<Args...>`](src/rpp/delegate.h#L724) | Multi-target event delegate, with one pointer of overhead when empty |
+| [`multicast_delegate<Args...>`](src/rpp/delegate.h#L723) | Multi-target event delegate, with one pointer of overhead when empty |
 
 ### delegate Methods
 
@@ -1456,11 +1456,11 @@ A listener can add, remove or clear listeners while a dispatch runs. It must not
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L994) / [`operator+=`](src/rpp/delegate.h#L1034) | Register a callback, and ignore an empty delegate |
-| [`operator-=`](src/rpp/delegate.h#L1044) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L1055) | Invoke all registered callbacks |
-| [`clear()`](src/rpp/delegate.h#L811) | Remove all callbacks |
-| [`size()`](src/rpp/delegate.h#L837) | Number of registered callbacks |
+| [`add(delegate)`](src/rpp/delegate.h#L952) / [`operator+=`](src/rpp/delegate.h#L992) | Register a callback, and ignore an empty delegate |
+| [`operator-=`](src/rpp/delegate.h#L1002) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L1013) | Invoke all registered callbacks |
+| [`clear()`](src/rpp/delegate.h#L790) | Remove all callbacks |
+| [`size()`](src/rpp/delegate.h#L816) | Number of registered callbacks |
 | [`multicast_fwd<T>`](src/rpp/delegate.h#L698) | Trait to deduce forwarding reference type for multicast args |
 
 ### Example
