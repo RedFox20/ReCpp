@@ -455,6 +455,7 @@ TestImpl(test_mutex)
         AssertEqual(*str, "Second value");
     }
 
+#if !RPP_HAS_CRITICAL_SECTION_MUTEX // FreeRTOS constructs it at runtime, and Cortex-M try_lock() always succeeds
     // a static mutex runs no constructor and no destructor, so a static initializer or an atexit handler can lock it
     TestCase(mutex_is_one_constant_initialized_word)
     {
@@ -491,4 +492,5 @@ TestImpl(test_mutex)
         held.unlock();
         AssertThat(rpp::spin_lock_for(m, rpp::millis(2)).owns_lock(), true);
     }
+#endif
 };
