@@ -71,6 +71,17 @@ Requires `ANDROID_NDK_HOME` to be set. Installs `qemu-user` automatically on fir
 Uses a pre-built bionic sysroot from Android API 29 ([`.github/android-qemu-sysroot-api29/`](.github/android-qemu-sysroot-api29/))
 with a custom `liblog.so` that redirects `__android_log_*` to stdout/stderr with colored priority labels.
 
+### Versioning
+
+`self.version` in [mamafile.py](mamafile.py) names the ReCpp package in place of the commit.
+Mama 0.14.13 and later treat a `MAJOR.MINOR` change as an ABI break, and rebuild every package which depends on ReCpp.
+Only a PATCH bump keeps the ABI. A change to docs or tests alone does not bump the version.
+
+| Bump | When |
+|------|------|
+| PATCH | The ABI stays the same: a `.cpp` fix, a new function, or a regenerated `.cppm` file |
+| MINOR | The ABI or the API changes: a class layout, an inline function, a template, an ABI flag, or a removed symbol |
+| MAJOR | A new major release, such as the C++20 modules refactor in 2.0.0 |
 
 ## Experimental: C++20 Modules
 
