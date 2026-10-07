@@ -1578,7 +1578,7 @@ namespace rpp
         }
 
         // a listener which frees a subscriber stops it, because the subscriber destructor removes its listener
-        TestCase(multicast_delegate_listener_frees_a_later_subscriber)
+        TestCase(multicast_delegate_listener_frees_subscribers)
         {
             struct Subscriber
             {
@@ -1591,12 +1591,13 @@ namespace rpp
             };
             int calls = 0;
             multicast_delegate<int> evt;
-            std::unique_ptr<Subscriber> sub;
-            evt += [&sub](int) { sub.reset(); };
-            sub = std::make_unique<Subscriber>(&evt, &calls);
+            auto early = std::make_unique<Subscriber>(&evt, &calls);
+            std::unique_ptr<Subscriber> late;
+            evt += [&early, &late](int) { early.reset(); late.reset(); };
+            late = std::make_unique<Subscriber>(&evt, &calls);
             const Subscriber kept { &evt, &calls };
             evt(1);
-            AssertThat(calls, 1);
+            AssertThat(calls, 2); // `early` ran before the listener, and `kept` runs after it
             AssertThat(evt.size(), 2);
         }
 

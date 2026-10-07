@@ -906,12 +906,7 @@ namespace rpp
 
         static void erase(container* c, int i) noexcept
         {
-            if (c->data[i].owns_heap()) // a functor destructor can edit `c`, so the functor dies after the shift
-            {
-                const deleg removed { static_cast<deleg&&>(c->data[i]) };
-                erase(c, i); // the moved-from slot owns nothing now
-                return;
-            }
+            const deleg removed { static_cast<deleg&&>(c->data[i]) }; // a functor destructor can edit `c`, so it dies after the shift
             c->data[i].~deleg();
             for (int j = i + 1; j < c->size; ++j)
                 relocate(&c->data[j - 1], &c->data[j]);
