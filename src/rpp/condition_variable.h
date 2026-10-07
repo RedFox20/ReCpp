@@ -16,6 +16,7 @@
 #include "mutex.h" // rpp::mutex
 #include <atomic>
 #include <mutex> // std::unique_lock
+#include <type_traits> // std::is_same_v
 
 namespace rpp
 {
