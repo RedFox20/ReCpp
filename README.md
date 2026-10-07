@@ -1456,9 +1456,9 @@ A listener can add, remove or clear listeners while a dispatch runs. It must not
 
 | Method | Description |
 |--------|-------------|
-| [`add(delegate)`](src/rpp/delegate.h#L952) / [`operator+=`](src/rpp/delegate.h#L992) | Register a callback, and ignore an empty delegate |
-| [`operator-=`](src/rpp/delegate.h#L1002) | Unregister a callback |
-| [`operator()(Args... args)`](src/rpp/delegate.h#L1013) | Invoke all registered callbacks |
+| [`add(delegate)`](src/rpp/delegate.h#L957) / [`operator+=`](src/rpp/delegate.h#L997) | Register a callback, and ignore an empty delegate |
+| [`operator-=`](src/rpp/delegate.h#L1007) | Unregister a callback |
+| [`operator()(Args... args)`](src/rpp/delegate.h#L1018) | Invoke all registered callbacks |
 | [`clear()`](src/rpp/delegate.h#L790) | Remove all callbacks |
 | [`size()`](src/rpp/delegate.h#L816) | Number of registered callbacks |
 | [`multicast_fwd<T>`](src/rpp/delegate.h#L698) | Trait to deduce forwarding reference type for multicast args |
