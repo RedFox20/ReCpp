@@ -238,3 +238,42 @@ namespace rpp::cvar
         return true;
     }
 }
+
+namespace rpp
+{
+    // the pause hint frees the core for its other hyperthread while this one spins
+    static FINLINE void cpu_pause() noexcept
+    {
+    #if _MSC_VER
+        YieldProcessor();
+    #elif __x86_64__ || __i386__
+        __builtin_ia32_pause();
+    #elif __aarch64__ || (__arm__ && __ARM_ARCH >= 7)
+        asm volatile("yield" ::: "memory");
+    #endif
+    }
+
+    // a kernel sleep and wake costs more than a short critical section, so a locker first waits with loads only.
+    // A CONTENDED word already has a sleeper, so a spin there only delays this sleep
+    void futex_mutex::lock_slow() noexcept
+    {
+        auto spin = [this] {
+            rpp::uint32 state = word.load(std::memory_order_relaxed);
+            for (int i = 0; state == LOCKED && i < 100; ++i)
+            {
+                cpu_pause();
+                state = word.load(std::memory_order_relaxed);
+            }
+            return state;
+        };
+        rpp::uint32 state = spin();
+        if (state == UNLOCKED && word.compare_exchange_strong(state, LOCKED, std::memory_order_acquire, std::memory_order_relaxed))
+            return;
+        // a woken locker cannot know if more lockers sleep, so it takes the lock as CONTENDED
+        while (state == CONTENDED || word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
+        {
+            cvar::wait(&word, CONTENDED);
+            state = spin();
+        }
+    }
+}

@@ -1,9 +1,11 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
+#include <rpp/condition_variable.h>
 #include <rpp/timepoint.h>
 #include <rpp/threads.h>
 #include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <cstdio>
 #include <mutex>
 #include <thread>
@@ -12,7 +14,6 @@
     #define WIN32_LEAN_AND_MEAN
     #define NOMINMAX
     #include <Windows.h>
-    #include <intrin.h>
 #else
     #include <pthread.h>
     #include <sys/resource.h>
@@ -27,21 +28,8 @@ namespace
         void lock() noexcept { AcquireSRWLockExclusive(&l); }
         void unlock() noexcept { ReleaseSRWLockExclusive(&l); }
     };
-    unsigned long release_unheld_srw_lock() noexcept
-    {
-        SRWLOCK unheld = SRWLOCK_INIT;
-        __try { ReleaseSRWLockExclusive(&unheld); }
-        __except (EXCEPTION_EXECUTE_HANDLER) { return GetExceptionCode(); }
-        return 0;
-    }
-    struct win_critical_section
-    {
-        CRITICAL_SECTION cs;
-        win_critical_section() noexcept { InitializeCriticalSection(&cs); }
-        ~win_critical_section() noexcept { DeleteCriticalSection(&cs); }
-        void lock() noexcept { EnterCriticalSection(&cs); }
-        void unlock() noexcept { LeaveCriticalSection(&cs); }
-    };
+    using os_lock = srw_lock;
+    constexpr const char* OS_LOCK = "SRWLOCK";
 #elif __linux__ && !__ANDROID__
     struct adaptive_mutex
     {
@@ -49,79 +37,20 @@ namespace
         void lock() noexcept { pthread_mutex_lock(&m); }
         void unlock() noexcept { pthread_mutex_unlock(&m); }
     };
+    using os_lock = adaptive_mutex;
+    constexpr const char* OS_LOCK = "pthread_adapt";
 #endif
 
-    inline void cpu_pause() noexcept
-    {
-    #if _MSC_VER && (_M_X64 || _M_IX86)
-        _mm_pause();
-    #elif _MSC_VER && _M_ARM64
-        __yield();
-    #elif __x86_64__ || __i386__
-        __builtin_ia32_pause();
-    #elif __aarch64__
-        asm volatile("yield");
-    #endif
-    }
-
-    // futex_mutex with a bounded spin before the first sleep
-    template<int SPINS>
-    struct spin_futex_mutex
+    // the futex_mutex before the spin: mark the word contended and sleep at once
+    struct plain_futex_mutex
     {
         std::atomic_uint32_t word { 0 };
-        bool try_lock() noexcept
-        {
-            rpp::uint32 e = 0;
-            return word.compare_exchange_strong(e, 1, std::memory_order_acquire, std::memory_order_relaxed);
-        }
         void lock() noexcept
         {
-            if (try_lock()) return;
-            for (int i = 0; i < SPINS; ++i)
-            {
-                cpu_pause();
-                if (word.load(std::memory_order_relaxed) == 0 && try_lock()) return;
-            }
+            rpp::uint32 e = 0;
+            if (word.compare_exchange_strong(e, 1, std::memory_order_acquire, std::memory_order_relaxed)) return;
             while (word.exchange(2, std::memory_order_acquire) != 0)
                 rpp::cvar::wait(&word, 2);
-        }
-        void unlock() noexcept
-        {
-            if (word.exchange(0, std::memory_order_release) == 2)
-                rpp::cvar::wake_one(&word);
-        }
-    };
-
-    // the Rust std futex mutex spin: load only, stop once a locker sleeps, and spin again after a wake
-    template<int SPINS, bool RESPIN>
-    struct polite_spin_mutex
-    {
-        std::atomic_uint32_t word { 0 };
-        bool try_lock() noexcept
-        {
-            rpp::uint32 e = 0;
-            return word.compare_exchange_strong(e, 1, std::memory_order_acquire, std::memory_order_relaxed);
-        }
-        rpp::uint32 spin() noexcept
-        {
-            rpp::uint32 s;
-            for (int i = 0; (s = word.load(std::memory_order_relaxed)) == 1 && i < SPINS; ++i) cpu_pause();
-            return s;
-        }
-        void lock() noexcept
-        {
-            if (try_lock()) return;
-            rpp::uint32 s = spin();
-            if (s == 0)
-            {
-                if (word.compare_exchange_strong(s, 1, std::memory_order_acquire, std::memory_order_relaxed)) return;
-            }
-            for (;;)
-            {
-                if (s != 2 && word.exchange(2, std::memory_order_acquire) == 0) return;
-                rpp::cvar::wait(&word, 2);
-                s = RESPIN ? spin() : word.load(std::memory_order_relaxed);
-            }
         }
         void unlock() noexcept
         {
@@ -154,7 +83,7 @@ namespace
     }
 
     template<class Mutex>
-    sample run_once(scenario sc, int duration_ms)
+    sample run_lock(scenario sc, int duration_ms)
     {
         alignas(64) Mutex m;
         alignas(64) unsigned shared[16] = {};
@@ -194,6 +123,95 @@ namespace
         return { double((t1 - t0).nsec) / double(total), (c1 - c0) * 1e9 / double(total), hi ? double(lo) / double(hi) : 0.0 };
     }
 
+    // producers and consumers on one bounded queue: every item goes through a notify and most through a wake
+    template<class Mutex, class CondVar>
+    sample run_queue(scenario sc, int duration_ms)
+    {
+        struct alignas(64) queue
+        {
+            Mutex m;
+            CondVar not_empty, not_full;
+            int items[8] = {};
+            int head = 0, size = 0;
+            bool stop = false;
+        } q;
+        std::atomic_int ready { 0 };
+        std::atomic_bool go { false };
+        std::atomic<long long> consumed { 0 };
+        std::vector<std::thread> pool;
+        for (int t = 0; t < sc.threads; ++t)
+        {
+            pool.emplace_back([&] {
+                ready.fetch_add(1);
+                while (!go.load(std::memory_order_acquire)) rpp::yield();
+                for (int i = 0;; ++i)
+                {
+                    std::unique_lock lock { q.m };
+                    while (q.size == 8 && !q.stop) q.not_full.wait(lock);
+                    if (q.stop) return;
+                    q.items[(q.head + q.size++) & 7] = i;
+                    q.not_empty.notify_one();
+                }
+            });
+            pool.emplace_back([&] {
+                long long n = 0;
+                ready.fetch_add(1);
+                while (!go.load(std::memory_order_acquire)) rpp::yield();
+                for (;;)
+                {
+                    std::unique_lock lock { q.m };
+                    while (q.size == 0 && !q.stop) q.not_empty.wait(lock);
+                    if (q.stop) break;
+                    q.head = (q.head + 1) & 7;
+                    --q.size;
+                    ++n;
+                    q.not_full.notify_one();
+                }
+                consumed.fetch_add(n);
+            });
+        }
+        while (ready.load() != 2 * sc.threads) rpp::yield();
+        double c0 = cpu_seconds();
+        rpp::TimePoint t0 = rpp::TimePoint::monotonic_now();
+        go.store(true, std::memory_order_release);
+        rpp::sleep_ms(duration_ms);
+        { std::unique_lock lock { q.m }; q.stop = true; }
+        q.not_empty.notify_all();
+        q.not_full.notify_all();
+        for (std::thread& th : pool) th.join();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
+        double c1 = cpu_seconds();
+        double total = double(consumed.load());
+        return { double((t1 - t0).nsec) / total, (c1 - c0) * 1e9 / total, 1.0 };
+    }
+
+    // two threads hand one turn back and forth, so every handoff is a notify, a wake and a relock
+    template<class Mutex, class CondVar>
+    sample run_pingpong(scenario, int)
+    {
+        constexpr int ROUNDS = 20'000;
+        Mutex m;
+        CondVar cv;
+        int turn = 0;
+        auto player = [&](int me) {
+            for (int i = 0; i < ROUNDS; ++i)
+            {
+                std::unique_lock lock { m };
+                while (turn != me) cv.wait(lock);
+                turn = 1 - me;
+                cv.notify_one();
+            }
+        };
+        double c0 = cpu_seconds();
+        rpp::TimePoint t0 = rpp::TimePoint::monotonic_now();
+        std::thread other { player, 1 };
+        player(0);
+        other.join();
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
+        double c1 = cpu_seconds();
+        return { double((t1 - t0).nsec) / (2.0 * ROUNDS), (c1 - c0) * 1e9 / (2.0 * ROUNDS), 1.0 };
+    }
+
     struct contender
     {
         const char* name;
@@ -201,18 +219,18 @@ namespace
         std::vector<sample> samples;
     };
 
-    void run_scenario(std::vector<contender>& all, scenario sc)
+    void run_scenario(const char* kind, std::vector<contender>& all, scenario sc, int reps = 7)
     {
         for (contender& c : all) c.samples.clear();
-        for (int rep = 0; rep < 7; ++rep)
+        for (int rep = 0; rep < reps; ++rep)
             for (contender& c : all) c.samples.push_back(c.run(sc, 200));
         for (contender& c : all)
         {
             std::vector<sample>& s = c.samples;
             std::sort(s.begin(), s.end(), [](const sample& a, const sample& b) { return a.wall_ns < b.wall_ns; });
             const sample& med = s[s.size() / 2];
-            std::printf("BENCH %-14s threads %2d cs %4d out %4d  wall %8.1f ns/op  cpu %8.1f ns/op  fair %.2f  (min %.1f max %.1f)\n",
-                        c.name, sc.threads, sc.cs_work, sc.out_work, med.wall_ns, med.cpu_ns, med.fairness,
+            std::printf("BENCH %-5s %-22s threads %2d cs %4d out %4d  wall %8.1f ns/op  cpu %8.1f ns/op  fair %.2f  (min %.1f max %.1f)\n",
+                        kind, c.name, sc.threads, sc.cs_work, sc.out_work, med.wall_ns, med.cpu_ns, med.fairness,
                         s.front().wall_ns, s.back().wall_ns);
         }
         std::printf("BENCH\n");
@@ -230,25 +248,32 @@ TestImpl(bench_mutex)
     {
         std::printf("BENCH cpus %u, sizeof rpp::mutex %zu, std::mutex %zu\n",
                     std::thread::hardware_concurrency(), sizeof(rpp::mutex), sizeof(std::mutex));
-    #if _WIN32
-        std::printf("BENCH release of an unheld SRWLOCK raises 0x%08lX\n", release_unheld_srw_lock());
-    #endif
-        std::vector<contender> all {
-            { "futex_mutex", &run_once<rpp::futex_mutex>, {} },
-            { "std::mutex", &run_once<std::mutex>, {} },
-        #if _WIN32
-            { "SRWLOCK", &run_once<srw_lock>, {} },
-        #elif __linux__ && !__ANDROID__
-            { "pthread_adapt", &run_once<adaptive_mutex>, {} },
-        #endif
-            { "spin40", &run_once<spin_futex_mutex<40>>, {} },
-            { "polite100", &run_once<polite_spin_mutex<100, true>>, {} },
-            { "polite1000", &run_once<polite_spin_mutex<1000, true>>, {} },
-            { "polite100_1x", &run_once<polite_spin_mutex<100, false>>, {} },
+        std::vector<contender> locks {
+            { "futex_plain", &run_lock<plain_futex_mutex>, {} },
+            { "futex_polite", &run_lock<rpp::futex_mutex>, {} },
+            { "std::mutex", &run_lock<std::mutex>, {} },
+            { OS_LOCK, &run_lock<os_lock>, {} },
         };
-        run_scenario(all, { 1, 0, 0 });
-        for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 0, 0 });
-        for (int threads : { 2, 4, 8, 16 }) run_scenario(all, { threads, 20, 100 });
-        for (int threads : { 4, 16 }) run_scenario(all, { threads, 1000, 1000 });
+        run_scenario("lock", locks, { 1, 0, 0 });
+        for (int threads : { 2, 4, 8, 16 }) run_scenario("lock", locks, { threads, 0, 0 });
+        for (int threads : { 2, 4, 8, 16 }) run_scenario("lock", locks, { threads, 20, 100 });
+        for (int threads : { 4, 16 }) run_scenario("lock", locks, { threads, 1000, 1000 });
+
+        using rpp_cv = rpp::condition_variable;
+        std::vector<contender> queues {
+            { "futex_plain+rpp_cv", &run_queue<plain_futex_mutex, rpp_cv>, {} },
+            { "futex_polite+rpp_cv", &run_queue<rpp::futex_mutex, rpp_cv>, {} },
+            { "std::mutex+std_cv", &run_queue<std::mutex, std::condition_variable>, {} },
+            { "os_lock+rpp_cv", &run_queue<os_lock, rpp_cv>, {} },
+        };
+        for (int pairs : { 1, 2, 4 }) run_scenario("queue", queues, { pairs, 0, 0 });
+
+        std::vector<contender> pingpongs {
+            { "futex_plain+rpp_cv", &run_pingpong<plain_futex_mutex, rpp_cv>, {} },
+            { "futex_polite+rpp_cv", &run_pingpong<rpp::futex_mutex, rpp_cv>, {} },
+            { "std::mutex+std_cv", &run_pingpong<std::mutex, std::condition_variable>, {} },
+            { "os_lock+rpp_cv", &run_pingpong<os_lock, rpp_cv>, {} },
+        };
+        run_scenario("pong", pingpongs, { 2, 0, 0 }, 5);
     }
 };

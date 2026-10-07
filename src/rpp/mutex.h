@@ -50,8 +50,11 @@ namespace rpp
         void lock() noexcept
         {
             if (!try_lock())
-                lock_contended();
+                lock_slow();
         }
+
+        /// Spins while the holder runs, then sleeps until the lock is free
+        RPPAPI void lock_slow() noexcept;
 
         /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
         void lock_contended() noexcept

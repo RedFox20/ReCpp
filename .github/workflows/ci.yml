@@ -45,3 +45,24 @@ jobs:
         run: mama gcc build with_tests jobs=4
       - name: Bench
         run: ./bin/RppTests bench_mutex
+
+  bench-ubuntu-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install libdw-dev libunwind-dev
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mama
+        run: pip install --upgrade mama
+      - name: Build
+        env:
+          CXX20: "1"
+          NO_NINJA: "1"
+        run: mama gcc build with_tests jobs=4
+      - name: Bench
+        run: ./bin/RppTests bench_mutex
