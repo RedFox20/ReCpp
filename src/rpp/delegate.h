@@ -705,10 +705,9 @@ namespace rpp
      * @note Multicast Delegate class is optimized to have minimal overhead if no subscribers are registered
      *       First registration optimized to reserve only 1 event delegate
      *       Subsequential growth is amortized
-     * @note A listener can add, remove or clear listeners, and move or destroy the multicast_delegate, while a dispatch runs.
+     * @note A listener can add, remove or clear listeners while a dispatch runs.
      *       A removed listener stops at once. An added listener joins when the outermost dispatch ends.
-     * @note A multicast_delegate destroyed during a dispatch frees its listeners when the dispatch ends,
-     *       so their destructors must not use it.
+     * @note A listener must not move or destroy the multicast_delegate which runs it.
      * @note A dispatch writes into the container, so dispatch from one thread at a time.
      *
      * @example
@@ -724,39 +723,28 @@ namespace rpp
     template<class... Args> struct multicast_delegate
     {
         using deleg = delegate<void(Args...)>; // delegate type
-    private:
-        struct dispatch_edits;
-    public:
 
         // dynamic data container, actual size is sizeof(container) + sizeof(T)*(capacity-1)
         struct container
         {
             int size;
             int capacity;
-            dispatch_edits* edits; // null while no dispatch runs, else no_edits() or the edits of the listeners
+            container* added; // null while no dispatch runs, else running() or the listeners which join when it ends
             deleg data[1];
         };
         container* ptr; // dynamic delegate array container
 
     private:
 
-        // the edits of the listeners, which the first edit allocates and the outermost dispatch applies
-        struct dispatch_edits
-        {
-            multicast_delegate* owner; // holds `ptr`, so the moves keep it current, and the destructor resets it
-            container* added; // the listeners which join when the outermost dispatch ends
-            int removed; // the slots which a removal emptied
-        };
-
         // ends the outermost dispatch, also when a listener throws
         struct dispatch_scope
         {
-            container* c; // the slots never move while a dispatch runs, so `c` stays valid
+            multicast_delegate* self;
 
             DELEGATE_FINLINE ~dispatch_scope() noexcept
             {
-                if (c->edits == no_edits()) c->edits = nullptr;
-                else end_dispatch(c);
+                if (self->ptr->added == running()) self->ptr->added = nullptr;
+                else self->end_dispatch();
             }
         };
 
@@ -768,25 +756,16 @@ namespace rpp
         }
         ~multicast_delegate() noexcept
         {
-            while (container* c = ptr) // a functor destructor can add a listener, so clear until none is left
-            {
-                clear();
-                if (ptr != c || !c->edits) continue;
-                dispatch_edits* e = edits_of(c);
-                if (!e->added) { e->owner = nullptr; ptr = nullptr; } // the running dispatch frees the container when it ends
-            }
+            clear();
         }
 
         multicast_delegate(multicast_delegate&& d) noexcept : ptr{d.ptr}
         {
             d.ptr = nullptr;
-            if (dispatch_edits* e = find_edits(ptr)) e->owner = this;
         }
         multicast_delegate& operator=(multicast_delegate&& d) noexcept
         {
             std::swap(ptr, d.ptr);
-            if (dispatch_edits* e = find_edits(ptr)) e->owner = this;
-            if (dispatch_edits* e = find_edits(d.ptr)) e->owner = &d;
             return *this;
         }
 
@@ -801,8 +780,8 @@ namespace rpp
                 clear();
                 for (const deleg& del : d)
                     this->add(del);
-                if (const dispatch_edits* e = find_edits(d.ptr); e && e->added)
-                    for (int i = 0; i < e->added->size; ++i) this->add(e->added->data[i]);
+                if (const container* added = added_of(d.ptr))
+                    for (int i = 0; i < added->size; ++i) this->add(added->data[i]);
             }
             return *this;
         }
@@ -810,21 +789,21 @@ namespace rpp
         /** @brief Removes every listener, and frees the container unless a dispatch runs */
         void clear() noexcept
         {
-            container* c = ptr;
-            if (!c) return;
-            if (!c->edits)
+            while (container* c = ptr) // a functor destructor can add a listener, so clear until none is left
             {
-                ptr = nullptr; // first, because a functor destructor can edit this multicast_delegate
-                destroy(c);
+                if (!c->added)
+                {
+                    ptr = nullptr; // first, because a functor destructor can edit this multicast_delegate
+                    destroy(c);
+                    continue;
+                }
+                for (int i = 0; i < c->size; ++i)
+                    c->data[i].f.fun = nullptr; // a running listener keeps its functor until the dispatch ends
+                container* added = added_of(c);
+                c->added = running();
+                pending(); // an empty list still tells the dispatch to drop the empty slots
+                destroy(added); // an added listener never ran, so it leaves at once
                 return;
-            }
-            for (int i = 0; i < c->size; ++i)
-                if (c->data[i]) remove_slot(c, i);
-            if (dispatch_edits* e = find_edits(c))
-            {
-                container* added = e->added; // an added listener never ran, so it leaves at once
-                e->added = nullptr;
-                destroy(added);
             }
         }
 
@@ -838,8 +817,12 @@ namespace rpp
         {
             const container* c = ptr;
             if (!c) return 0;
-            const dispatch_edits* e = find_edits(c);
-            return e ? c->size - e->removed + (e->added ? e->added->size : 0) : c->size;
+            if (!c->added) return c->size;
+            const container* added = added_of(c);
+            int n = added ? added->size : 0; // a running dispatch counts the live slots and the added listeners
+            for (int i = 0; i < c->size; ++i)
+                if (c->data[i]) ++n;
+            return n;
         }
 
         /** @note While a dispatch runs, the range holds an empty delegate for a removed listener, and omits an added one */
@@ -866,22 +849,20 @@ namespace rpp
         }
 
         // a dispatch with no edits yet, which every module sees with one value, unlike the address of a static
-        static dispatch_edits* no_edits() noexcept { return reinterpret_cast<dispatch_edits*>(uintptr_t{1}); }
+        static container* running() noexcept { return reinterpret_cast<container*>(uintptr_t{1}); }
 
-        // the edits of the running dispatch, or null if no dispatch runs or no listener edited it
-        static dispatch_edits* find_edits(const container* c) noexcept
+        // the listeners which a running dispatch added, or null
+        static container* added_of(const container* c) noexcept
         {
-            return c && c->edits != no_edits() ? c->edits : nullptr;
+            return c && c->added != running() ? c->added : nullptr;
         }
 
-        NOINLINE dispatch_edits* edits_of(container* c) noexcept
+        // the first edit allocates the list, which tells the outermost dispatch to apply the edits
+        container*& pending() noexcept
         {
-            if (c->edits != no_edits()) return c->edits;
-            auto* e = static_cast<dispatch_edits*>(calloc(1, sizeof(dispatch_edits)));
-            if (!e) { std::terminate(); }
-            e->owner = this;
-            c->edits = e;
-            return e;
+            container*& added = ptr->added;
+            if (added == running()) { added = nullptr; grow(added); }
+            return added;
         }
 
         static void grow(container*& c) noexcept
@@ -895,7 +876,7 @@ namespace rpp
             if (!p) { std::terminate(); }
             p->size = 0;
             p->capacity = capacity;
-            p->edits = nullptr;
+            p->added = nullptr;
             if (old)
             {
                 for (int i = 0; i < old->size; ++i)
@@ -906,14 +887,6 @@ namespace rpp
             c = p;
         }
 
-        // the listener in the slot can still run, so its functor lives until the outermost dispatch ends
-        NOINLINE void remove_slot(container* c, int i) noexcept
-        {
-            dispatch_edits* e = edits_of(c);
-            c->data[i].f.fun = nullptr;
-            ++e->removed;
-        }
-
         template<class Match> void remove_first(const Match& match) noexcept
         {
             container* c = ptr;
@@ -921,14 +894,14 @@ namespace rpp
             for (int i = 0; i < c->size; ++i)
             {
                 if (!match(c->data[i])) continue;
-                if (c->edits) remove_slot(c, i);
-                else erase(c, i);
+                if (!c->added) { erase(c, i); return; }
+                pending(); // the dispatch drops the empty slot when it ends
+                c->data[i].f.fun = nullptr; // the listener can still run, so its functor lives until then
                 return;
             }
-            dispatch_edits* e = find_edits(c);
-            if (!e || !e->added) return;
-            for (int i = 0; i < e->added->size; ++i)
-                if (match(e->added->data[i])) { erase(e->added, i); return; } // an added listener never ran, so it leaves at once
+            if (container* added = added_of(c))
+                for (int i = 0; i < added->size; ++i)
+                    if (match(added->data[i])) { erase(added, i); return; } // an added listener never ran, so it leaves at once
         }
 
         static void erase(container* c, int i) noexcept
@@ -945,44 +918,34 @@ namespace rpp
             --c->size;
         }
 
-        // destroys the removed functors while the dispatch still holds the slots, then applies the edits
-        NOINLINE static void end_dispatch(container* c) noexcept
+        // drops the empty slots and appends the added listeners, then destroys the removed functors
+        NOINLINE void end_dispatch() noexcept
         {
-            for (bool again = true; again;) // a functor destructor can empty a slot which this pass checked already
-            {
-                again = false;
-                for (int i = 0; i < c->size; ++i)
-                {
-                    deleg& slot = c->data[i];
-                    if (slot || !slot.owns_heap()) continue;
-                    const deleg removed { static_cast<deleg&&>(slot) }; // its destructor can edit the multicast_delegate
-                    again = true;
-                }
-            }
-            dispatch_edits* e = c->edits;
-            multicast_delegate* owner = e->owner;
-            container* added = e->added;
-            free(e);
-            c->edits = nullptr;
-            if (!owner) { destroy(c); return; } // the multicast_delegate was destroyed while the dispatch ran
-            int kept = 0; // every empty slot is trivial now, so it needs no destructor
+            container* c = ptr;
+            container* added = c->added;
+            c->added = nullptr;
+            container* removed = nullptr; // these die last, because a destructor can edit or free this multicast_delegate
+            int kept = 0;
             for (int i = 0; i < c->size; ++i)
-                if (c->data[i] && kept++ != i) relocate(&c->data[kept - 1], &c->data[i]);
+            {
+                deleg& slot = c->data[i];
+                if (slot) { if (kept != i) relocate(&c->data[kept], &slot); ++kept; }
+                else if (slot.owns_heap()) { grow(removed); relocate(&removed->data[removed->size++], &slot); }
+            }
             c->size = kept;
-            if (!added) return;
-            container*& slots = owner->ptr; // still `c`, because the slots never move while a dispatch runs
             for (int i = 0; i < added->size; ++i)
             {
-                grow(slots);
-                relocate(&slots->data[slots->size++], &added->data[i]);
+                grow(ptr);
+                relocate(&ptr->data[ptr->size++], &added->data[i]);
             }
             free(added);
+            destroy(removed);
         }
 
         // constructs the delegate in its slot, so a member function never passes through a temporary
         template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
         {
-            container*& slots = ptr && ptr->edits ? edits_of(ptr)->added : ptr; // a running dispatch keeps its slots in place
+            container*& slots = ptr && ptr->added ? pending() : ptr; // a running dispatch keeps its slots in place
             grow(slots);
             new (&slots->data[slots->size]) deleg{std::forward<DelegateArgs>(args)...};
             ++slots->size;
@@ -1007,7 +970,7 @@ namespace rpp
          */
         void remove(const deleg& d) noexcept
         {
-            if (d) remove_first([&d](const deleg& listener) { return listener == d; });
+            remove_first([&d](const deleg& listener) { return listener == d; });
         }
 
 
@@ -1064,15 +1027,15 @@ namespace rpp
 
     private:
 
-        // the loop holds no `this`, and its container stays allocated until the outermost dispatch ends
+        // the slots never move or free while a dispatch runs, so the loop can hold them
         DELEGATE_FINLINE void dispatch(multicast_fwd_t<Args>... args) const
         {
             container* c = ptr;
             if (!c) return;
-            if (c->edits) // a nested dispatch leaves the edits to the outermost one
+            if (c->added) // a nested dispatch leaves the edits to the outermost one
                 return call_listeners(c, static_cast<multicast_fwd_t<Args>>(args)...);
-            c->edits = no_edits();
-            const dispatch_scope scope { c };
+            c->added = running();
+            const dispatch_scope scope { const_cast<multicast_delegate*>(this) }; // the outermost dispatch applies the edits
             call_listeners(c, static_cast<multicast_fwd_t<Args>>(args)...);
         }
 

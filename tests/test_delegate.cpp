@@ -1455,7 +1455,6 @@ namespace rpp
                 void on_event(int x)
                 {
                     evt->remove(first, &Recorder::on_event); // ran before this listener
-                    evt->remove(*evt->begin()); // the empty slot of `first` matches nothing
                     evt->remove(this, &Remover::on_event);
                     evt->remove(last, &Recorder::on_event); // runs after this listener
                     size_inside = evt->size();
@@ -1578,18 +1577,27 @@ namespace rpp
             AssertThat(int(evt.end() - evt.begin()), 4);
         }
 
-        // a listener which destroys its multicast_delegate stops the rest, and the dispatch frees the container
-        TestCase(multicast_delegate_listener_destroys_it_while_it_runs)
+        // a listener which frees a subscriber stops it, because the subscriber destructor removes its listener
+        TestCase(multicast_delegate_listener_frees_a_later_subscriber)
         {
-            std::vector<int> log;
-            Recorder rec { 1, &log };
-            auto evt = std::make_unique<multicast_delegate<int>>();
-            evt->add(&rec, &Recorder::on_event);
-            *evt += [&evt](int) { evt.reset(); };
-            evt->add(&rec, &Recorder::on_event);
-            (*evt)(1);
-            AssertThat(log, (std::vector<int>{ 101 }));
-            AssertThat(evt == nullptr, true);
+            struct Subscriber
+            {
+                multicast_delegate<int>* evt; int* calls;
+                Subscriber(multicast_delegate<int>* evt, int* calls) : evt{evt}, calls{calls} { evt->add(this, &Subscriber::on_event); }
+                Subscriber(const Subscriber&) = delete;
+                Subscriber& operator=(const Subscriber&) = delete;
+                ~Subscriber() { evt->remove(this, &Subscriber::on_event); }
+                void on_event(int) { ++*calls; }
+            };
+            int calls = 0;
+            multicast_delegate<int> evt;
+            std::unique_ptr<Subscriber> sub;
+            evt += [&sub](int) { sub.reset(); };
+            sub = std::make_unique<Subscriber>(&evt, &calls);
+            const Subscriber kept { &evt, &calls };
+            evt(1);
+            AssertThat(calls, 1);
+            AssertThat(evt.size(), 2);
         }
 
         // a removed functor can hold the last reference to its multicast_delegate, so it dies after the dispatch ends
@@ -1661,24 +1669,10 @@ namespace rpp
             int calls = 0;
             {
                 multicast_delegate<int> evt;
-                evt += [a = std::make_shared<Adder>(&evt), &calls](int) { ++calls; };
+                evt += [a = std::make_shared<Adder>(&evt, 2), &calls](int) { ++calls; };
                 evt(1);
             }
-            AssertThat(calls, 1); // LeakSanitizer reports the added listener if the destructor misses it
-        }
-
-        // a pending listener can add another while a listener destroys the multicast_delegate mid dispatch
-        TestCase(multicast_delegate_destroyed_mid_dispatch_frees_a_listener_which_a_functor_adds)
-        {
-            auto evt = std::make_unique<multicast_delegate<int>>();
-            multicast_delegate<int>* raw = evt.get();
-            *evt += [&evt, raw](int)
-            {
-                *raw += [a = std::make_shared<Adder>(raw, 2)](int) {}; // waits for the dispatch, and its destructors add
-                evt.reset();
-            };
-            (*raw)(1);
-            AssertThat(evt == nullptr, true); // LeakSanitizer reports the second listener if the dispatch misses it
+            AssertThat(calls, 1); // LeakSanitizer reports an added listener if the destructor misses it
         }
 
         // an added listener waits outside the slots, so a running mutable functor keeps what it writes
@@ -1692,55 +1686,6 @@ namespace rpp
             evt(2);
             AssertThat(seen, 2);
             AssertThat(evt.size(), 3);
-        }
-
-        // a moved multicast_delegate takes the running dispatch along, so an added listener joins the new owner
-        TestCase(multicast_delegate_listener_moves_it_while_it_runs)
-        {
-            std::vector<int> log;
-            Recorder rec { 1, &log };
-            struct Owners
-            {
-                multicast_delegate<int> source, assigned, spare;
-                std::unique_ptr<multicast_delegate<int>> constructed;
-                Recorder* rec;
-            };
-            Owners o;
-            o.rec = &rec;
-            o.spare.add(&rec, &Recorder::on_event);
-            o.source.add(&rec, &Recorder::on_event);
-            o.source += [&o](int x) // each move follows an add, so the edits change their owner
-            {
-                if (x == 1)
-                {
-                    o.source.add(o.rec, &Recorder::on_event);
-                    o.constructed = std::make_unique<multicast_delegate<int>>(std::move(o.source));
-                    o.constructed->add(o.rec, &Recorder::on_event);
-                }
-                else if (x == 2)
-                {
-                    o.constructed->add(o.rec, &Recorder::on_event);
-                    o.assigned = std::move(*o.constructed);
-                    o.assigned.add(o.rec, &Recorder::on_event);
-                }
-                else if (x == 3)
-                {
-                    o.assigned.add(o.rec, &Recorder::on_event);
-                    o.assigned = std::move(o.spare); // the running dispatch moves into `spare`
-                }
-            };
-            o.source(1);
-            AssertThat(o.source.size(), 0);
-            AssertThat(o.constructed->size(), 4);
-
-            (*o.constructed)(2);
-            AssertThat(o.constructed->size(), 0);
-            AssertThat(o.assigned.size(), 6);
-            AssertThat(log, (std::vector<int>{ 101, 102, 102, 102 }));
-
-            o.assigned(3);
-            AssertThat(o.assigned.size(), 1);
-            AssertThat(o.spare.size(), 7);
         }
 
         // a listener which throws still ends the dispatch, so the removed slot goes away
