@@ -7,6 +7,7 @@
 #include <deque>
 #include <memory> // std::shared_ptr
 #include <mutex> // std::lock_guard, std::unique_lock
+#include <stdexcept> // std::runtime_error
 #include <thread>
 #include <type_traits> // std::is_trivially_destructible_v, std::is_same_v, std::conditional_t
 #include <vector>
@@ -536,8 +537,8 @@ TestImpl(test_mutex)
             }
         }
 
-        /// @returns false when a thread misses the one second hang guard
-        bool join()
+        /// Throws when a thread misses the hang guard, so the case stops before it reads the state the thread still writes
+        void join()
         {
             const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1);
             for (rpp::uint32 done; (done = finished->load()) != threads.size();)
@@ -546,12 +547,11 @@ TestImpl(test_mutex)
                 if (left.nsec <= 0)
                 {
                     for (std::thread& t : threads) t.detach();
-                    return false;
+                    throw std::runtime_error{"a thread missed the hang guard"};
                 }
                 (void)rpp::cvar::wait_for(finished.get(), done, left);
             }
             for (std::thread& t : threads) t.join();
-            return true;
         }
     };
 
@@ -586,7 +586,7 @@ TestImpl(test_mutex)
         thread_group lockers { 8, s, [](guarded_counter& s, int) {
             for (int i = 0; i < 5'000; ++i) lock_and_enter(s, i);
         }};
-        AssertThat(lockers.join(), true);
+        lockers.join();
         AssertThat(s->overlaps.load(), 0);
         AssertThat(s->count, 40'000);
     }
@@ -598,7 +598,7 @@ TestImpl(test_mutex)
         thread_group lockers { 32, s, [](guarded_counter& s, int) {
             for (int i = 0; i < 500; ++i) lock_and_enter(s, i);
         }};
-        AssertThat(lockers.join(), true);
+        lockers.join();
         AssertThat(s->overlaps.load(), 0);
         AssertThat(s->count, 16'000);
     }
@@ -615,7 +615,8 @@ TestImpl(test_mutex)
             const bool contended = wait_until_contended(s->m);
             for (int i = 0; i < 10; ++i) rpp::yield(); // more lockers reach the sleep
             s->m.unlock();
-            woke = lockers.join() && contended && s->count == 6 && s->overlaps == 0;
+            lockers.join();
+            woke = contended && s->count == 6 && s->overlaps == 0;
         }
         AssertThat(woke, true);
     }
@@ -632,7 +633,7 @@ TestImpl(test_mutex)
                 rpp::yield();
             }
         }};
-        AssertThat(lockers.join(), true);
+        lockers.join();
         AssertThat(s->overlaps.load(), 0);
         AssertThat(s->count, 1'800);
     }
@@ -648,7 +649,7 @@ TestImpl(test_mutex)
         std::thread([&] { taken = s->m.try_lock(); }).join();
         AssertThat(taken, false);
         s->m.unlock();
-        AssertThat(locker.join(), true);
+        locker.join();
         AssertThat(s->count, 1);
     }
 
@@ -678,7 +679,7 @@ TestImpl(test_mutex)
                 }
             }
         }};
-        AssertThat(lockers.join(), true);
+        lockers.join();
         AssertThat(s->overlaps.load(), 0);
         AssertThat(s->count, 12'000);
     }
@@ -699,7 +700,8 @@ TestImpl(test_mutex)
             }};
             const bool contended = wait_until_contended(*m);
             m->unlock();
-            freed = freer.join() && contended;
+            freer.join();
+            freed = contended;
         }
         AssertThat(freed, true);
     }
@@ -720,7 +722,7 @@ TestImpl(test_mutex)
                 ++s.count[b];
             }
         }};
-        AssertThat(lockers.join(), true);
+        lockers.join();
         for (int count : s->count) AssertThat(count, 4'000);
     }
 
@@ -754,7 +756,7 @@ TestImpl(test_mutex)
                 }
             }
         }};
-        AssertThat(workers.join(), true);
+        workers.join();
         AssertThat(s->sum, 4LL * 499'500); // each producer pushes 0 to 999
         AssertThat(s->items.empty(), true);
     }
