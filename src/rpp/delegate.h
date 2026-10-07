@@ -945,10 +945,10 @@ namespace rpp
         // constructs the delegate in its slot, so a member function never passes through a temporary
         template<class... DelegateArgs> void emplace(DelegateArgs&&... args)
         {
-            container*& slots = ptr && ptr->added ? begin_edits() : ptr; // a running dispatch keeps its slots in place
-            grow(slots);
-            new (&slots->data[slots->size]) deleg{std::forward<DelegateArgs>(args)...};
-            ++slots->size;
+            container*& list = ptr && ptr->added ? begin_edits() : ptr; // a running dispatch keeps its slots in place
+            grow(list);
+            new (&list->data[list->size]) deleg{std::forward<DelegateArgs>(args)...};
+            ++list->size;
         }
 
     public:
