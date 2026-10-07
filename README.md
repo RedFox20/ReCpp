@@ -396,6 +396,7 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_TSAN`](src/rpp/config.h#L112) | `1` if ThreadSanitizer is enabled |
 | [`RPP_UBSAN`](src/rpp/config.h#L119) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
 | [`RPP_SANITIZERS`](src/rpp/config.h#L129) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
+| [`RPP_TSAN_ANNOTATE(call)`](src/rpp/mutex.h#L14) | Expands to `call` when ThreadSanitizer is enabled, and to nothing otherwise |
 
 ### Platform & Architecture
 
@@ -2061,39 +2062,40 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L78) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, `std::mutex` elsewhere |
-| [`futex_mutex`](src/rpp/mutex.h#L30) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
-| [`recursive_mutex`](src/rpp/mutex.h#L99) | Recursive mutex variant |
-| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L241) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L511) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`mutex`](src/rpp/mutex.h#L101) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, `std::mutex` elsewhere |
+| [`futex_mutex`](src/rpp/mutex.h#L38) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
+| [`recursive_mutex`](src/rpp/mutex.h#L122) | Recursive mutex variant |
+| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L264) | RAII unlock guard: unlocks on construction, relocks on destruction |
+| [`synchronized<T>`](src/rpp/mutex.h#L534) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L265) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L301) | Spin-lock with timeout |
-| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L191) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L343) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L288) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L324) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L214) | Indicates platform provides native critical_section mutex |
+| [`SyncableType`](src/rpp/mutex.h#L366) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
-call, and has a trivial destructor, so a static instance is safe before and after `main()`.
+call, and has a trivial destructor, so a static instance is safe before and after `main()`. In a TSAN build each
+lock and unlock annotates itself, so TSAN reports a lock-order inversion as it does for `std::mutex`.
 
 | Method | Description |
 |--------|-------------|
-| [`try_lock()`](src/rpp/mutex.h#L46) | Takes the lock without a wait, and returns false when another thread holds it |
-| [`lock()`](src/rpp/mutex.h#L53) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
-| [`lock_contended()`](src/rpp/mutex.h#L60) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
-| [`unlock()`](src/rpp/mutex.h#L67) | Releases the lock, and wakes one sleeping thread when the lock was contended |
+| [`try_lock()`](src/rpp/mutex.h#L61) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/mutex.h#L70) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
+| [`lock_contended()`](src/rpp/mutex.h#L79) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/mutex.h#L88) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under `futex_mutex`, the condition variable and the semaphore flags.
 
 | Function | Description |
 |----------|-------------|
-| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L17) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
-| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L20) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
-| [`wake_one(const void* addr)`](src/rpp/mutex.h#L23) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
-| [`wake_all(const void* addr)`](src/rpp/mutex.h#L26) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L25) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L28) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/mutex.h#L31) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/mutex.h#L34) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
 
 ### Example: Basic Mutex and Spin Lock
 

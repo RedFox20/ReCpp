@@ -551,6 +551,10 @@ set exit 66 on its own.
 Eighth sighting on 74c5a71 in #131, on `ubuntu-cpp20-tsan-clang18`, so libc++ reports it too.
 A ninth came on 0d1bc06, on `ubuntu-cpp23-tsan-gcc13`, with the two lines above.
 
+Tenth sighting on 2f22f16 in #136, on `ubuntu-cpp23-tsan-clang18`. The free is in `__cxa_end_catch`,
+and the read is at `tests.cpp:744`. All 738 cases passed. The commit before it passed the same job, and
+this commit changes only an include and a comment.
+
 The libc++ stack names the freed object. The worker frees the exception of
 `parallel_task_exception` in `__cxa_end_catch`, at the end of its catch block in
 `pool_worker::run()`. The main thread read that exception at `tests.cpp:733`, in the
