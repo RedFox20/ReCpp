@@ -619,7 +619,7 @@ TestImpl(test_concurrent_queue)
         AssertTrue(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
         AssertThat(item, "item3");
         // now wait until producer exits by setting the cancellation condition
-        // wait_pop polls the cancel condition every tenth of its timeout, so a return before that proves the notify woke it
+        // a return before the cancel poll of wait_pop proves the notify woke it
         rpp::Timer t;
         AssertFalse(queue.wait_pop(item, rpp::seconds(1), cancelCondition));
         AssertLess(t.elapsed_millis(), 100);

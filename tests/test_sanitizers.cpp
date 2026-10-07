@@ -30,6 +30,7 @@ const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifi
 #if RPP_TSAN_BUILD && __linux__
 #include <rpp/mutex.h>
 #include <atomic> // std::atomic_int
+#include <initializer_list> // std::initializer_list
 #include <memory> // std::make_unique
 #include <mutex> // std::lock_guard
 #include <sanitizer/tsan_interface.h>
