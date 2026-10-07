@@ -2258,10 +2258,10 @@ thread which sleeps on the mutex wakes at the next unlock.
 
 | Method | Description |
 |--------|-------------|
-| [`notify_one()`](src/rpp/condition_variable.h#L189) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
-| [`notify_all()`](src/rpp/condition_variable.h#L196) | Wakes all waiting threads |
-| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L223) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
-| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L236) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+| [`notify_one()`](src/rpp/condition_variable.h#L186) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
+| [`notify_all()`](src/rpp/condition_variable.h#L193) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L220) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L233) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`.
 

@@ -202,6 +202,20 @@ TestImpl(test_condition_variable)
         AssertThat(lock.locks, 1);
     }
 
+    TestCase(a_wait_relocks_through_the_lock_of_a_derived_mutex)
+    {
+        struct counting_mutex : rpp::futex_mutex
+        {
+            int locks = 0;
+            void lock() noexcept { ++locks; futex_mutex::lock(); }
+        };
+        rpp::condition_variable cv;
+        counting_mutex m;
+        std::unique_lock lock { m };
+        (void)cv.wait_for(lock, rpp::millis(5)); // nothing notifies, so the wait times out
+        AssertThat(m.locks, 2);
+    }
+
     TestCase(wait_for_zero_duration_returns_immediately)
     {
         rpp::condition_variable cv;

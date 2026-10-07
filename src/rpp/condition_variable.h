@@ -127,12 +127,9 @@ namespace rpp
         std::atomic_uint32_t seq { 0 }; // the word a waiter sleeps on, and a notify changes
         std::atomic_uint32_t state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
 
-        // only a unique_lock, because another lock type can add its own work to lock() and unlock()
+        // only the exact type, because another lock or a derived mutex can add its own work to lock() and unlock()
         template<class Lock>
-        static constexpr bool marks_contended = requires(Lock& lock) {
-            requires std::is_same_v<Lock, std::unique_lock<typename Lock::mutex_type>>;
-            lock.mutex()->lock_contended();
-        };
+        static constexpr bool marks_contended = std::is_same_v<Lock, std::unique_lock<rpp::futex_mutex>>;
 
         // a waiter reads seq before it registers, so a notify which counts it also changes the seq it sleeps on
         rpp::uint32 begin_wait() noexcept
