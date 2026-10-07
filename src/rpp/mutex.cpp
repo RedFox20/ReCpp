@@ -2,6 +2,7 @@
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #include <type_traits> // std::is_trivially_destructible_v
 #endif
 #if RPP_FREERTOS
     #include "debugging.h"
@@ -19,33 +20,11 @@ namespace rpp
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
     /////////////////////////////////////////////////////////////////
 
-    #define GET_SRW_LOCK() ((SRWLOCK*)&mtx)
+    static_assert(sizeof(SRWLOCK) == sizeof(mutex) && std::is_trivially_destructible_v<mutex>);
 
-    mutex::mutex() noexcept : mtx{SRWLOCK_INIT}
-    {
-        static_assert(sizeof(SRWLOCK) == sizeof(mutex::mtx));
-    }
-    mutex::~mutex() noexcept
-    {
-        mtx = SRWLOCK_INIT;
-    }
-    bool mutex::try_lock() noexcept
-    {
-        SRWLOCK* srw = GET_SRW_LOCK();
-        return srw && TryAcquireSRWLockExclusive(srw);
-    }
-    void mutex::lock()
-    {
-        if (SRWLOCK* srw = GET_SRW_LOCK())
-            AcquireSRWLockExclusive(srw);
-        else
-            throw std::runtime_error{"rpp::mutex::lock() failed: lock destroyed"};
-    }
-    void mutex::unlock() noexcept
-    {
-        if (SRWLOCK* srw = GET_SRW_LOCK())
-            ReleaseSRWLockExclusive(srw);
-    }
+    bool mutex::try_lock() noexcept { return TryAcquireSRWLockExclusive((SRWLOCK*)&srw); }
+    void mutex::lock() noexcept { AcquireSRWLockExclusive((SRWLOCK*)&srw); }
+    void mutex::unlock() noexcept { ReleaseSRWLockExclusive((SRWLOCK*)&srw); }
 
     /////////////////////////////////////////////////////////////////
 

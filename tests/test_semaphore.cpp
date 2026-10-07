@@ -369,7 +369,7 @@ TestImpl(test_semaphore)
     // the wait relocks the mutex as contended, so the next unlock wakes a locker which sleeps on it without delay
     TestCase(a_wait_relocks_the_semaphore_mutex_as_contended)
     {
-        if constexpr (std::is_same_v<rpp::cv_mutex, rpp::futex_mutex>)
+        if constexpr (std::is_same_v<rpp::mutex, rpp::futex_mutex>)
         {
             rpp::semaphore sem;
             rpp::semaphore started;

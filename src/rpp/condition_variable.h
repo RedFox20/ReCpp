@@ -13,29 +13,13 @@
 #include "timepoint.h" // rpp::Duration, rpp::TimePoint
 #include "predicates.h" // rpp::IsPredicate
 #include "debugging.h" // LogError
-#include "mutex.h" // rpp::mutex
+#include "mutex.h" // rpp::cvar
 #include <atomic>
 #include <mutex> // std::unique_lock
 #include <type_traits> // std::is_same_v
 
 namespace rpp
 {
-    /// Waits in the kernel on a 32-bit word: a futex on Linux and Android, WaitOnAddress() on Windows
-    namespace cvar
-    {
-        /// Sleeps until the 32-bit word at `addr` no longer equals `expected`
-        RPPAPI void wait(const void* addr, rpp::uint32 expected) noexcept;
-
-        /// Same as wait(), but at most for `timeout`. @returns false when the timeout elapsed first
-        RPPAPI bool wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept;
-
-        /// Wakes one thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
-        RPPAPI void wake_one(const void* addr) noexcept;
-
-        /// Wakes every thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
-        RPPAPI void wake_all(const void* addr) noexcept;
-    }
-
     /// The result of a timed condition_variable wait without a predicate
     enum class cv_status : rpp::byte
     {
@@ -66,55 +50,6 @@ namespace rpp
         }
         return remaining;
     }
-
-    /// A mutex in one 32-bit word, which sleeps through rpp::cvar. A condition_variable wait relocks it as contended
-    class futex_mutex
-    {
-        static constexpr rpp::uint32 UNLOCKED = 0;
-        static constexpr rpp::uint32 LOCKED = 1;
-        static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
-        std::atomic_uint32_t word { UNLOCKED };
-
-    public:
-        futex_mutex() noexcept = default;
-        futex_mutex(const futex_mutex&) = delete;
-        futex_mutex& operator=(const futex_mutex&) = delete;
-
-        /// @returns true when this thread took the lock, false when another thread holds it
-        bool try_lock() noexcept
-        {
-            rpp::uint32 expected = UNLOCKED;
-            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
-        }
-
-        /// Takes the lock, and sleeps while another thread holds it
-        void lock() noexcept
-        {
-            if (!try_lock())
-                lock_contended();
-        }
-
-        /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
-        void lock_contended() noexcept
-        {
-            while (word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
-                cvar::wait(&word, CONTENDED);
-        }
-
-        /// Releases the lock, and wakes one sleeping thread when the lock was contended
-        void unlock() noexcept
-        {
-            if (word.exchange(UNLOCKED, std::memory_order_release) == CONTENDED)
-                cvar::wake_one(&word);
-        }
-    };
-
-#if _MSC_VER || __linux__
-    /// The mutex which suits rpp::condition_variable best on this target
-    using cv_mutex = rpp::futex_mutex;
-#else
-    using cv_mutex = rpp::mutex; // the parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
-#endif
 
     /**
      * @brief Blocks a thread until a notify, and works with any lock which has lock() and unlock().

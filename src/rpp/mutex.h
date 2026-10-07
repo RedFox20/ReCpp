@@ -1,35 +1,99 @@
 #pragma once
 #include "config.h"
+#include "config.types.h" // rpp::uint32
 #include "type_traits.h"
 #include "timer.h" // rpp:Timer
 #include "threads.h" // rpp::yield
 #include "timepoint.h" // rpp::Duration
+#include <atomic>
 #include <mutex> // lock_guard etc
 
 namespace rpp
 {
+    /// Waits in the kernel on a 32-bit word: a futex on Linux and Android, WaitOnAddress() on Windows
+    namespace cvar
+    {
+        /// Sleeps until the 32-bit word at `addr` no longer equals `expected`
+        RPPAPI void wait(const void* addr, rpp::uint32 expected) noexcept;
+
+        /// Same as wait(), but at most for `timeout`. @returns false when the timeout elapsed first
+        RPPAPI bool wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout) noexcept;
+
+        /// Wakes one thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
+        RPPAPI void wake_one(const void* addr) noexcept;
+
+        /// Wakes every thread which sleeps on `addr`. It never reads `addr`, so the memory may already be freed
+        RPPAPI void wake_all(const void* addr) noexcept;
+    }
+
+    /// A mutex in one 32-bit word, which sleeps through rpp::cvar. A condition_variable wait relocks it as contended
+    class futex_mutex
+    {
+        static constexpr rpp::uint32 UNLOCKED = 0;
+        static constexpr rpp::uint32 LOCKED = 1;
+        static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
+        std::atomic_uint32_t word { UNLOCKED };
+
+        // spins while the holder runs, then sleeps until the lock is free
+        RPPAPI void lock_slow() noexcept;
+
+    public:
+        futex_mutex() noexcept = default;
+        futex_mutex(const futex_mutex&) = delete;
+        futex_mutex& operator=(const futex_mutex&) = delete;
+
+        /// @returns true when this thread took the lock, false when another thread holds it
+        bool try_lock() noexcept
+        {
+            rpp::uint32 expected = UNLOCKED;
+            return word.compare_exchange_strong(expected, LOCKED, std::memory_order_acquire, std::memory_order_relaxed);
+        }
+
+        /// Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps
+        void lock() noexcept
+        {
+            if (!try_lock())
+                lock_slow();
+        }
+
+        /// Takes the lock and marks it contended, so the next unlock wakes a sleeping thread
+        void lock_contended() noexcept
+        {
+            while (word.exchange(CONTENDED, std::memory_order_acquire) != UNLOCKED)
+                cvar::wait(&word, CONTENDED);
+        }
+
+        /// Releases the lock, and wakes one sleeping thread when the lock was contended
+        void unlock() noexcept
+        {
+            if (word.exchange(UNLOCKED, std::memory_order_release) == CONTENDED)
+                cvar::wake_one(&word);
+        }
+    };
+
 #if _MSC_VER
     #define USE_CUSTOM_WINDOWS_MUTEX 1
     #if USE_CUSTOM_WINDOWS_MUTEX
+        /// The platform mutex on MSVC, an SRWLOCK
         class mutex
         {
-            struct { void* ctx; } mtx;
+            void* srw = nullptr; // SRWLOCK_INIT
         public:
-            mutex() noexcept;
-            ~mutex() noexcept;
-
-            mutex(mutex&&) = delete;
-            mutex& operator=(mutex&&) = delete;
-
+            constexpr mutex() noexcept = default;
             mutex(const mutex&) = delete;
             mutex& operator=(const mutex&) = delete;
 
-            bool try_lock() noexcept;
-            void lock();
-            void unlock() noexcept;
+            /// @returns true when this thread took the lock, false when another thread holds it
+            RPPAPI bool try_lock() noexcept;
 
-            // this mutex is always valid and not copyable
-            void* native_handle() const noexcept { return (void*)&mtx; }
+            /// Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps
+            RPPAPI void lock() noexcept;
+
+            /// Releases the lock. Only the thread which took the lock can release it
+            RPPAPI void unlock() noexcept;
+
+            /// @returns the SRWLOCK
+            void* native_handle() const noexcept { return (void*)&srw; }
         };
 
         class recursive_mutex
@@ -156,7 +220,12 @@ namespace rpp
     using recursive_mutex = critical_section;
 
 #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
+#elif __linux__
+    /// The platform mutex, a futex_mutex on Linux and Android
+    using mutex = rpp::futex_mutex;
+    using recursive_mutex = std::recursive_mutex;
 #else
+    // the Apple and Emscripten parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
     using mutex = std::mutex;
     using recursive_mutex = std::recursive_mutex;
 #endif

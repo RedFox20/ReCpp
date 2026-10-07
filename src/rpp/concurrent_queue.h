@@ -5,7 +5,7 @@
  */
 #pragma once
 #include "config.h"
-#include "condition_variable.h" // rpp::condition_variable, rpp::cv_mutex
+#include "condition_variable.h" // rpp::condition_variable
 #include "mutex.h" // rpp::spin_lock, rpp::yield
 #include "atomic_timepoint.h" // rpp::AtomicTimeSource
 #include "timepoint.h" // rpp::Duration
@@ -51,7 +51,7 @@ namespace rpp
     public:
         using duration = rpp::Duration;
         using time_point = rpp::TimePoint;
-        using mutex_t = rpp::cv_mutex;
+        using mutex_t = rpp::mutex;
         using lock_t = std::unique_lock<mutex_t>;
 
     private:

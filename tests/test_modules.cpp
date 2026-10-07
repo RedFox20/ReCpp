@@ -331,6 +331,9 @@ TestImpl(test_modules)
         m.unlock();
         std::unique_lock<rpp::mutex> held = rpp::spin_lock(m);
         AssertThat(held.owns_lock(), true);
+        rpp::futex_mutex fm;
+        AssertThat(fm.try_lock(), true);
+        fm.unlock();
     }
 
     TestCase(paths_module_carries_the_whole_surface)
@@ -393,13 +396,6 @@ TestImpl(test_modules)
         rpp::mutex m;
         std::unique_lock<rpp::mutex> lock { m };
         AssertThat(cv.wait_for(lock, rpp::millis(1)) == rpp::cv_status::timeout, true);
-
-        rpp::cv_mutex cm;
-        std::unique_lock<rpp::cv_mutex> cv_lock { cm };
-        AssertThat(cv.wait_for(cv_lock, rpp::millis(1)) == rpp::cv_status::timeout, true);
-        rpp::futex_mutex fm;
-        AssertThat(fm.try_lock(), true);
-        fm.unlock();
     }
 
     TestCase(file_io_module_carries_the_whole_surface)

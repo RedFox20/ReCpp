@@ -1,6 +1,16 @@
 #include <rpp/tests.h>
 #include <rpp/mutex.h>
+#include <rpp/condition_variable.h>
+#include <rpp/threads.h> // rpp::yield
+#include <rpp/timepoint.h> // rpp::TimePoint, rpp::seconds, rpp::millis
+#include <atomic>
+#include <deque>
+#include <memory> // std::shared_ptr
+#include <mutex> // std::lock_guard, std::unique_lock
+#include <stdexcept> // std::runtime_error
 #include <thread>
+#include <type_traits> // std::is_trivially_destructible_v, std::is_same_v, std::conditional_t
+#include <vector>
 
 TestImpl(test_mutex)
 {
@@ -452,4 +462,303 @@ TestImpl(test_mutex)
         t.join();
         AssertEqual(*str, "Second value");
     }
+
+#if !RPP_HAS_CRITICAL_SECTION_MUTEX // FreeRTOS constructs it at runtime, and Cortex-M try_lock() always succeeds
+    // a static mutex runs no constructor and no destructor, so a static initializer or an atexit handler can lock it
+    TestCase(mutex_is_one_constant_initialized_word)
+    {
+        static constinit rpp::mutex m;
+        std::lock_guard guard { m };
+        bool taken = true;
+        std::thread([&] { taken = m.try_lock(); }).join(); // a std::mutex owner which calls try_lock() is undefined
+        AssertThat(taken, false);
+    #if __linux__ || _MSC_VER
+        AssertThat(std::is_trivially_destructible_v<rpp::mutex>, true);
+        AssertThat(sizeof(m), sizeof(std::conditional_t<std::is_same_v<rpp::mutex, rpp::futex_mutex>, rpp::uint32, void*>));
+    #endif
+    }
+
+    TestCase(try_lock_fails_while_another_thread_holds_the_mutex)
+    {
+        rpp::mutex m;
+        auto try_lock_on_another_thread = [&] {
+            bool taken = false;
+            std::thread([&] { if ((taken = m.try_lock())) m.unlock(); }).join();
+            return taken;
+        };
+        m.lock();
+        AssertThat(try_lock_on_another_thread(), false);
+        m.unlock();
+        AssertThat(try_lock_on_another_thread(), true);
+    }
+
+    TestCase(spin_lock_for_gives_up_on_a_held_mutex)
+    {
+        rpp::mutex m;
+        std::unique_lock held { m };
+        bool owned = true;
+        std::thread([&] { owned = rpp::spin_lock_for(m, rpp::millis(2)).owns_lock(); }).join();
+        AssertThat(owned, false);
+        held.unlock();
+        AssertThat(rpp::spin_lock_for(m, rpp::millis(2)).owns_lock(), true);
+    }
+
+    // counts the lockers inside the mutex, so an overlap shows even when the count comes out right
+    struct guarded_counter
+    {
+        rpp::mutex m;
+        std::atomic_int inside { 0 };
+        std::atomic_int overlaps { 0 };
+        int count = 0;
+        void enter() noexcept
+        {
+            if (inside.fetch_add(1) != 0) overlaps.fetch_add(1);
+            ++count;
+            inside.fetch_sub(1);
+        }
+    };
+
+    // the guard sleeps on its own word, so a broken mutex cannot stall it. An abandoned thread keeps `state` alive
+    struct thread_group
+    {
+        std::shared_ptr<std::atomic_uint32_t> finished = std::make_shared<std::atomic_uint32_t>(0u);
+        std::vector<std::thread> threads;
+
+        template<class State, class Body>
+        thread_group(int n, const std::shared_ptr<State>& state, Body body)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                threads.emplace_back([state, body, i, finished = finished] {
+                    body(*state, i);
+                    finished->fetch_add(1);
+                    rpp::cvar::wake_all(finished.get());
+                });
+            }
+        }
+
+        /// Throws when a thread misses the hang guard, so the case stops before it reads the state the thread still writes
+        void join()
+        {
+            const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1);
+            for (rpp::uint32 done; (done = finished->load()) != threads.size();)
+            {
+                const rpp::Duration left = deadline - rpp::TimePoint::monotonic_now();
+                if (left.nsec <= 0)
+                {
+                    for (std::thread& t : threads) t.detach();
+                    throw std::runtime_error{"a thread missed the hang guard"};
+                }
+                (void)rpp::cvar::wait_for(finished.get(), done, left);
+            }
+            for (std::thread& t : threads) t.join();
+        }
+    };
+
+    // a futex_mutex word reads contended once a locker marked it to sleep. Another mutex shows no state, so it gets a few yields
+    /// @returns false when no locker marked the mutex within the hang guard
+    static bool wait_until_contended(const rpp::mutex& m)
+    {
+        if constexpr (std::is_same_v<rpp::mutex, rpp::futex_mutex>)
+        {
+            const auto* word = reinterpret_cast<const std::atomic_uint32_t*>(&m);
+            const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1); // a hang guard, a locker ends it
+            while (word->load() != 2u && rpp::TimePoint::monotonic_now() < deadline)
+                rpp::yield();
+            return word->load() == 2u;
+        }
+        else
+        {
+            for (int i = 0; i < 10; ++i) rpp::yield();
+            return true;
+        }
+    }
+
+    static void lock_and_enter(guarded_counter& s, int) noexcept
+    {
+        std::lock_guard guard { s.m };
+        s.enter();
+    }
+
+    TestCase(contended_lockers_never_overlap)
+    {
+        auto s = std::make_shared<guarded_counter>();
+        thread_group lockers { 8, s, [](guarded_counter& s, int) {
+            for (int i = 0; i < 5'000; ++i) lock_and_enter(s, i);
+        }};
+        lockers.join();
+        AssertThat(s->overlaps.load(), 0);
+        AssertThat(s->count, 40'000);
+    }
+
+    // many lockers, so most of them sleep and wake many times
+    TestCase(oversubscribed_lockers_all_finish)
+    {
+        auto s = std::make_shared<guarded_counter>();
+        thread_group lockers { 32, s, [](guarded_counter& s, int) {
+            for (int i = 0; i < 500; ++i) lock_and_enter(s, i);
+        }};
+        lockers.join();
+        AssertThat(s->overlaps.load(), 0);
+        AssertThat(s->count, 16'000);
+    }
+
+    // several lockers sleep on the held mutex, and each unlock must wake the next one
+    TestCase(every_sleeping_locker_wakes)
+    {
+        bool woke = true;
+        for (int round = 0; woke && round < 20; ++round)
+        {
+            auto s = std::make_shared<guarded_counter>();
+            s->m.lock();
+            thread_group lockers { 6, s, &lock_and_enter };
+            const bool contended = wait_until_contended(s->m);
+            for (int i = 0; i < 10; ++i) rpp::yield(); // more lockers reach the sleep
+            s->m.unlock();
+            lockers.join();
+            woke = contended && s->count == 6 && s->overlaps == 0;
+        }
+        AssertThat(woke, true);
+    }
+
+    // a holder which yields inside the lock makes the others sleep, so every handoff goes through a wake
+    TestCase(a_slow_holder_hands_the_mutex_to_sleeping_lockers)
+    {
+        auto s = std::make_shared<guarded_counter>();
+        thread_group lockers { 6, s, [](guarded_counter& s, int) {
+            for (int i = 0; i < 300; ++i)
+            {
+                std::lock_guard guard { s.m };
+                s.enter();
+                rpp::yield();
+            }
+        }};
+        lockers.join();
+        AssertThat(s->overlaps.load(), 0);
+        AssertThat(s->count, 1'800);
+    }
+
+    // a failed try_lock() keeps the mark which makes the next unlock wake a sleeping locker
+    TestCase(a_failed_try_lock_keeps_the_sleeping_locker_wakeable)
+    {
+        auto s = std::make_shared<guarded_counter>();
+        s->m.lock();
+        thread_group locker { 1, s, &lock_and_enter };
+        AssertThat(wait_until_contended(s->m), true);
+        bool taken = true;
+        std::thread([&] { taken = s->m.try_lock(); }).join();
+        AssertThat(taken, false);
+        s->m.unlock();
+        locker.join();
+        AssertThat(s->count, 1);
+    }
+
+    TestCase(lock_try_lock_and_spin_lock_for_exclude_each_other)
+    {
+        auto s = std::make_shared<guarded_counter>();
+        thread_group lockers { 6, s, [](guarded_counter& s, int t) {
+            for (int i = 0; i < 2'000; ++i)
+            {
+                if (t % 3 == 0)
+                {
+                    lock_and_enter(s, i);
+                }
+                else if (t % 3 == 1)
+                {
+                    while (!s.m.try_lock()) rpp::yield();
+                    s.enter();
+                    s.m.unlock();
+                }
+                else if (std::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
+                {
+                    s.enter();
+                }
+                else
+                {
+                    lock_and_enter(s, i);
+                }
+            }
+        }};
+        lockers.join();
+        AssertThat(s->overlaps.load(), 0);
+        AssertThat(s->count, 12'000);
+    }
+
+    // the next owner may free the mutex while the last unlock still runs, so unlock() never touches it after the release
+    TestCase(a_locker_can_free_the_mutex_right_after_the_unlock)
+    {
+        bool freed = true;
+        for (int round = 0; freed && round < 100; ++round)
+        {
+            auto s = std::make_shared<rpp::mutex*>(new rpp::mutex);
+            rpp::mutex* m = *s;
+            m->lock();
+            thread_group freer { 1, s, [](rpp::mutex*& m, int) {
+                m->lock();
+                m->unlock();
+                delete m;
+            }};
+            const bool contended = wait_until_contended(*m);
+            m->unlock();
+            freer.join();
+            freed = contended;
+        }
+        AssertThat(freed, true);
+    }
+
+    // packed mutexes share a cache line and a kernel wait bucket, so a wake must reach the word it names
+    TestCase(adjacent_mutexes_wake_their_own_lockers)
+    {
+        struct packed { rpp::mutex m[8]; int count[8] = {}; };
+        auto s = std::make_shared<packed>();
+        thread_group lockers { 8, s, [](packed& s, int t) {
+            const int next = (t + 1) % 8;
+            const int a = next < t ? next : t, b = next < t ? t : next; // one lock order, so no deadlock
+            for (int i = 0; i < 2'000; ++i)
+            {
+                std::lock_guard first { s.m[a] };
+                std::lock_guard second { s.m[b] };
+                ++s.count[a];
+                ++s.count[b];
+            }
+        }};
+        lockers.join();
+        for (int count : s->count) AssertThat(count, 4'000);
+    }
+
+    // a bounded queue sleeps on both sides, and every wait relocks the mutex under contention
+    TestCase(a_bounded_queue_hands_every_item_to_one_consumer)
+    {
+        struct queue
+        {
+            rpp::mutex m;
+            rpp::condition_variable not_empty, not_full;
+            std::deque<int> items;
+            long long sum = 0;
+        };
+        auto s = std::make_shared<queue>();
+        thread_group workers { 8, s, [](queue& q, int t) {
+            for (int i = 0; i < 1'000; ++i)
+            {
+                std::unique_lock lock { q.m };
+                if (t < 4)
+                {
+                    q.not_full.wait(lock, [&] { return q.items.size() < 8; });
+                    q.items.push_back(i);
+                    q.not_empty.notify_one();
+                }
+                else
+                {
+                    q.not_empty.wait(lock, [&] { return !q.items.empty(); });
+                    q.sum += q.items.front();
+                    q.items.pop_front();
+                    q.not_full.notify_one();
+                }
+            }
+        }};
+        workers.join();
+        AssertThat(s->sum, 4LL * 499'500); // each producer pushes 0 to 999
+        AssertThat(s->items.empty(), true);
+    }
+#endif
 };
