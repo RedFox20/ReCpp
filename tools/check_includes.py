@@ -66,13 +66,16 @@ def headers() -> list[str]:
     return sorted(f for f in os.listdir(SRC) if f.endswith('.h') and f not in SKIP)
 
 
+QT_KEYWORDS = '#define slots\n#define signals public\n#define emit\n'
+
+
 def compile_header(header: str, include_root: str) -> tuple[bool, str]:
     """Compiles a translation unit that includes the header twice and nothing else."""
     with tempfile.TemporaryDirectory() as td:
         tu = os.path.join(td, 'tu.cpp')
-        # the second include proves the include guard works
+        # the second include proves the include guard works. Qt defines these keywords as macros.
         with open(tu, 'w') as f:
-            f.write(f'#include <rpp/{header}>\n#include <rpp/{header}>\n')
+            f.write(f'{QT_KEYWORDS}#include <rpp/{header}>\n#include <rpp/{header}>\n')
         cmd = [CXX, f'-std={STD}', '-fsyntax-only', '-I', include_root, tu]
         p = subprocess.run(cmd, capture_output=True, text=True)
         return p.returncode == 0, p.stderr
