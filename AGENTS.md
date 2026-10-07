@@ -122,8 +122,8 @@ alters the built library bumps the version. A change to docs or tests alone does
 
 Mama 0.14.13 and later rebuild a dependent package when the ReCpp `MAJOR.MINOR` changes.
 
-1. Bump PATCH when no header changes, such as a fix inside a `.cpp` file.
-2. Bump MINOR when a header changes and existing code still compiles, such as a new function.
+1. Bump PATCH when no header, `.cppm` file, or ABI flag changes, such as a fix inside a `.cpp` file.
+2. Bump MINOR for any other change which keeps existing code compiling, such as a new function.
 3. Bump MAJOR when the change breaks the API.
 
 ## Reference
