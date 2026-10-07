@@ -1587,7 +1587,7 @@ namespace rpp
                 Subscriber(const Subscriber&) = delete;
                 Subscriber& operator=(const Subscriber&) = delete;
                 ~Subscriber() { evt->remove(this, &Subscriber::on_event); }
-                void on_event(int) { ++*calls; }
+                void on_event(int /*x*/) { ++*calls; }
             };
             int calls = 0;
             multicast_delegate<int> evt;
