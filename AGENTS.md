@@ -121,7 +121,7 @@ place of the commit, so two commits with one version share one package. A change
 alters the built library bumps the version. A change to docs or tests alone does not bump it.
 
 Mama 0.14.13 and later treat a `MAJOR.MINOR` change as an ABI break, and rebuild each dependent package.
-Only a PATCH bump keeps the ABI. README.md Versioning holds the same table.
+Only a PATCH bump keeps the ABI.
 
 1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, or a regenerated `.cppm` file.
 2. Bump MINOR when the ABI or the API changes: a class layout, an inline function, a template, an ABI flag, or a removed symbol.
