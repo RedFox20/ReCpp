@@ -321,6 +321,9 @@ warning within one second. A dump at the timeout showed one worker in the libtsa
 state D. A second worker waited on a libtsan lock, and the warning arrived after the case ended.
 So `warning_capture` waits longer in a TSAN build.
 
+CI run [37866167831](https://github.com/RedFox20/ReCpp/actions/runs/37866167831) on `4f07e08` reported the same libc++ free/read pair in
+`cross_thread_exception_propagation` and `except_handlers_catch_third`. All 745 cases passed, and TSAN alone set exit code 66.
+
 ### B26. `~event_loop()` can return while a detached worker still holds the loop
 `~event_loop()` waits two seconds in `wait_on_all()`, then reports a timeout through
 `__assertion_failure`. That macro does not act the same on every platform. On gcc, clang and

@@ -28,6 +28,173 @@ TestImpl(test_async)
 {
     TestInit(test_async) {}
 
+    TestCase(event_loop_pumps_future_results_and_exceptions)
+    {
+        rpp::event_loop loop;
+        promise<int> value;
+        future<int> result = value.get_future();
+        loop.post([&] { value.set_value(42); });
+        AssertThat(loop.run_until_ready(result), 42);
+        AssertThat(result.valid(), false);
+
+        promise<void> done;
+        future<void> completed = done.get_future();
+        loop.post([&] { done.set_value(); });
+        loop.run_until_ready(completed);
+        AssertThat(completed.valid(), false);
+
+        future<int> failed = rpp::exceptional_future<int>(std::runtime_error{"loop_result"});
+        AssertThrows(loop.run_until_ready(failed), std::runtime_error);
+        AssertThat(failed.valid(), false);
+    }
+
+    TestCase(event_loop_future_timeout_keeps_the_result)
+    {
+        rpp::event_loop loop;
+        promise<int> value;
+        future<int> result = value.get_future();
+        AssertThat(loop.pump_until_ready(result, rpp::Duration::zero()), false);
+        AssertThrows(loop.run_until_ready(result, rpp::Duration::zero()), std::runtime_error);
+        value.set_value(7);
+        AssertThat(loop.run_until_ready(result, rpp::Duration::zero()), 7);
+        AssertThat(loop.pump_until_ready(result), false);
+    }
+
+    TestCase(run_tasks_launches_every_future_before_waiting)
+    {
+        std::vector<int> items {1, 2, 3};
+        std::atomic_int total {0};
+        std::vector<promise<void>> pending;
+        struct launcher
+        {
+            std::atomic_int& total;
+            std::vector<promise<void>>& pending;
+            size_t count;
+            RPP_CORO_WRAPPER future<void> operator()(int& item) const
+            {
+                total.fetch_add(item);
+                pending.emplace_back();
+                future<void> f = pending.back().get_future();
+                if (pending.size() == count)
+                    for (promise<void>& p : pending) p.set_value();
+                return f;
+            }
+        };
+        launcher launch {total, pending, items.size()};
+        rpp::run_tasks(items, launch);
+        AssertThat(total.load(), 6);
+        std::vector<int> empty;
+        rpp::run_tasks(empty, launch);
+    }
+
+    TestCase(run_tasks_drains_results_before_rethrowing)
+    {
+        std::vector<int> items {1, 2, 3};
+        int launched = 0;
+        rpp::semaphore release;
+        std::atomic_bool completed {false};
+        struct launcher
+        {
+            int& launched;
+            rpp::semaphore& release;
+            std::atomic_bool& completed;
+            RPP_CORO_WRAPPER future<void> operator()(int& item) const
+            {
+                ++launched;
+                if (item == 1) return rpp::exceptional_future<void>(std::runtime_error{"task_failed"});
+                if (item == 2) return rpp::async([this] { release.wait(rpp::seconds(1)); completed.store(true); });
+                release.notify();
+                return rpp::ready_future();
+            }
+        };
+        launcher launch {launched, release, completed};
+        AssertThrows(rpp::run_tasks(items, launch), std::runtime_error);
+        AssertThat(launched, 3);
+        AssertThat(completed.load(), true);
+
+        completed.store(false);
+        struct throwing_launcher
+        {
+            rpp::semaphore& release;
+            std::atomic_bool& completed;
+            RPP_CORO_WRAPPER future<void> operator()(int& item) const
+            {
+                if (item == 2)
+                {
+                    release.notify();
+                    throw std::logic_error{"launcher_failed"};
+                }
+                return rpp::async([this] { release.wait(rpp::seconds(1)); completed.store(true); });
+            }
+        };
+        throwing_launcher throwing {release, completed};
+        AssertThrows(rpp::run_tasks(items, throwing), std::logic_error);
+        AssertThat(completed.load(), true);
+    }
+
+    TestCase(run_tasks_keeps_the_legacy_launcher)
+    {
+        struct launcher
+        {
+            RPP_CORO_WRAPPER cfuture<void> operator()(int& item) const
+            {
+                return rpp::async_task([&item] { ++item; });
+            }
+        };
+        std::vector<int> items {1, 2};
+        rpp::run_tasks(items, launcher{});
+        AssertThat(items[0], 2);
+        AssertThat(items[1], 3);
+    }
+
+    static rpp::event_task await_on_loop(rpp::event_loop& loop, future<int> result, int& value, rpp::uint64& thread)
+    {
+        value = co_await loop.run_async(std::move(result));
+        thread = rpp::get_thread_id();
+    }
+
+    TestCase(await_future_resumes_on_the_loop_thread)
+    {
+        rpp::event_loop loop;
+        int value = 0;
+        rpp::uint64 thread = 0;
+        promise<int> pending;
+        rpp::event_task task = await_on_loop(loop, pending.get_future(), value, thread);
+        AssertThat(task.done(), false);
+        AssertThat(loop.background_tasks(), 1);
+        pending.set_value(42);
+        AssertThat(task.done(), false);
+        loop.run_until_done(task);
+        AssertThat(value, 42);
+        AssertThat(thread, rpp::get_thread_id());
+        AssertThat(loop.background_tasks(), 0);
+
+        task = await_on_loop(loop, rpp::ready_future(7), value, thread);
+        AssertThat(task.done(), false);
+        loop.run_until_done(task);
+        AssertThat(value, 7);
+
+        task = await_on_loop(loop, rpp::exceptional_future<int>(std::runtime_error{"await_failed"}), value, thread);
+        AssertThrows(loop.run_until_done(task), std::runtime_error);
+    }
+
+    TestCase(loop_drain_waits_for_a_pending_future)
+    {
+        rpp::event_loop loop;
+        int value = 0;
+        rpp::uint64 thread = 0;
+        promise<int> pending;
+        rpp::event_task task = await_on_loop(loop, pending.get_future(), value, thread);
+        AssertThat(loop.has_pending_work(), true);
+        future<void> producer = rpp::async([&] { pending.set_value(42); });
+        loop.run_until_idle();
+        producer.get();
+        AssertThat(task.done(), true);
+        AssertThat(value, 42);
+        AssertThat(thread, rpp::get_thread_id());
+        AssertThat(loop.has_pending_work(), false);
+    }
+
     TestCase(simple_chaining)
     {
         promise<std::string> loadString;
@@ -859,17 +1026,6 @@ TestImpl(test_async)
         AssertNotEqual(ranOn, first.worker);
     }
 
-    // runs `loop` on this thread until `f` holds its result, or until the hang guard ends
-    template<class T> static bool run_until_ready(rpp::event_loop& loop, future<T>& f)
-    {
-        rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1);
-        while (!f.await_ready() && rpp::TimePoint::monotonic_now() < deadline)
-            loop.run_once(rpp::millis(5));
-        if (f.await_ready()) return true;
-        f.detach(); // the case fails on the result, and the destructor does not terminate on it
-        return false;
-    }
-
     TestCase(then_and_continue_with_on_a_loop_run_the_task_on_the_loop_thread)
     {
         rpp::event_loop loop;
@@ -878,7 +1034,7 @@ TestImpl(test_async)
             ranOn = rpp::get_thread_id();
             return x + 1;
         });
-        AssertThat(run_until_ready(loop, f), true); // a hang guard, the loop runs the task
+        AssertThat(loop.pump_until_ready(f, rpp::seconds(1)), true);
         AssertThat(f.get(), 21);
         AssertThat(ranOn, rpp::get_thread_id());
 
@@ -889,7 +1045,7 @@ TestImpl(test_async)
             ranOn = x == 42 ? rpp::get_thread_id() : 0;
             ran.set_value();
         });
-        AssertThat(run_until_ready(loop, done), true); // a hang guard, the loop runs the task
+        AssertThat(loop.pump_until_ready(done, rpp::seconds(1)), true);
         AssertThat(ranOn, rpp::get_thread_id());
     }
 
@@ -905,7 +1061,7 @@ TestImpl(test_async)
                 ranOn = rpp::get_thread_id();
                 return x;
             });
-            return run_until_ready(loop, f) && f.get() == 1;
+            return loop.run_until_ready(f, rpp::seconds(1)) == 1;
         }).get();
         AssertThat(ran, true); // a hang guard, the loop runs the first step
         AssertNotEqual(ranOn, loopThread);
