@@ -52,6 +52,7 @@ export namespace rpp {
     using rpp::yield;
     using rpp::task;
     using rpp::deferred;
+    using rpp::future;
     using rpp::cfuture;
     using rpp::wait_result;
     using rpp::coro_handle;
@@ -63,7 +64,6 @@ export namespace rpp {
     using rpp::readonly_lock;
     using rpp::exclusive_lock;
     using rpp::close_sync;
-    using rpp::future;
     using rpp::IsEventLoop;
     using rpp::promise;
     using rpp::async;

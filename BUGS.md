@@ -558,6 +558,11 @@ Tenth sighting on 2f22f16 in #136, on `ubuntu-cpp23-tsan-clang18`. The free is i
 and the read is at `tests.cpp:744`. All 738 cases passed. The commit before it passed the same job, and
 this commit changes only an include and a comment.
 
+Eleventh sighting on 56e7bdb in #146, on `ubuntu-cpp23-tsan-clang18`.
+Worker `rpp_task_28` frees in `__cxa_end_catch`, while the main thread reads at `tests.cpp:744`.
+The creation stack again names `test_sockets::test_udp_poll_nonblocking_select`.
+All 748 cases passed, and TSAN alone set exit code 66.
+
 The libc++ stack names the freed object. The worker frees the exception of
 `parallel_task_exception` in `__cxa_end_catch`, at the end of its catch block in
 `pool_worker::run()`. The main thread read that exception at `tests.cpp:733`, in the

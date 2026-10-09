@@ -12,6 +12,9 @@
 
 namespace rpp
 {
+    template<class T>
+    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND future;
+
     template<class T = void>
     class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
 

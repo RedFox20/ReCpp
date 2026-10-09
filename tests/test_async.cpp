@@ -1,6 +1,8 @@
 #include <rpp/async.h>
+#include <rpp/coroutines.h>
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
+#include <rpp/future.h> // rpp::IsFuture and callable concepts
 #include <rpp/minmax.h> // rpp::min, rpp::max
 #include <rpp/scope_guard.h> // rpp::make_scope_guard
 #include <rpp/semaphore.h>
@@ -29,6 +31,72 @@ using namespace std::string_literals;
 TestImpl(test_async)
 {
     TestInit(test_async) {}
+
+    TestCase(future_concepts_include_modern_futures)
+    {
+        AssertThat(IsFuture<future<int>>, true);
+        AssertThat(IsFuture<future<>>, true);
+        AssertThat(NotFuture<future<int>>, false);
+        AssertThat(IsFunctionReturningFuture<delegate<future<int>()>>, true);
+        AssertThat(IsFunctionReturningFuture<delegate<future<void>()>>, true);
+        AssertThat(IsFunctionNotReturningFuture<delegate<future<int>()>>, false);
+        AssertThat(IsFuture<cfuture<int>>, true);
+        AssertThat(IsFuture<cfuture<void>>, true);
+        AssertThat(IsFuture<std::future<int>>, true);
+        AssertThat(IsFuture<std::future<void>>, true);
+        AssertThat(IsFuture<int>, false);
+        AssertThat(IsFunctionNotReturningFuture<delegate<int()>>, true);
+    }
+
+    template<typename Launcher>
+    static cfuture<int> await_modern_launcher(Launcher launch)
+    {
+        using Awaiter = decltype(rpp::coro_operators::operator co_await(std::move(launch)));
+        using Result = decltype(std::declval<Awaiter&>().await_resume());
+        if constexpr (std::is_same_v<Result, int>)
+            co_return co_await std::move(launch);
+        else if constexpr (std::is_void_v<Result>)
+        {
+            co_await std::move(launch);
+            co_return 1;
+        }
+        else
+        {
+            Result nested = co_await std::move(launch);
+            nested.detach();
+            co_return -1;
+        }
+    }
+
+    TestCase(coroutine_launchers_await_modern_value_futures)
+    {
+        struct launcher
+        {
+            RPP_CORO_WRAPPER future<int> operator()() const { return rpp::ready_future(42); }
+        };
+        AssertThat(await_modern_launcher(launcher{}).get(), 42);
+        delegate<future<int>()> action = launcher{};
+        AssertThat(await_modern_launcher(std::move(action)).get(), 42);
+    }
+
+    TestCase(coroutine_launchers_await_modern_void_and_exceptions)
+    {
+        struct launcher
+        {
+            int mode;
+            RPP_CORO_WRAPPER future<void> operator()() const
+            {
+                if (mode == 1) return rpp::exceptional_future<void>(std::runtime_error{"future_failed"});
+                if (mode == 2) throw std::runtime_error{"launcher_failed"};
+                return rpp::ready_future();
+            }
+        };
+        AssertThat(await_modern_launcher(launcher{0}).get(), 1);
+        delegate<future<void>()> action = launcher{0};
+        AssertThat(await_modern_launcher(std::move(action)).get(), 1);
+        AssertThrows(await_modern_launcher(launcher{1}).get(), std::runtime_error);
+        AssertThrows(await_modern_launcher(launcher{2}).get(), std::runtime_error);
+    }
 
     TestCase(event_loop_pumps_future_results_and_exceptions)
     {

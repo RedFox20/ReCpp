@@ -5,7 +5,7 @@
  * Distributed under MIT Software License
  */
 #include "thread_pool.h"
-#include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::IsFunction
+#include "future_types.h" // rpp::future, rpp::cfuture, rpp::coro_handle, rpp::IsFunction
 #include "traits.h"
 #include "debugging.h" // __assertion_failure
 #include "config.types.h" // rpp::__wrap
@@ -19,10 +19,11 @@ namespace rpp
     // These name std::future, so they live here and not in future_types.h. Every header
     // which includes that one would carry <future>, which crashes an importer. See BUGS.md B16
 
-    /// Matches `rpp::cfuture<T>` and `std::future<T>`, by the return type of `get()`
+    /// Matches `rpp::future<T>`, `rpp::cfuture<T>`, and `std::future<T>` by the return type of `get()`
     template<typename F>
     concept IsFuture = requires(F f) {
-        requires std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
+        requires std::is_same_v<F, rpp::future<decltype(f.get())>>
+              || std::is_same_v<F, rpp::cfuture<decltype(f.get())>>
               || std::is_same_v<F, std::future<decltype(f.get())>>;
     };
 

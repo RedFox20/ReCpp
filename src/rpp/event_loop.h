@@ -15,7 +15,7 @@
 #include "config.h"
 #include "debugging.h"
 #include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::suspend_never
-#include "future.h" // rpp::IsFuture, rpp::IsFunctionReturningFuture
+#include "future.h" // rpp::IsFuture
 #include "task.h" // rpp::task<T> (driven to completion by run_until_done)
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "timepoint.h" // rpp::Duration
@@ -959,16 +959,12 @@ namespace rpp
                 using T = decltype(fut_or_cb.get());
                 return future_awaiter<T>{ *this, std::move(fut_or_cb) };
             }
-            else if constexpr (IsFunctionReturningFuture<Decayed>) // lambda[]() -> rpp::cfuture<R>
-            {
-                using Fut = decltype(fut_or_cb());
-                return background_awaiter_fut<Fut>{ *this, std::move(fut_or_cb) };
-            }
             else // lambda[]()->R or rpp::delegate<R()>
             {
                 using R = decltype(fut_or_cb());
                 if constexpr (requires { requires std::is_same_v<R, rpp::future<typename R::value_type>>; })
                     return async_launcher_awaiter<typename R::value_type>{ *this, std::move(fut_or_cb) };
+                else if constexpr (IsFuture<R>) return background_awaiter_fut<R>{ *this, std::move(fut_or_cb) };
                 else if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
                 else                                  return background_awaiter<R>{ *this, std::move(fut_or_cb) };
             }
