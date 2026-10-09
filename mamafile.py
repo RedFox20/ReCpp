@@ -9,7 +9,7 @@ class ReCpp(mama.BuildTarget):
 
     def settings(self):
         # one raw string literal, because mama reads it without running this file. See AGENTS.md Versioning
-        self.version = '2.1.3'
+        self.version = '2.2.0'
         # if no preference, prefer gcc since its support is better in 2023
         self.prefer_gcc()
         if os.getenv('NO_NINJA'):
