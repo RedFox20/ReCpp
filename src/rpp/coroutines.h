@@ -10,6 +10,7 @@
 #include "delegate.h" // rpp::delegate
 #include "future_types.h" // rpp::cfuture, rpp::coro_handle
 #include "thread_pool.h" // rpp::parallel_task_detached
+#include <type_traits> // std::is_same_v
 
 
 namespace rpp
@@ -135,7 +136,12 @@ namespace rpp
             {
                 try {
                     f = action(); // get the future from the lambda
-                    f.wait(); // wait for the nested coroutine to finish (can throw)
+                    if constexpr (std::is_same_v<Future, rpp::future<decltype(f.get())>>)
+                    {
+                        // The continuation can resume and destroy this awaiter before registration returns.
+                        if (f.await_suspend(cont)) return;
+                    }
+                    else f.wait(); // Legacy futures have no completion hook.
                 } catch (...) { ex = std::current_exception(); }
                 // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                 cont.resume(); // call await_resume() and continue on this background thread

@@ -15,7 +15,7 @@
 #include "config.h"
 #include "debugging.h"
 #include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::suspend_never
-#include "future.h" // rpp::IsFuture, rpp::IsFunctionReturningFuture
+#include "future.h" // rpp::IsFuture
 #include "task.h" // rpp::task<T> (driven to completion by run_until_done)
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "timepoint.h" // rpp::Duration
@@ -886,6 +886,38 @@ namespace rpp
             T await_resume() { return fut.get(); }
         };
 
+        /// Runs a future launcher on the pool, then awaits its result without a blocking worker
+        template<typename T>
+        struct RPP_CORO_RETURN_TYPE async_launcher_awaiter : async_future_awaiter<T>
+        {
+            rpp::delegate<rpp::future<T>()> action;
+            std::exception_ptr ex;
+
+            async_launcher_awaiter(event_loop& loop, rpp::delegate<rpp::future<T>()> action) noexcept
+                : async_future_awaiter<T>{loop, {}}, action{std::move(action)} {}
+            void await_suspend(rpp::coro_handle<> cont) noexcept
+            {
+                this->loop.start_in_background([this, cont]() mutable
+                {
+                    try { this->fut = action(); }
+                    catch (...)
+                    {
+                        ex = std::current_exception();
+                        this->loop.post_resume(cont);
+                        return;
+                    }
+                    // Keep the launcher alive until the coroutine resumes on the loop.
+                    async_future_awaiter<T>::await_suspend(cont);
+                });
+            }
+            T await_resume()
+            {
+                action = {};
+                if (ex) std::rethrow_exception(ex);
+                return async_future_awaiter<T>::await_resume();
+            }
+        };
+
         /**
          * @brief Creates an awaiter that runs the given lambda on the thread pool
          *        and resumes the coroutine on the event loop thread.
@@ -911,6 +943,8 @@ namespace rpp
          *     // After co_await, we are back on the event loop thread
          * @endcode
          */
+        // The awaiter takes ownership of futures and delegates, including lvalues.
+        // NOLINTBEGIN(bugprone-move-forwarding-reference)
         template<typename FutureOrCallback>
         RPP_CORO_WRAPPER auto run_async(FutureOrCallback&& fut_or_cb) noexcept
         {
@@ -925,18 +959,17 @@ namespace rpp
                 using T = decltype(fut_or_cb.get());
                 return future_awaiter<T>{ *this, std::move(fut_or_cb) };
             }
-            else if constexpr (IsFunctionReturningFuture<Decayed>) // lambda[]() -> rpp::cfuture<R>
-            {
-                using Fut = decltype(fut_or_cb());
-                return background_awaiter_fut<Fut>{ *this, std::move(fut_or_cb) };
-            }
             else // lambda[]()->R or rpp::delegate<R()>
             {
                 using R = decltype(fut_or_cb());
-                if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
-                else                             return background_awaiter<R>{ *this, std::move(fut_or_cb) };
+                if constexpr (requires { requires std::is_same_v<R, rpp::future<typename R::value_type>>; })
+                    return async_launcher_awaiter<typename R::value_type>{ *this, std::move(fut_or_cb) };
+                else if constexpr (IsFuture<R>) return background_awaiter_fut<R>{ *this, std::move(fut_or_cb) };
+                else if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
+                else                                  return background_awaiter<R>{ *this, std::move(fut_or_cb) };
             }
         }
+        // NOLINTEND(bugprone-move-forwarding-reference)
 
         // ─── Semaphore / Queue await ────────────────────────────────
 

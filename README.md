@@ -1690,41 +1690,41 @@ name. The examples for each pattern are in `rpp/async.h`.
 
 | Item | Description |
 |------|-------------|
-| [`cfuture<T>`](src/rpp/future.h#L191) | Extended `std::future` with composition and coroutine support |
-| [`async_task(task)`](src/rpp/future.h#L90) | Launch a task on the thread pool, returns `cfuture<T>` |
-| [`make_ready_future(value)`](src/rpp/future.h#L1018) | Create an already-completed future |
-| [`make_exceptional_future(e)`](src/rpp/future.h#L1035) | Create an already-errored future |
-| [`wait_all(const std::vector<cfuture<T>>& vf)`](src/rpp/future.h#L1044) | Block until all futures complete |
-| [`get_all(futures)`](src/rpp/future.h#L1057) | Block and gather results from all futures |
+| [`cfuture<T>`](src/rpp/future.h#L192) | Extended `std::future` with composition and coroutine support |
+| [`async_task(task)`](src/rpp/future.h#L91) | Launch a task on the thread pool, returns `cfuture<T>` |
+| [`make_ready_future(value)`](src/rpp/future.h#L1019) | Create an already-completed future |
+| [`make_exceptional_future(e)`](src/rpp/future.h#L1036) | Create an already-errored future |
+| [`wait_all(const std::vector<cfuture<T>>& vf)`](src/rpp/future.h#L1045) | Block until all futures complete |
+| [`get_all(futures)`](src/rpp/future.h#L1058) | Block and gather results from all futures |
 
 ### cfuture Methods
 
 | Method | Description |
 |--------|-------------|
-| [`~cfuture()`](src/rpp/future.h#L205) | **Fail-fast destructor**: collects a ready result, fails an assertion on a stored exception, and calls `std::terminate()` for a valid unready future, deferred included |
-| [`then()`](src/rpp/future.h#L235) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
-| [`then(Task task)`](src/rpp/future.h#L252) | Chain a continuation that receives the result (runs via `async_task`) |
-| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L279) | Chain with 1–4 typed exception recovery handlers |
-| [`then(cfuture<U>&& next)`](src/rpp/future.h#L331) | Chain by waiting for this future, then returning the result of `next` |
-| [`continue_with(Task task)`](src/rpp/future.h#L348) | Fire-and-forget continuation (moves `*this` into background). An error which no handler takes goes to `LogWarning()` |
-| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L356) | Fire-and-forget continuation with 1–4 typed exception handlers. An error which no handler takes goes to `LogWarning()` |
-| [`detach()`](src/rpp/future.h#L411) | Abandon future, wait in background (swallows exceptions) |
-| [`chain_async(Task task)`](src/rpp/future.h#L443) | Sequential chaining: if invalid, starts a new async task. If valid, appends as continuation (swallows prior exceptions) |
-| [`chain_async(cfuture&& next)`](src/rpp/future.h#L456) | Sequential chaining with another future |
-| [`await_ready()`](src/rpp/future.h#L470) | Non-blocking check if the future is already finished |
-| [`collect_ready(T* result)`](src/rpp/future.h#L501) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
-| [`collect_wait(T* result)`](src/rpp/future.h#L519) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
-| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L530) | C++20 coroutine suspension point — waits on background thread, then resumes |
-| [`await_resume()`](src/rpp/future.h#L542) | C++20 coroutine resume — returns the result, rethrows exceptions |
-| [`promise_type`](src/rpp/future.h#L569) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
-| [`coro_handle<T>`](src/rpp/future_types.h#L29) | Alias for `std::coroutine_handle<T>` |
-| [`suspend_never`](src/rpp/future_types.h#L30) | Alias for the standard never-suspend awaiter |
-| [`suspend_always`](src/rpp/future_types.h#L31) | Alias for the standard always-suspend awaiter |
-| [`wait_result`](src/rpp/future_types.h#L20) | The outcome of a timed wait: `finished`, `timeout`, or `deferred` for a task which runs on `get()` |
-| [`IsFuture`](src/rpp/future.h#L24) | Concept which matches `rpp::cfuture<T>` and `std::future<T>` |
-| [`NotFuture`](src/rpp/future.h#L31) | Concept which matches any type `IsFuture` rejects |
-| [`IsFunction`](src/rpp/future_types.h#L35) | Concept which matches a callable taking no argument |
-| [`IsFunctionReturningFuture`](src/rpp/future.h#L35) | Concept which matches a callable returning a future |
+| [`~cfuture()`](src/rpp/future.h#L206) | **Fail-fast destructor**: collects a ready result, fails an assertion on a stored exception, and calls `std::terminate()` for a valid unready future, deferred included |
+| [`then()`](src/rpp/future.h#L236) | Downcast `cfuture<T>` to `cfuture<void>` (discard return value) |
+| [`then(Task task)`](src/rpp/future.h#L253) | Chain a continuation that receives the result (runs via `async_task`) |
+| [`then(Task task, ExceptHA a, ...)`](src/rpp/future.h#L280) | Chain with 1–4 typed exception recovery handlers |
+| [`then(cfuture<U>&& next)`](src/rpp/future.h#L332) | Chain by waiting for this future, then returning the result of `next` |
+| [`continue_with(Task task)`](src/rpp/future.h#L349) | Fire-and-forget continuation (moves `*this` into background). An error which no handler takes goes to `LogWarning()` |
+| [`continue_with(Task task, ExceptHA a, ...)`](src/rpp/future.h#L357) | Fire-and-forget continuation with 1–4 typed exception handlers. An error which no handler takes goes to `LogWarning()` |
+| [`detach()`](src/rpp/future.h#L412) | Abandon future, wait in background (swallows exceptions) |
+| [`chain_async(Task task)`](src/rpp/future.h#L444) | Sequential chaining: if invalid, starts a new async task. If valid, appends as continuation (swallows prior exceptions) |
+| [`chain_async(cfuture&& next)`](src/rpp/future.h#L457) | Sequential chaining with another future |
+| [`await_ready()`](src/rpp/future.h#L471) | Non-blocking check if the future is already finished |
+| [`collect_ready(T* result)`](src/rpp/future.h#L502) | If already finished, collects the result into `*result` (non-blocking). Returns `true` if collected |
+| [`collect_wait(T* result)`](src/rpp/future.h#L520) | If valid, blocks until finished and collects the result into `*result`. Returns `true` if collected |
+| [`await_suspend(coro_handle<>)`](src/rpp/future.h#L531) | C++20 coroutine suspension point — waits on background thread, then resumes |
+| [`await_resume()`](src/rpp/future.h#L543) | C++20 coroutine resume — returns the result, rethrows exceptions |
+| [`promise_type`](src/rpp/future.h#L570) | C++20 coroutine promise enabling `rpp::cfuture<T>` as a coroutine return type |
+| [`coro_handle<T>`](src/rpp/future_types.h#L32) | Alias for `std::coroutine_handle<T>` |
+| [`suspend_never`](src/rpp/future_types.h#L33) | Alias for the standard never-suspend awaiter |
+| [`suspend_always`](src/rpp/future_types.h#L34) | Alias for the standard always-suspend awaiter |
+| [`wait_result`](src/rpp/future_types.h#L23) | The outcome of a timed wait: `finished`, `timeout`, or `deferred` for a task which runs on `get()` |
+| [`IsFuture`](src/rpp/future.h#L24) | Concept which matches `rpp::future<T>`, `rpp::cfuture<T>`, and `std::future<T>` |
+| [`NotFuture`](src/rpp/future.h#L32) | Concept which matches any type `IsFuture` rejects |
+| [`IsFunction`](src/rpp/future_types.h#L38) | Concept which matches a callable taking no argument |
+| [`IsFunctionReturningFuture`](src/rpp/future.h#L36) | Concept which matches a callable returning a future |
 
 ---
 
@@ -1756,18 +1756,18 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 
 | Class | Description |
 |-------|-------------|
-| [`functor_awaiter<T>`](src/rpp/coroutines.h#L33) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L115) | Awaiter for lambdas returning futures |
-| [`time_awaiter`](src/rpp/coroutines.h#L195) | Awaiter for `rpp::Duration` durations (async sleep) |
+| [`functor_awaiter<T>`](src/rpp/coroutines.h#L34) | Awaiter for lambdas/delegates via `parallel_task()` |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L116) | Awaits future launchers and releases the worker while a modern future is pending |
+| [`time_awaiter`](src/rpp/coroutines.h#L201) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L248) | Run delegate async on thread pool |
-| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L279) | Run lambda async on thread pool |
-| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L285) | Await a composable future |
-| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L315) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L254) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L285) | Run lambda async on thread pool |
+| [`operator co_await(cfuture<T>&)`](src/rpp/coroutines.h#L291) | Await a composable future |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L321) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;
@@ -1805,30 +1805,31 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L530) | Pump on the owner thread until that one future is ready. Returns `bool` and never blocks past the timeout |
 | [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L565) | Pump until that future is ready and return its value. Throws on timeout |
 | [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L587) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L915) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L949) | Run a delegate on the pool, await its future result when present, and resume on the loop thread |
+| [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L891) | Await a future launcher without a blocking worker after the launcher returns |
 | [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L616) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1192) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1225) | Event-driven join: suspend until all forks complete or timeout expires |
 | [`num_forks()`](src/rpp/event_loop.h#L660) | Number of active forked coroutines |
 | [`drain_forks()`](src/rpp/event_loop.h#L668) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L951) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L965) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L979) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L984) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L998) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L1012) | Pop from queue returning `optional<T>`, resume on loop thread |
 | [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L706) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
 | [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L698) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1207) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L1015) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1240) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L1048) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
 | [`pending_waiters()`](src/rpp/event_loop.h#L366) | Number of delay() timers and socket waits pending on the loop thread |
-| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1055) | Suspend until the socket has data, a closed peer or an error. False on timeout |
-| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1064) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1121) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1099) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1088) | Suspend until the socket has data, a closed peer or an error. False on timeout |
+| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1097) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
+| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1154) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1132) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L164) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
 | [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L277) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
 | [`current_time()`](src/rpp/event_loop.h#L289) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
 | [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L292) | The virtual time of `src`, or the monotonic wall clock when it is null |
 | [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L296) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
 | [`get_time_source_frame()`](src/rpp/event_loop.h#L306) | Snapshot the loop clock on the thread which builds a deadline |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L1019) | Park on the loop timer queue until a time point, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L1052) | Park on the loop timer queue until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L380) | Signal the loop to stop and finalize pending tasks |
 | [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L389) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
 | [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L401) | Stop, wait for the background tasks, run every queued resume, and detach the time source |

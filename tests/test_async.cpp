@@ -1,10 +1,13 @@
 #include <rpp/async.h>
+#include <rpp/coroutines.h>
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
+#include <rpp/future.h> // rpp::IsFuture and callable concepts
 #include <rpp/minmax.h> // rpp::min, rpp::max
 #include <rpp/scope_guard.h> // rpp::make_scope_guard
 #include <rpp/semaphore.h>
 #include <rpp/threads.h> // rpp::get_thread_id
+#include <rpp/thread_pool.h>
 #include <rpp/timepoint.h>
 #include <rpp/tests.h>
 #include <atomic>
@@ -13,6 +16,7 @@
 #include <map>
 #include <stdexcept>
 #include <string> // std::string
+#include <type_traits>
 #include <utility> // std::exchange, std::pair
 #include <vector>
 #include "warning_capture.h"
@@ -27,6 +31,134 @@ using namespace std::string_literals;
 TestImpl(test_async)
 {
     TestInit(test_async) {}
+
+    TestCase(future_concepts_include_modern_futures)
+    {
+        AssertThat(IsFuture<future<int>>, true);
+        AssertThat(IsFuture<future<>>, true);
+        AssertThat(NotFuture<future<int>>, false);
+        AssertThat(IsFunctionReturningFuture<delegate<future<int>()>>, true);
+        AssertThat(IsFunctionReturningFuture<delegate<future<void>()>>, true);
+        AssertThat(IsFunctionNotReturningFuture<delegate<future<int>()>>, false);
+        AssertThat(IsFuture<cfuture<int>>, true);
+        AssertThat(IsFuture<cfuture<void>>, true);
+        AssertThat(IsFuture<std::future<int>>, true);
+        AssertThat(IsFuture<std::future<void>>, true);
+        AssertThat(IsFuture<int>, false);
+        AssertThat(IsFunctionNotReturningFuture<delegate<int()>>, true);
+    }
+
+    template<typename Launcher>
+    static cfuture<int> await_modern_launcher(Launcher launch)
+    {
+        using Awaiter = decltype(rpp::coro_operators::operator co_await(std::move(launch)));
+        using Result = decltype(std::declval<Awaiter&>().await_resume());
+        if constexpr (std::is_same_v<Result, int>)
+            co_return co_await std::move(launch);
+        else if constexpr (std::is_void_v<Result>)
+        {
+            co_await std::move(launch);
+            co_return 1;
+        }
+        else
+        {
+            Result nested = co_await std::move(launch);
+            nested.detach();
+            co_return -1;
+        }
+    }
+
+    TestCase(coroutine_launchers_await_modern_value_futures)
+    {
+        struct launcher
+        {
+            RPP_CORO_WRAPPER future<int> operator()() const { return rpp::ready_future(42); }
+        };
+        AssertThat(await_modern_launcher(launcher{}).get(), 42);
+        delegate<future<int>()> action = launcher{};
+        AssertThat(await_modern_launcher(std::move(action)).get(), 42);
+    }
+
+    TestCase(coroutine_launchers_await_modern_void_and_exceptions)
+    {
+        struct launcher
+        {
+            int mode;
+            RPP_CORO_WRAPPER future<void> operator()() const
+            {
+                if (mode == 1) return rpp::exceptional_future<void>(std::runtime_error{"future_failed"});
+                if (mode == 2) throw std::runtime_error{"launcher_failed"};
+                if (mode == 3) return {};
+                return rpp::ready_future();
+            }
+        };
+        AssertThat(await_modern_launcher(launcher{0}).get(), 1);
+        delegate<future<void>()> action = launcher{0};
+        AssertThat(await_modern_launcher(std::move(action)).get(), 1);
+        AssertThrows(await_modern_launcher(launcher{1}).get(), std::runtime_error);
+        AssertThrows(await_modern_launcher(launcher{2}).get(), std::runtime_error);
+        AssertThrows(await_modern_launcher(launcher{3}).get(), std::logic_error);
+    }
+
+    TestCase(coroutine_pending_value_launchers_release_workers)
+    {
+        struct launcher
+        {
+            promise<int>& pending;
+            RPP_CORO_WRAPPER future<int> operator()() const { return pending.get_future(); }
+        };
+        std::vector<promise<int>> pending(8);
+        std::vector<cfuture<int>> results;
+        for (size_t i = 0; i < pending.size(); ++i)
+        {
+            if (i % 2 == 0)
+                results.push_back(await_modern_launcher(launcher{pending[i]}));
+            else
+            {
+                delegate<future<int>()> action = launcher{pending[i]};
+                results.push_back(await_modern_launcher(std::move(action)));
+            }
+        }
+        // The launchers release their workers before these producers publish.
+        const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
+        bool all_pending = true;
+        for (cfuture<int>& result : results) all_pending &= !result.await_ready();
+        for (size_t i = 0; i < pending.size(); ++i) pending[i].set_value(static_cast<int>(i));
+        std::vector<int> values;
+        for (cfuture<int>& result : results) values.push_back(result.get());
+        AssertThat(idle, wait_result::finished);
+        AssertThat(all_pending, true);
+        for (size_t i = 0; i < values.size(); ++i) AssertThat(values[i], static_cast<int>(i));
+    }
+
+    TestCase(coroutine_pending_void_launchers_release_workers)
+    {
+        struct launcher
+        {
+            promise<void>& pending;
+            RPP_CORO_WRAPPER future<void> operator()() const { return pending.get_future(); }
+        };
+        promise<void> first;
+        promise<void> second;
+        promise<void> failed;
+        cfuture<int> a = await_modern_launcher(launcher{first});
+        delegate<future<void>()> action = launcher{second};
+        cfuture<int> b = await_modern_launcher(std::move(action));
+        cfuture<int> c = await_modern_launcher(launcher{failed});
+        // The launchers release their workers before these producers publish.
+        const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
+        const bool all_pending = !a.await_ready() && !b.await_ready() && !c.await_ready();
+        first.set_value();
+        second.set_value();
+        failed.set_exception(std::make_exception_ptr(std::runtime_error{"future_failed"}));
+        const int first_value = a.get();
+        const int second_value = b.get();
+        AssertThrows(c.get(), std::runtime_error);
+        AssertThat(idle, wait_result::finished);
+        AssertThat(all_pending, true);
+        AssertThat(first_value, 1);
+        AssertThat(second_value, 1);
+    }
 
     TestCase(event_loop_pumps_future_results_and_exceptions)
     {
@@ -193,6 +325,118 @@ TestImpl(test_async)
         AssertThat(value, 42);
         AssertThat(thread, rpp::get_thread_id());
         AssertThat(loop.has_pending_work(), false);
+    }
+
+    template<typename Launcher>
+    // Each caller drains the task before its referenced locals leave scope.
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-reference-coroutine-parameters)
+    static rpp::event_task await_launcher(rpp::event_loop& loop, Launcher launch, int& value, rpp::uint64& thread)
+    {
+        using Result = decltype(loop.run_async(std::move(launch)).await_resume());
+        if constexpr (std::is_same_v<Result, int>)
+            value = co_await loop.run_async(std::move(launch));
+        else if constexpr (std::is_void_v<Result>)
+        {
+            co_await loop.run_async(std::move(launch));
+            value = 1;
+        }
+        else
+        {
+            Result nested = co_await loop.run_async(std::move(launch));
+            nested.detach();
+            value = -1;
+        }
+        thread = rpp::get_thread_id();
+    }
+
+    TestCase(await_future_launcher_waits_without_a_pool_worker)
+    {
+        rpp::thread_pool pool {1};
+        rpp::event_loop loop {0, &pool};
+        promise<int> pending;
+        int value = 0;
+        rpp::uint64 thread = 0;
+        rpp::uint64 worker = 0;
+        struct launcher
+        {
+            promise<int>& pending;
+            rpp::uint64& worker;
+            RPP_CORO_WRAPPER future<int> operator()() const
+            {
+                worker = rpp::get_thread_id();
+                return pending.get_future();
+            }
+        };
+        rpp::event_task task = await_launcher(loop, launcher{pending, worker}, value, thread);
+        // The launcher releases the worker before the producer completes its future.
+        const wait_result idle = pool.wait_until_idle(rpp::seconds(1));
+        loop.run_all_ready();
+        const bool resumed_early = task.done();
+        const int background = loop.background_tasks();
+        pending.set_value(42);
+        loop.run_until_done(task);
+        AssertThat(idle, wait_result::finished);
+        AssertThat(resumed_early, false);
+        AssertThat(background, 1);
+        AssertThat(value, 42);
+        AssertThat(thread, rpp::get_thread_id());
+        AssertThat(worker != thread, true);
+        AssertThat(loop.has_pending_work(), false);
+    }
+
+    TestCase(await_void_future_launcher_waits_for_completion)
+    {
+        rpp::thread_pool pool {1};
+        rpp::event_loop loop {0, &pool};
+        promise<void> pending;
+        int value = 0;
+        rpp::uint64 thread = 0;
+        struct launcher
+        {
+            promise<void>& pending;
+            RPP_CORO_WRAPPER future<void> operator()() const { return pending.get_future(); }
+        };
+        rpp::event_task task = await_launcher(loop, launcher{pending}, value, thread);
+        // The launcher releases the worker before the producer completes its future.
+        const wait_result idle = pool.wait_until_idle(rpp::seconds(1));
+        loop.run_all_ready();
+        const bool resumed_early = task.done();
+        pending.set_value();
+        loop.run_until_done(task);
+        AssertThat(idle, wait_result::finished);
+        AssertThat(resumed_early, false);
+        AssertThat(value, 1);
+        AssertThat(thread, rpp::get_thread_id());
+        AssertThat(loop.background_tasks(), 0);
+    }
+
+    TestCase(await_future_launcher_keeps_results_and_exceptions)
+    {
+        rpp::event_loop loop;
+        int value = 0;
+        rpp::uint64 thread = 0;
+        struct launcher
+        {
+            int mode;
+            RPP_CORO_WRAPPER future<int> operator()() const
+            {
+                if (mode == 1) return rpp::exceptional_future<int>(std::runtime_error{"future_failed"});
+                if (mode == 2) throw std::runtime_error{"launcher_failed"};
+                if (mode == 3) return {};
+                return rpp::ready_future(7);
+            }
+        };
+        rpp::event_task task = await_launcher(loop, launcher{0}, value, thread);
+        loop.run_until_done(task);
+        AssertThat(value, 7);
+        AssertThat(thread, rpp::get_thread_id());
+        task = await_launcher(loop, launcher{1}, value, thread);
+        AssertThrows(loop.run_until_done(task), std::runtime_error);
+        task = await_launcher(loop, launcher{2}, value, thread);
+        AssertThrows(loop.run_until_done(task), std::runtime_error);
+        task = await_launcher(loop, launcher{3}, value, thread);
+        AssertThrows(loop.run_until_done(task), std::logic_error);
+        AssertThat(loop.background_tasks(), 0);
     }
 
     TestCase(simple_chaining)
