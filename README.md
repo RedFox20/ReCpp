@@ -1805,30 +1805,31 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`pump_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L530) | Pump on the owner thread until that one future is ready. Returns `bool` and never blocks past the timeout |
 | [`run_until_ready(cfuture<T>&, timeout)`](src/rpp/event_loop.h#L565) | Pump until that future is ready and return its value. Throws on timeout |
 | [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L587) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L915) | Dispatch future or lambda to thread pool, resume coroutine on the loop thread |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L949) | Run a delegate on the pool, await its future result when present, and resume on the loop thread |
+| [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L891) | Await a future launcher without a blocking worker after the launcher returns |
 | [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L616) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1192) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1229) | Event-driven join: suspend until all forks complete or timeout expires |
 | [`num_forks()`](src/rpp/event_loop.h#L660) | Number of active forked coroutines |
 | [`drain_forks()`](src/rpp/event_loop.h#L668) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L951) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L965) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L979) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L988) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L1002) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L1016) | Pop from queue returning `optional<T>`, resume on loop thread |
 | [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L706) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
 | [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L698) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1207) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L1015) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1244) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L1052) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
 | [`pending_waiters()`](src/rpp/event_loop.h#L366) | Number of delay() timers and socket waits pending on the loop thread |
-| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1055) | Suspend until the socket has data, a closed peer or an error. False on timeout |
-| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1064) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1121) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1099) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1092) | Suspend until the socket has data, a closed peer or an error. False on timeout |
+| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L1101) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
+| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1158) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1136) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L164) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
 | [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L277) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
 | [`current_time()`](src/rpp/event_loop.h#L289) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
 | [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L292) | The virtual time of `src`, or the monotonic wall clock when it is null |
 | [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L296) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
 | [`get_time_source_frame()`](src/rpp/event_loop.h#L306) | Snapshot the loop clock on the thread which builds a deadline |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L1019) | Park on the loop timer queue until a time point, resume on the loop thread |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L1056) | Park on the loop timer queue until a time point, resume on the loop thread |
 | [`stop()`](src/rpp/event_loop.h#L380) | Signal the loop to stop and finalize pending tasks |
 | [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L389) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
 | [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L401) | Stop, wait for the background tasks, run every queued resume, and detach the time source |

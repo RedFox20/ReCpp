@@ -821,6 +821,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 
 ## Closed
 
+### C35. The event loop resumed before a future launcher completed
+`run_async()` treated a delegate that returns `rpp::future<T>` as an ordinary delegate and returned a nested future.
+It now awaits that future through its completion hook and resumes on the loop thread.
+
 ### C34. A delegate bound to a method of a non-primary or a virtual base called it with the wrong `this`
 `init_method` kept the derived pointer and ignored the member pointer this adjustment, so the method
 read the fields of another subobject. It converts to the declaring class first and applies the adjustment
