@@ -651,6 +651,8 @@ namespace rpp
         T await_resume() { return get(); }
 
     private:
+        friend class event_loop; // attaches a continuation which resumes on the loop thread
+
         detail::future_state<T>& checked() const
         {
             if (!state) throw std::logic_error{"rpp::future is invalid, so it has no result"};
@@ -837,5 +839,24 @@ namespace rpp
     inline void get_all(std::vector<future<void>>& futures)
     {
         detail::collect_all(futures, [](future<void>& f) { f.get(); });
+    }
+
+    /// Launches every task before collecting its result. Collects every future before rethrowing an exception
+    template<typename U, typename Launcher>
+        requires std::is_same_v<std::invoke_result_t<const Launcher&, U&>, future<void>>
+    void run_tasks(std::vector<U>& items, const Launcher& launch)
+    {
+        std::vector<future<void>> futures;
+        futures.reserve(items.size());
+        try
+        {
+            for (U& item : items) futures.emplace_back(launch(item));
+        }
+        catch (...)
+        {
+            try { get_all(futures); } catch (...) {} // drain launched tasks before their borrowed items end
+            throw;
+        }
+        get_all(futures);
     }
 } // namespace rpp

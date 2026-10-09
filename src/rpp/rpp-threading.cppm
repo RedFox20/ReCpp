@@ -71,6 +71,7 @@ export namespace rpp {
     using rpp::exceptional_future;
     using rpp::wait_all;
     using rpp::get_all;
+    using rpp::run_tasks;
 #if !RPP_BARE_METAL
     using rpp::set_this_thread_name;
     using rpp::get_this_thread_name;
