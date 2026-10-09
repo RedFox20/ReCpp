@@ -88,6 +88,7 @@ TestImpl(test_async)
             {
                 if (mode == 1) return rpp::exceptional_future<void>(std::runtime_error{"future_failed"});
                 if (mode == 2) throw std::runtime_error{"launcher_failed"};
+                if (mode == 3) return {};
                 return rpp::ready_future();
             }
         };
@@ -96,6 +97,67 @@ TestImpl(test_async)
         AssertThat(await_modern_launcher(std::move(action)).get(), 1);
         AssertThrows(await_modern_launcher(launcher{1}).get(), std::runtime_error);
         AssertThrows(await_modern_launcher(launcher{2}).get(), std::runtime_error);
+        AssertThrows(await_modern_launcher(launcher{3}).get(), std::logic_error);
+    }
+
+    TestCase(coroutine_pending_value_launchers_release_workers)
+    {
+        struct launcher
+        {
+            promise<int>& pending;
+            RPP_CORO_WRAPPER future<int> operator()() const { return pending.get_future(); }
+        };
+        std::vector<promise<int>> pending(8);
+        std::vector<cfuture<int>> results;
+        for (size_t i = 0; i < pending.size(); ++i)
+        {
+            if (i % 2 == 0)
+                results.push_back(await_modern_launcher(launcher{pending[i]}));
+            else
+            {
+                delegate<future<int>()> action = launcher{pending[i]};
+                results.push_back(await_modern_launcher(std::move(action)));
+            }
+        }
+        // The launchers release their workers before these producers publish.
+        const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
+        bool all_pending = true;
+        for (cfuture<int>& result : results) all_pending &= !result.await_ready();
+        for (size_t i = 0; i < pending.size(); ++i) pending[i].set_value(static_cast<int>(i));
+        std::vector<int> values;
+        for (cfuture<int>& result : results) values.push_back(result.get());
+        AssertThat(idle, wait_result::finished);
+        AssertThat(all_pending, true);
+        for (size_t i = 0; i < values.size(); ++i) AssertThat(values[i], static_cast<int>(i));
+    }
+
+    TestCase(coroutine_pending_void_launchers_release_workers)
+    {
+        struct launcher
+        {
+            promise<void>& pending;
+            RPP_CORO_WRAPPER future<void> operator()() const { return pending.get_future(); }
+        };
+        promise<void> first;
+        promise<void> second;
+        promise<void> failed;
+        cfuture<int> a = await_modern_launcher(launcher{first});
+        delegate<future<void>()> action = launcher{second};
+        cfuture<int> b = await_modern_launcher(std::move(action));
+        cfuture<int> c = await_modern_launcher(launcher{failed});
+        // The launchers release their workers before these producers publish.
+        const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
+        const bool all_pending = !a.await_ready() && !b.await_ready() && !c.await_ready();
+        first.set_value();
+        second.set_value();
+        failed.set_exception(std::make_exception_ptr(std::runtime_error{"future_failed"}));
+        const int first_value = a.get();
+        const int second_value = b.get();
+        AssertThrows(c.get(), std::runtime_error);
+        AssertThat(idle, wait_result::finished);
+        AssertThat(all_pending, true);
+        AssertThat(first_value, 1);
+        AssertThat(second_value, 1);
     }
 
     TestCase(event_loop_pumps_future_results_and_exceptions)
