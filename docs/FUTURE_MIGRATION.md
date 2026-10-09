@@ -1,5 +1,9 @@
 # rpp::future, a module future which owns its own state
 
+The helpers now accept `rpp::future`: `event_loop::pump_until_ready`, `run_until_ready`,
+`run_async`, and `run_tasks`. Legacy `cfuture` and std future interop remain available
+until downstream migrations merge. The sections below record the original design.
+
 `rpp::cfuture<T>` derives from `std::future<T>`. That one line sets the cost of most
 lines below it.
 
@@ -56,7 +60,6 @@ Each row is a std behavior which no longer exists, not one which moved.
 | the implicit `<future>` include | the point of the whole change |
 | `std::future_error` | a missing state or a broken promise throws `std::logic_error`, the base of `std::future_error` |
 | `wait_result::deferred` | `rpp::async` always starts the task on the pool, so no wait reports a deferred state |
-| `run_tasks()` | its launcher returns a `cfuture<void>`, so it stays in `future.h` |
 | the silent release in a move assignment | a move assignment over an unready future terminates, as the destructor does |
 
 **`share()` never arrives, and nothing asks for it.** A grep over `src` and `tests` finds no
@@ -98,6 +101,8 @@ The names below read the same on both types, so a mechanical port compiles.
   any number of exception handlers, where `cfuture` stops at four
 - the destructor which drains a ready result and terminates on an unawaited one
 - `co_await`, through the same operator set
+- `run_tasks(items, launcher)` in `async.h`, for launchers returning `future<void>`; it drains
+  all launched tasks before rethrowing. The legacy launcher overload stays in `future.h`.
 
 `detach()` releases the state at once, so no pool thread blocks on an abandoned result.
 `then()`, `continue_with()` and `co_await` park no thread. The pool thread which publishes the
