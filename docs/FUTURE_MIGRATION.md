@@ -101,7 +101,7 @@ The names below read the same on both types, so a mechanical port compiles.
   any number of exception handlers, where `cfuture` stops at four
 - the destructor which drains a ready result and terminates on an unawaited one
 - `co_await`, through the same operator set
-- `run_tasks(items, launcher)` in `async.h`, for launchers returning `future<void>`; it drains
+- `run_tasks(items, launcher)` in `async.h`, for launchers returning `future<void>`. It drains
   all launched tasks before rethrowing. The legacy launcher overload stays in `future.h`.
 
 `detach()` releases the state at once, so no pool thread blocks on an abandoned result.
