@@ -525,6 +525,7 @@ namespace rpp
          * @warning Must be called on the loop's owner thread.
          * @returns true if `fut` became ready within `timeout`; false on timeout (never blocks past it).
          */
+        // TODO: remove the cfuture helpers in phase two, see https://github.com/RedFox20/ReCpp/issues/144.
         template<typename T>
         bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
         {
@@ -872,11 +873,14 @@ namespace rpp
                         event_loop& owner = loop;
                         rpp::coro_handle<> next = cont;
                         delete this;
+                        // Keep the pending count until the resume is queued, so loop draining cannot finish early.
                         owner.post_resume(next);
                         owner.num_background_suspended.fetch_sub(1, std::memory_order_acq_rel);
                     }
                 };
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
+                // Only future exposes a completion hook. A pending cfuture needs a waiting worker because std hides its state.
+                // A pending state owns this continuation. start() deletes it before the loop can resume the coroutine.
                 detail::start_after(fut.state, new resume_on_loop{loop, cont});
             }
             T await_resume() { return fut.get(); }
