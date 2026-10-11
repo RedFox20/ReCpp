@@ -1001,7 +1001,7 @@ TestImpl(test_sockets)
         socket_poller poller;
         poller.poll(0); // opens the wake socket on 127.0.0.1
         AssertGreater(holder.sendto(ipaddress(AF_IPv4, "127.0.0.1", holder.port()), "hi", 2), 0);
-        AssertTrue(holder.poll(100, socket::PF_Read)); // on Windows a wake socket on this port takes the datagram
+        AssertTrue(holder.poll(100, socket::PF_Read)); // the datagram reaches the holder, and no wake socket shares its port
         AssertThat(rand(), first_rand); // the wake socket drew no port from rand()
     }
 
