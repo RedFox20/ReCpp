@@ -991,7 +991,7 @@ TestImpl(test_sockets)
     // the wake socket binds a free OS port, so it never takes the datagrams of a socket on a rand() port
     TestCase(socket_poller_wake_socket_binds_an_os_port)
     {
-        srand(1); // an unseeded process starts at seed 1, so the old wake socket drew the same port in every run
+        srand(1); // the seed of an unseeded process, so the holder takes the port each process draws first
         const int first_rand = rand();
         srand(1);
         socket holder = make_udp_randomport(rpp::SO_NonBlock); // 0.0.0.0 on the first rand() port
