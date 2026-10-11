@@ -826,6 +826,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 
 ## Closed
 
+### C36. The `socket_poller` wake socket took the datagrams of another socket on Windows
+It bound 127.0.0.1 on a port from the unseeded `rand()`, and Windows allows that next to a 0.0.0.0 socket on the port.
+It binds port 0 now, so the OS picks a free port, which `socket_poller_wake_socket_binds_an_os_port` pins.
+
 ### C35. The event loop resumed before a future launcher completed
 `run_async()` treated a delegate that returns `rpp::future<T>` as an ordinary delegate and returned a nested future.
 It now awaits that future through its completion hook and resumes on the loop thread.

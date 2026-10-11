@@ -1940,9 +1940,9 @@ namespace rpp
         if (!wake_socket_opened)
         {
             wake_socket_opened = true;
-            const raw_address loopback { AF_IPv4, "127.0.0.1" };
-            wake_socket = make_udp_randomport(SO_NonBlock, loopback);
-            wake_addr = ipaddress{ loopback, wake_socket.port() };
+            // the OS picks a free port, because Windows binds a chosen port next to a 0.0.0.0 socket and takes its datagrams
+            wake_socket = socket::make_udp(ipaddress{ AF_IPv4, "127.0.0.1", 0 }, SO_NonBlock);
+            wake_addr = ipaddress{ wake_socket.os_handle() }; // the bound address, with the port the OS picked
             if (wake_socket.bad()) // the socket layer logged the cause, and a caller polls in slices instead
                 LogWarning("socket_poller wake socket failed, wake() cannot end a poll");
         }
