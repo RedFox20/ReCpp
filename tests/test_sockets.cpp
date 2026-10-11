@@ -9,6 +9,7 @@
 #include <string> // std::string
 #include <cerrno> // ENODEV, EPERM
 #include <cstring> // memcmp
+#include <cstdlib> // srand, rand
 
 using namespace rpp;
 using namespace std::string_literals;
@@ -985,6 +986,23 @@ TestImpl(test_sockets)
         AssertGreater(a.sendto(ipaddress(AF_IPv4, "127.0.0.1", a.port()), "hi", 2), 0);
         AssertThat(poller.poll(10), 1); // a ready entry reports, and the wake entry never counts
         AssertThat(poller.ready(0), true);
+    }
+
+    // the wake socket binds a free OS port, so it never takes the datagrams of a socket on a rand() port
+    TestCase(socket_poller_wake_socket_binds_an_os_port)
+    {
+        srand(1); // the seed of each process, so parallel runs draw the same rand() ports
+        const int first_rand = rand();
+        srand(1);
+        socket holder = make_udp_randomport(rpp::SO_NonBlock); // 0.0.0.0 on the first rand() port
+        AssertTrue(holder.good());
+
+        srand(1);
+        socket_poller poller;
+        poller.poll(0); // opens the wake socket on 127.0.0.1
+        AssertGreater(holder.sendto(ipaddress(AF_IPv4, "127.0.0.1", holder.port()), "hi", 2), 0);
+        AssertTrue(holder.poll(100, socket::PF_Read)); // on Windows a wake socket on this port takes the datagram
+        AssertThat(rand(), first_rand); // the wake socket drew no port from rand()
     }
 
     TestCase(tcp_connect_start_then_finish)
