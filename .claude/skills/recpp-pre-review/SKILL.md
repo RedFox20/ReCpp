@@ -5,131 +5,59 @@ description: Second pass over your own prose before you hand work over. Reload t
 
 # recpp-pre-review
 
-Run this pass on your own output before you call the work done. The first draft
-almost never carries the STE rules. A model writes the code, then pads the prose
-around it. This pass removes that padding, in the same session, with no subagent
-and no wait.
+Run this pass on your own prose before you call the work done. A first draft pads the prose around the code,
+and this pass removes the padding in the same session, with no subagent.
 
-## Run it BEFORE the write, not after
+## Hooks
 
-The first draft never carries the STE rules, and editing a draft is weaker than
-composing under the constraint. Check the sentence before you splice it in.
+Three hooks share `.claude/hooks/prose_rules.py`. Run `.claude/hooks/prose_rules.py --selftest` after you edit
+it, because a linter which stops detecting reports nothing.
 
-A `PreToolUse` hook on `Edit` and `Write` enforces this. It lints only the lines an
-edit introduces, and it blocks the write when one breaks a rule. A blocked write is
-not a failure. Fix the line and retry.
+1. The `Edit` and `Write` hook lints the lines an edit adds, and blocks a line which breaks a rule. Fix it and retry.
+2. The `Bash` hook refuses a command which writes a `.md`, `.h`, `.cpp` or `.cppm` file. A `/tmp` path is exempt.
+3. The `Stop` hook lints the markdown diff at the end of the turn.
 
-The checks it runs mechanically:
-
-| Check | Applies to |
-|-------|------------|
-| sentence over 25 words | markdown prose, comments |
-| contraction, semicolon | markdown prose, comments |
-| contraction, semicolon | a markdown table cell |
-| comment block over 2 lines | `.h`, `.cpp`, `.cppm` |
-| comment ending on a dangling comma | `.h`, `.cpp`, `.cppm` |
-| comment which names a number the code beside it sets | `.h`, `.cpp`, `.cppm` |
-| `sleep_ms(N)` with N over 10 | `.h`, `.cpp`, `.cppm` |
-
-Code fences and headings are exempt, because they carry reference data. A table
-cell is not exempt. The row around it is reference data and the cell is prose, so
-the README API index reaches the same word rules as any paragraph.
-
-Both whole-line and trailing comments reach these checks. A trailing comment breaks
-the constant rule most often, because the literal sits on the same line.
-
-All three hooks share `.claude/hooks/prose_rules.py`, so one module holds every rule
-above. Run `.claude/hooks/prose_rules.py --selftest` after you edit it. A linter
-which stops detecting reports nothing, and nothing looks the same as clean.
-
-## Prose never goes in through the shell
-
-A second hook refuses a Bash command which writes a `.md`, `.h`, `.cpp`, or `.cppm`
-file. Reading, building, and restoring stay allowed, and a scratch path under
-`/tmp` is never project prose.
-
-It reads shell lines and heredoc bodies apart, so text which quotes a redirect is
-documentation, not an edit. A markdown code span is stripped for the same reason.
-
-Three layers cover the whole path. The Bash hook pushes an edit to the right tool,
-the Edit hook lints the text before it lands, and the Stop hook re-lints the
-markdown diff at the end of the turn.
+They check sentence length, contractions and semicolons in prose and table cells. In code they also check
+comment blocks over 2 lines and `sleep_ms(N)` over 10. A comment fails when it ends on a comma, or when it
+names a number the code beside it sets. Code fences and headings are exempt.
 
 ## When to run
 
-Run it in every one of these cases:
-
 1. Before you report a task as complete.
 2. Before you write a commit message or PR text.
-3. Before you invoke `/recpp-review` or the `recpp-reviewer` subagent.
-4. After any edit which added a comment, a doxygen block, a `LogError()` string,
-   a `ThrowErr()` string, or a markdown line.
-
-The review subagent must never spend a round on a rule you can fix here in
-seconds.
+3. Before you call `/recpp-review` or the `recpp-reviewer` subagent.
+4. After an edit which adds a comment, a doxygen block, a `LogError()` or `ThrowErr()` string, or a markdown line.
 
 ## Steps
 
-1. **Reload the rules.** Invoke `/ste-writing` and read
-   `.claude/skills/ste-writing/SKILL.md` again. Do not trust your memory of it.
-   The rules leave the working set as soon as you start writing code.
-
-2. **Collect the prose you added.**
-   ```bash
-   git diff -U0 -- '*.h' '*.cpp' | grep -E '^\+' | grep -E '//|/\*|\*|Log|Throw'
-   git diff -- '*.md' AGENTS.md README.md BUGS.md
-   ```
-
-3. **Rewrite each line.** Apply the checks below. Edit in place.
-
-4. **Report one line.** Name the count: `pre-review: 4 comments cut to 1 line, 2
-   passive sentences fixed`. Then continue.
+1. Read `.claude/skills/ste-writing/SKILL.md` again, because its rules leave the working set during code work.
+2. Collect the added prose with `git diff -U0 -- '*.h' '*.cpp' | grep -E '^\+' | grep -E '//|/\*|\*|Log|Throw'`
+   and `git diff -- '*.md'`.
+3. Rewrite each line by the checks below.
+4. Report one line, such as `pre-review: 4 comments cut to 1 line, 2 passive sentences fixed`.
 
 ## Checks
-
-Work through this list once per added line. Each check has a mechanical fix.
 
 | # | Check | Fix |
 |---|-------|-----|
 | 1 | Comment over 2 lines | Cut to one line. Move the story to BUGS.md |
-| 2 | Comment names a session, an agent, a date, or a fix history | Delete that clause. A `see BUGS.md C15` pointer may stay |
+| 2 | Comment names a session, an agent, a date or a fix history | Delete that clause. A `see BUGS.md C15` pointer may stay |
 | 3 | Comment paraphrases the code below it | Delete the comment |
-| 4 | Comment repeats a constant the code beside it sets | Drop the number, keep the reason. A platform fact no line sets may stay |
+| 4 | Comment repeats a constant the code beside it sets | Drop the number, keep the reason. A platform fact may stay |
 | 5 | Sentence over 20 words in an instruction, 25 in a description | Split it |
-| 6 | Semicolon | Write two sentences |
-| 7 | Contraction | Expand it |
-| 8 | Passive voice with a known actor | Make it active |
-| 9 | `-ing` main verb, or "perform an analysis" | Use the plain verb |
-| 10 | Long word: utilize, facilitate, ensure, prior to, regarding | Use the short one |
-| 11 | Marketing word: seamless, robust, powerful, blazing | Delete it, or give the number |
-| 12 | The same thing under two names | Pick one name and use it everywhere |
-| 13 | A public declaration with no doxygen | Add a one-line `///` |
-| 14 | Comment defends, justifies or overexplains a design decision | Cut to one sentence that states the reason |
-| 15 | Comment breaks off mid clause | Finish the sentence, or cut it to the half which carries the why |
-| 16 | A comment asserts which thread runs a callback | Name the reentrant case, or drop the claim. See R13 |
-| 17 | A new timing value no sibling case in the file uses | Reuse the sibling value. See R2 |
+| 6 | Semicolon or contraction | Write two sentences, or the full form |
+| 7 | Passive voice with a known actor, an "-ing" main verb or a nominalization | Use active voice and the plain verb |
+| 8 | Long word (utilize, ensure, prior to) or marketing word | Use the short word, or give the number |
+| 9 | One thing under two names | Pick one name and use it everywhere |
+| 10 | Public declaration with no doxygen | Add a one-line `///` |
+| 11 | Comment defends a design decision, or breaks off mid clause | Write one complete sentence with the reason |
+| 12 | Comment asserts which thread runs a callback | Name the reentrant case, or drop the claim. See R13 |
+| 13 | New timing value which no sibling case uses | Reuse the sibling value. See R2 |
 
-## The comment budget
-
-One line is the target. Two lines is the limit. The line says WHAT the code wants
-to do, or WHY a subtle line exists. It never says who found the bug or when. It
-never defends, justifies or overexplains a design decision. It states the reason
-in one short sentence.
+One line is the target, and two lines is the limit. A workaround keeps its why in one line:
 
 ```cpp
-// bad
-// This was added because a previous session discovered that the delegate
-// destructor could run on the worker thread after the future was already
-// consumed by the main thread, which the TSAN run in CI reported as a race.
-
-// good
 // the worker frees the future state after the waiter released it, see BUGS.md C15
 ```
 
-A workaround keeps its why, in one line. Never delete a comment which carries a
-why. Rewrite it.
-
-## Scope
-
-This pass edits prose. It does not edit code, rename a symbol, or move a line. A
-code finding belongs to `/recpp-review`, which runs after this pass.
+This pass edits prose only. A code finding belongs to `/recpp-review`.
