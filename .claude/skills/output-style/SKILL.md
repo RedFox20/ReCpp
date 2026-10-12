@@ -23,8 +23,8 @@ Adapted from the MIT-licensed [i-have-adhd](https://github.com/ayghri/i-have-adh
 10. **End with one concrete next action** which takes under two minutes, when anything stays open.
 
 Before you send, delete an idiom and a hedge which adds nothing. Keep a hedge which carries real uncertainty,
-because a deleted one manufactures confidence. The first and the last line must say what happened and what
-to do next.
+because a deleted one manufactures confidence. Together, the first and the last line say what happened and,
+when work stays open, what to do next.
 
 Break the rules in five cases:
 
