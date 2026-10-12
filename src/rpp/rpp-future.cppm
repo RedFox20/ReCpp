@@ -14,7 +14,6 @@ export namespace rpp {
     using rpp::event_loop;
     using rpp::functor_awaiter;
     using rpp::functor_awaiter_fut;
-    using rpp::std_future_awaiter;
     using rpp::time_awaiter;
 }
 

@@ -277,6 +277,15 @@ TestImpl(test_async)
         AssertThat((std::is_same_v<Yield, std::future<int>>), true);
     }
 
+    template<typename F>
+    static constexpr bool co_awaits = requires(F f) { rpp::coro_operators::operator co_await(std::move(f)); };
+
+    TestCase(co_await_takes_no_std_future)
+    {
+        AssertThat(co_awaits<delegate<int()>>, true);
+        AssertThat(co_awaits<std::future<int>>, false);
+    }
+
     static rpp::event_task await_on_loop(rpp::event_loop& loop, future<int> result, int& value, rpp::uint64& thread)
     {
         value = co_await loop.run_async(std::move(result));

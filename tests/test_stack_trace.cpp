@@ -4,7 +4,7 @@
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <rpp/delegate.h>
-#include <future>
+#include <rpp/async.h>
 using namespace rpp;
 
 static std::string stack_tracer() { return stack_trace(); }
@@ -51,8 +51,8 @@ TestImpl(test_stack_trace)
     }
     TestCaseExpectedEx(trace_ex_from_future, traced_exception)
     {
-        std::async(std::launch::async, [] {
-            throw traced_exception{ "TracedException from std::async" };
+        rpp::async([] {
+            throw traced_exception{ "TracedException from rpp::async" };
         }).get();
     }
     TestCaseExpectedEx(trace_ex_from_parallel_task, traced_exception)

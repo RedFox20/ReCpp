@@ -17,9 +17,7 @@
 // freed after the last reader released looks like a race. See BUGS.md C25.
 extern "C" __attribute__((visibility("default"))) // -fvisibility=hidden hides it from libtsan.so
 const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifier)
-    return "race:std::__1::promise\n"           // libc++ puts every promise in namespace __1
-           "race:std::__future_base\n"          // libstdc++ keeps the shared state here
-           "race:std::__exception_ptr\n"        // and the exception refcount here
+    return "race:std::__exception_ptr\n"        // libstdc++ keeps the exception refcount here
            "race:std::runtime_error::~runtime_error\n"
            "race:std::range_error::~range_error\n";
 }

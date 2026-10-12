@@ -88,7 +88,7 @@ compiler at configure time.
 |-------------|---------|
 | C++ standard | C++20 |
 | CMake | 3.28+ |
-| GCC | 15+, because gcc-14 crashes an importer which calls `std::future::get()`, see `BUGS.md` B28 |
+| GCC | 15+, because gcc-14 crashed an importer of `rpp.future` before 2.2, see `BUGS.md` B28 |
 | Clang | 21+ |
 | Generator | Ninja (required) |
 
@@ -143,13 +143,12 @@ directly, so the group is the unit you import:
 | `rpp.containers` | collections, memory_pool, load_balancer |
 | `rpp.io` | file_io, paths, sockets, binary_stream, binary_serializer |
 | `rpp.threading` | mutex, condition_variable, semaphore, concurrent_queue, thread_pool, threads, task, future_types, atomic_shared_ptr, close_sync, async |
-| `rpp.future` | future, event_loop, coroutines |
+| `rpp.future` | event_loop, coroutines |
 | `rpp.testing` | tests |
 
-`rpp.future` sits apart for one reason. Its three headers are the only ones which reach
-`<future>`, and gcc-14 crashes an importer of any module whose fragment carries it. See
-`BUGS.md` B16. Every other module stays safe, and a consumer who never imports `rpp.future`
-never meets that defect.
+`rpp.future` sat apart because its headers were the only ones which reached `<future>`, and gcc-14
+crashes an importer of any module whose fragment carries it. See `BUGS.md` B16. Since 2.2 no
+header reaches `<future>`, and the group keeps its name.
 
 The groups partition every public header, so each header sits in exactly one group.
 `gen_module_exports.py --all --check` fails when that stops holding. `tools/gen_module_exports.py`
@@ -249,16 +248,17 @@ Four groups carry a limit the export list cannot state:
 | `rpp.containers` | [`memory_pool.h`](src/rpp/memory_pool.h) | Drops `pool_types_constructor`, an internal mixin. Each pool still gives you `construct<T>()` and the array forms |
 | `rpp.threading` | [`thread_pool.h`](src/rpp/thread_pool.h) | Drops `test_threadpool`, the forward declaration a unit test needs as a friend |
 
-`rpp.future` carries `<future>`, and that header is why the GCC minimum is 15. On gcc-14 an
-importer cannot instantiate `std::promise` at `-O1` or above, and an importer which calls
-`std::future::get()` beside `<memory>` crashes at every optimization level. `BUGS.md` B16 and B28 hold
-the reproducers and the measurements.
+Before 2.2, `rpp.future` carried `<future>`, and that header is why the GCC minimum is 15. On gcc-14
+an importer could not instantiate `std::promise` at `-O1` or above, and an importer which named a
+`cfuture` beside `<memory>` crashed at every optimization level. `BUGS.md` B16 and B28 hold the
+reproducers and the measurements. No module carries `<future>` since 2.2, and no gcc-14 run has
+measured the modules since.
 
 A gcc-14 project needs no workaround, because ReCpp exports it no module and the build takes
 the header path. gcc-15, clang-21 and MSVC carry no such limit.
 
-An importer of `rpp.future` also includes `<typeinfo>` and `<new>` before it calls into the
-future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
+Before 2.2, an importer of `rpp.future` also included `<typeinfo>` and `<new>` before it called into
+the future machinery. libstdc++ names `typeid` and placement `new` inside `<future>`, and a
 global module fragment reaches an importer only when an exported declaration names it.
 
 ### How it works
@@ -1508,9 +1508,9 @@ and for `co_await`.
 | `co_await [=]{ ... }` | `co_await rpp::async([=]{ ... })` |
 
 `then()`, `continue_with()`, `chain_async()`, `get_all()` and the wait methods keep their names. `rpp::future`
-has no `share()`, no `std::future` conversion and no deferred state. A site which needs one of these uses
-`std::future` directly. `event_loop::run_async()` rejects a `std::future`, because a pool worker would block on
-it. A plain function which returns a future, and is no coroutine, needs `RPP_CORO_WRAPPER`, because
+has no `share()`, no `std::future` conversion and no deferred state. ReCpp supports no `std::future`:
+`event_loop::run_async()` rejects one, because a pool worker would block on it, and `co_await` takes none.
+A plain function which returns a future, and is no coroutine, needs `RPP_CORO_WRAPPER`, because
 clang 19 and later reject it otherwise.
 
 | Item | Description |
@@ -1730,17 +1730,17 @@ C++20 coroutine awaiters and `co_await` operators. Supports MSVC++, GCC, and Cla
 
 | Class | Description |
 |-------|-------------|
-| [`functor_awaiter<T>`](src/rpp/coroutines.h#L34) | Awaiter for lambdas/delegates via `parallel_task()` |
-| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L116) | Awaits future launchers and releases the worker while an `rpp::future` is pending |
-| [`time_awaiter`](src/rpp/coroutines.h#L197) | Awaiter for `rpp::Duration` durations (async sleep) |
+| [`functor_awaiter<T>`](src/rpp/coroutines.h#L33) | Awaiter for lambdas/delegates via `parallel_task()` |
+| [`functor_awaiter_fut<F>`](src/rpp/coroutines.h#L115) | Awaits future launchers and releases the worker while an `rpp::future` is pending |
+| [`time_awaiter`](src/rpp/coroutines.h#L158) | Awaiter for `rpp::Duration` durations (async sleep) |
 
 ### co_await Operators (namespace `coro_operators`)
 
 | Operator | Description |
 |----------|-------------|
-| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L250) | Run delegate async on thread pool |
-| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L287) | Run lambda async on thread pool |
-| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L305) | Async sleep for a duration |
+| [`operator co_await(delegate<T()>&&)`](src/rpp/coroutines.h#L211) | Run delegate async on thread pool |
+| [`operator co_await(lambda&&)`](src/rpp/coroutines.h#L242) | Run lambda async on thread pool |
+| [`operator co_await(rpp::Duration)`](src/rpp/coroutines.h#L254) | Async sleep for a duration |
 
 ```cpp
 using namespace rpp::coro_operators;

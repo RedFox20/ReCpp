@@ -1,9 +1,8 @@
-// Drives the event_loop and the awaiters of rpp.future beside <memory>. This target awaits
-// no std::future, so no std::future::get() reaches the B28 merge.
+// Drives the event_loop and the awaiters of rpp.future beside <memory>, see BUGS.md B28.
 #ifdef MAMA_HAS_MODULES
-#include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
+#include <typeinfo> // the include set of BUGS.md B28
 #include <new>      // placement new, which the loop queue runs
-#include <memory>   // the header B28 rejects beside std::future::get(), see BUGS.md B28
+#include <memory>   // the header B28 rejected beside a <future> module, see BUGS.md B28
 #include <vector>
 
 import rpp.core;
@@ -12,7 +11,7 @@ import rpp.future;
 
 int main()
 {
-    // <memory> is live here, so the target fails if B28 ever widens past std::future::get()
+    // <memory> is live here, so the target fails if B28 ever returns
     std::shared_ptr<int> owned = std::make_shared<int>(4);
     if (*owned != 4) return 1;
 

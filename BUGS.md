@@ -194,20 +194,17 @@ meets this crash. The `consumer-gcc14-headers` CI row pins that path.
 variable of the same name for a mama build. A build which takes it prints a warning and
 names the include set above. Use it to test the module path on gcc-14, never to ship one.
 
-**`std_future_awaiter<T>` is the last path to condition 3.** ReCpp 2.2 removed `cfuture`,
-whose destructor called `get()`, so holding one was enough. In `rpp.future` only
-`std_future_awaiter<T>::await_resume()` calls `std::future::get()` now.
+**ReCpp 2.2 removed condition 1 from every module.** It deleted `cfuture`, whose destructor
+called `get()`, and `std_future_awaiter`. No ReCpp header reaches `<future>` now, so no module
+fragment carries it. No gcc-14 run has measured an importer since, so `RPP_MODULES_MIN_GCC` stays.
 
-So the restriction bounds one awaiter, not the group. A consumer which awaits no `std::future`
-imports `rpp.future` beside any include. `RppCoroModuleOnly` pins that on gcc-14. It
-includes `<memory>` and drives `event_loop`, `time_awaiter` and `functor_awaiter`.
+`RppCoroModuleOnly` drives `event_loop`, `time_awaiter` and `functor_awaiter` beside `<memory>`.
 `RppFutureModuleOnly` drives `rpp::future`, and on gcc-14 it keeps to the include set above,
 because no run has measured it beside `<memory>` there.
 
 **This is a gcc-14 limit, not a limit of the module.** gcc-15, clang-21 and MSVC build and
 run `RppFutureModuleOnly` with no such restriction, and the `RPP_B28_FREE` block in that
-file drives `<memory>` beside a future call. So the group works on every other tier 1
-compiler, and it keeps `<future>` out of the eight modules beside it either way.
+file drives `<memory>` beside a future call.
 
 MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
 `<chrono>`, which gcc-14 forbids here, so `future_module_only.cpp` guards that include on
@@ -286,8 +283,8 @@ a COW string. Both refcounts live in an uninstrumented library, so TSAN cannot s
 
 `rpp::future` reaches it when a caller passes `std::make_exception_ptr(std::runtime_error{"x"})` to
 `set_exception()`, then frees it while a handler reads `e.what()`. 3 of 5 clang-18 TSAN runs
-reported it, and 0 of 5 with the exception built before the race. `test_sanitizers.cpp:23-24`
-suppresses the destructor frames of this pair.
+reported it, and 0 of 5 with the exception built before the race. `__tsan_default_suppressions()` in
+`test_sanitizers.cpp` suppresses the destructor frames of this pair.
 
 The earlier sightings named `cfuture` and `test_future`, which ReCpp 2.2 removed. Git holds their stacks.
 
@@ -593,25 +590,21 @@ int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() ==
 
 **Narrowed to one module.** `future_types.h` reached every rpp header and carried `<future>`
 into all ten. It needed the include for one concept, `IsFuture`, which `async.h` holds now.
-`rpp.future` now carries the three headers which reach `<future>`, and the other eight
-modules are clean. Measured after the split, each at `-O2`:
+`rpp.future` then carried the three headers which reached `<future>`, and the other eight
+modules were clean. Measured after the split, each at `-O2`:
 
 | Importer | Result |
 |---|---|
 | `rpp.threading`, `rpp.testing`, `rpp.io` | compiles and runs |
 | `rpp.future` | ICE |
 
-So a consumer meets this defect only when it imports `rpp.future`. Two ways around it.
-Import another module, or include the `rpp.future` headers in the unit which names `std::promise`.
+Before 2.2, a consumer met this defect only when it imported `rpp.future`.
 
 `RppPromiseModuleOnly` in `tests/module_consumer/` is the gate. It imports `rpp.threading`,
 instantiates `std::promise` and runs at `-O2`. It failed to build before the split.
 
-`test_modules_future.cpp` imports `rpp.future`, so it names `std::future` only unevaluated.
-
 Ten headers reached `<future>` before the split, and `future_types.h` was the only direct
-includer. One reaches it now: `coroutines.h` includes it for `std_future_awaiter`. ReCpp 2.2
-removed `future.h`, so `event_loop.h` no longer reaches it.
+includer. None reaches it since 2.2, which removed `future.h` and `std_future_awaiter`.
 
 No export list removes the crash. Only the fragment which carries `<future>` decides it.
 

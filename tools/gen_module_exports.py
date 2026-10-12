@@ -424,8 +424,7 @@ GROUP_HEADERS = {
     'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
                   'thread_pool.h', 'threads.h', 'task.h', 'future_types.h',
                   'atomic_shared_ptr.h', 'close_sync.h', 'async.h'),
-    # coroutines.h reaches <future>. gcc-14 crashes an importer of any module whose fragment
-    # carries it, so this group sits alone and rpp.threading stays safe. See BUGS.md B16
+    # the event loop and the awaiters. This group kept <future> out of rpp.threading before 2.2, see BUGS.md B16
     'future': ('event_loop.h', 'coroutines.h'),
     'testing': ('tests.h',),
 }

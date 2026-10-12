@@ -7,7 +7,6 @@
 #if RPP_BUILD_WITH_MODULES
 
 #include <rpp/tests.macros.h> // TestImpl, TestCase, AssertThat
-#include <future>             // std::future, which std_future_awaiter awaits
 #include <type_traits>        // std::is_same_v, which pins an exported signature
 
 // Keep this import list as short as it is. rpp.future carries the whole threading stack in
@@ -53,12 +52,9 @@ TestImpl(test_modules_future)
         rpp::functor_awaiter<int> functor { rpp::delegate<int()>{ +[] { return 7; } } };
         AssertThat(functor.await_ready(), false);
 
-        // the constrained overloads pick a different awaiter, so each one needs its own probe
+        // the constrained overload picks the awaiter, so the probe names it
         static_assert(std::is_same_v<decltype(operator co_await(rpp::delegate<int()>{})), rpp::functor_awaiter<int>>);
-        static_assert(std::is_same_v<decltype(operator co_await(std::future<int>{})), rpp::std_future_awaiter<int>>);
-
         static_assert(sizeof(rpp::functor_awaiter<void>) > 0, "the module must export functor_awaiter<void>");
-        static_assert(sizeof(rpp::std_future_awaiter<int>) > 0, "the module must export std_future_awaiter");
     }
 };
 

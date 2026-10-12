@@ -40,8 +40,8 @@ class ReCpp(mama.BuildTarget):
         if not version: return
         min_gcc = '.'.join(str(p) for p in MODULES_MIN_GCC).removesuffix('.0')
         warning(f'GCC {version} is below the ReCpp modules minimum of GCC {min_gcc}, so this build ' + \
-                'takes the header path. GCC 14.2 and 14.4 crash on an importer which calls ' + \
-                'std::future::get() beside <memory>, at every optimization level. The header path carries ' + \
+                'takes the header path. GCC 14.2 and 14.4 crashed on an importer of rpp.future ' + \
+                'beside <memory> before ReCpp 2.2, at every optimization level. The header path carries ' + \
                 'no such limit, and it supports every compiler. See BUGS.md B28.')
 
 

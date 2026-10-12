@@ -10,7 +10,6 @@
 #include "delegate.h" // rpp::delegate
 #include "future_types.h" // rpp::coro_handle
 #include "thread_pool.h" // rpp::parallel_task_detached
-#include <future> // std::future, which std_future_awaiter awaits
 
 
 namespace rpp
@@ -153,44 +152,6 @@ namespace rpp
         }
     };
 
-    // TODO: should reimplement this using coroutine traits
-    // TODO: https://en.cppreference.com/w/cpp/coroutine/coroutine_traits
-    template<typename T>
-    struct RPP_CORO_RETURN_TYPE std_future_awaiter
-    {
-        std::future<T> f;
-        std::exception_ptr ex {};
-        bool suspended = false;
-
-        // NOTE: there is no safe way to grab the reference normally
-        //       so we always MOVE the future into this awaiter
-        explicit std_future_awaiter(std::future<T>&& f) noexcept
-            : f{std::move(f)} {}
-
-        bool await_ready() const noexcept { return false; }
-        // suspension point that launches the background async task
-        void await_suspend(rpp::coro_handle<> cont) noexcept
-        {
-            if (suspended) std::terminate(); // avoid task explosion
-            suspended = true;
-            // Use detached task: storing the pool_task_handle into a member is a race,
-            // because cont.resume() may destroy the coroutine frame (and `this`)
-            // before the handle assignment completes on the calling thread.
-            rpp::parallel_task_detached([this, cont]()
-            {
-                try { f.wait(); /* wait for the nested coroutine to finish (can throw) */ }
-                catch (...) { ex = std::current_exception(); }
-                cont.resume(); // call await_resume() and continue on this background thread
-            });
-        }
-        // similar to future<T>, either gets the result T, or throws the caught exception
-        T await_resume()
-        {
-            if (ex) std::rethrow_exception(ex);
-            return f.get();
-        }
-    };
-
     /**
      * @brief Awaiter object for rpp::Duration and rpp::TimePoint, allowing to co_await on them directly.
      */
@@ -281,18 +242,6 @@ namespace rpp
         RPP_CORO_WRAPPER inline auto operator co_await(FF&& action) noexcept -> functor_awaiter_fut<decltype(action())>
         {
             return functor_awaiter_fut<decltype(action())>{ std::move(action) };
-        }
-
-        template<typename T>
-        RPP_CORO_WRAPPER inline std_future_awaiter<T> operator co_await(std::future<T>& future) noexcept
-        {
-            return std_future_awaiter<T>{ std::move(future) };
-        }
-
-        template<typename T>
-        RPP_CORO_WRAPPER inline std_future_awaiter<T> operator co_await(std::future<T>&& future) noexcept
-        {
-            return std_future_awaiter<T>{ std::move(future) };
         }
 
         /**

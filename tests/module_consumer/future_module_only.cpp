@@ -1,7 +1,7 @@
 // Drives rpp::future through rpp.threading and rpp.future from an import alone. On gcc-14 the include
 // list keeps clear of bits/exception_ptr.h, because no run measured rpp::future beside it. See BUGS.md B28.
 #ifdef MAMA_HAS_MODULES
-#include <typeinfo> // libstdc++ names typeid inside <future>, and the fragment does not carry it
+#include <typeinfo> // the include set of BUGS.md B28
 #include <new>      // placement new, which a vector of futures runs
 #include <vector>
 #if _MSC_VER

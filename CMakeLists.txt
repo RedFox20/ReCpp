@@ -324,7 +324,7 @@ endif()
 # Experimental C++20 Modules support
 # The first version of each compiler family a consumer of the rpp-*.cppm facades can use.
 # Below these, the same sources crash the compiler or give hundreds of std redefinition errors.
-set(RPP_MODULES_MIN_GCC   15)     # gcc-14 crashes an importer which calls std::future::get(), see BUGS.md B28
+set(RPP_MODULES_MIN_GCC   15)     # gcc-14 crashed an importer of rpp.future before 2.2, see BUGS.md B28
 set(RPP_MODULES_MIN_CLANG 21)     # Clang 18 mis-resolves the facade using-declarations
 set(RPP_MODULES_MIN_MSVC  19.34)  # VS 2022 17.4
 
@@ -376,9 +376,9 @@ if(RPP_BUILD_MODULES)
     if(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC})
         message(WARNING
             "RPP_MODULES_ALLOW_GCC14 is on, so GCC ${CMAKE_CXX_COMPILER_VERSION} builds modules anyway. "
-            "An importer which calls std::future::get() must keep to <typeinfo>, <new>, <vector>, "
-            "<string> and <functional>. Adding <memory>, <chrono>, <thread>, <exception> or "
-            "<stdexcept> crashes the compiler. See BUGS.md B28.")
+            "No run has measured gcc-14 since ReCpp 2.2 removed <future> from every module. "
+            "Before that, an importer which added <memory>, <chrono>, <thread>, <exception> or "
+            "<stdexcept> crashed the compiler. See BUGS.md B28.")
     endif()
 
     # One unit per header group, each carrying its headers directly, because of the

@@ -4,7 +4,6 @@
 #include <rpp/timer.h>
 
 #include <rpp/tests.h>
-#include <future> // std::future, std::async
 #include <string> // std::string
 using namespace rpp;
 using namespace std::this_thread;
@@ -250,46 +249,13 @@ TestImpl(test_coroutines)
         functor_nonfuture_string_coro().get();
     }
 
-    static rpp::future<void> std_future_void_coro()
+    static rpp::future<void> future_void_coro()
     {
         co_await rpp::millis(10);
         co_return;
     }
-    TestCase(std_future_void_coro)
+    TestCase(future_void_coro)
     {
-        std_future_void_coro().get();
+        future_void_coro().get();
     }
-
-
-    static rpp::future<std::string> std_future_string_coro()
-    {
-        std::string s = co_await std::async(std::launch::async, [] {
-            return "future string"s;
-        });
-        co_return s;
-    }
-    TestCase(std_future_string_coro)
-    {
-        std::string s = std_future_string_coro().get();
-        AssertThat(s, "future string"s);
-    }
-
-
-    static rpp::future<std::string> std_future_lambda_coro()
-    {
-        // a lambda which returns a std::future yields that future, which the coroutine then awaits
-        std::future<std::string> f = co_await []() -> std::future<std::string> {
-            return std::async(std::launch::async, [] {
-                return "future string"s;
-            });
-        };
-        co_return co_await std::move(f);
-    }
-
-    TestCase(std_future_lambda_coro)
-    {
-        std::string s = std_future_lambda_coro().get();
-        AssertThat(s, "future string"s);
-    }
-
 };

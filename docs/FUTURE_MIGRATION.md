@@ -1,8 +1,8 @@
 # rpp::future, a module future which owns its own state
 
-ReCpp 2.2 removed `cfuture`, `cpromise`, `async_task`, `rpp/future.h` and the `std::future` path of
-`event_loop::run_async`, see [#144](https://github.com/RedFox20/ReCpp/issues/144). `rpp::future` is the only
-future now. `std_future_awaiter` in `coroutines.h` still awaits a `std::future`. The sections below record
+ReCpp 2.2 removed `cfuture`, `cpromise`, `async_task`, `rpp/future.h`, `std_future_awaiter` and the
+`std::future` path of `event_loop::run_async`, see [#144](https://github.com/RedFox20/ReCpp/issues/144).
+`rpp::future` is the only future now, and no ReCpp header includes `<future>`. The sections below record
 the original design.
 
 `rpp::cfuture<T>` derives from `std::future<T>`. That one line sets the cost of most

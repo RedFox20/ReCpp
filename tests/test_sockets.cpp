@@ -5,7 +5,6 @@
 #include <rpp/timer.h>
 #include <rpp/tests.h>
 #include <thread>
-#include <future> // std::async
 #include <string> // std::string
 #include <cerrno> // ENODEV, EPERM
 #include <cstring> // memcmp
@@ -1063,7 +1062,7 @@ TestImpl(test_sockets)
         socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock)); // this is our server
         AssertThat(server.is_blocking(), false);
 
-        std::future<void> remote = std::async(std::launch::async, [&server]()
+        rpp::future<void> remote = rpp::async([&server]()
         {
             int receivedMessages = 0;
             socket to_server = connect("127.0.0.1", server.port(), rpp::SO_NonBlock);
@@ -1123,7 +1122,7 @@ TestImpl(test_sockets)
         struct message_stats { int sent = 0; int received = 0; };
 
         // start client thread
-        std::future<message_stats> client_runner = std::async(std::launch::async, [&server, &running]()
+        rpp::future<message_stats> client_runner = rpp::async([&server, &running]()
         {
             socket to_server = connect("127.0.0.1", server.port(), SO_Blocking);
             AssertThat(to_server.is_blocking(), true);
@@ -1209,7 +1208,7 @@ TestImpl(test_sockets)
         server.set_nagle(false);
 
         // remote client lives in a separate thread
-        std::future<void> remote = std::async(std::launch::async, [&]()
+        rpp::future<void> remote = rpp::async([&]()
         {
             std::vector<char> buf(TransmitSize, '$');
 
@@ -1283,7 +1282,7 @@ TestImpl(test_sockets)
         AssertTrue(receiverSocket.good());
         std::atomic_bool running { true };
 
-        std::future<int32_t> receiver = std::async(std::launch::async,
+        rpp::future<int32_t> receiver = rpp::async(
             [&running, &receiverSocket]() {
                 int32_t bytesReceived = 0;
                 uint8_t buffer[2048];
