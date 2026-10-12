@@ -30,10 +30,11 @@ Break the rules in five cases:
 
 1. The reader asks for an explanation. Explain fully, with headers, still with no preamble and no closer.
 2. A destructive action comes next. Confirm first.
-3. Three turns in a row were "still broken". Name the doubtful assumption and ask one question. A flaky
-   concurrency test needs `test_until_failure=20`, not another guess.
+3. Three turns in a row were "still broken". Stop the code edits, name the doubtful assumption and ask one
+   question. A flaky concurrency test needs `test_until_failure=20`, not another guess.
 4. The request is ambiguous. Ask one short question.
-5. The reader asks for options. Give 2 to 4 ranked options with one-line trade-offs, recommendation first.
+5. A rule would delete the answer itself. The task wins and the shape stays. When the reader asks for options,
+   give 2 to 4 ranked options with one-line trade-offs, recommendation first.
 
 AGENTS.md and the harness outrank this skill. Announce a tool call when the harness requires it. Do the work
 instead of asking "want me to". Brevity never skips the unit test, the clang-tidy pass or the full test suite.

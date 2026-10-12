@@ -16,12 +16,13 @@ Three hooks share `.claude/hooks/prose_rules.py`. Run `.claude/hooks/prose_rules
 it, because a linter which stops detecting reports nothing.
 
 1. The `Edit` and `Write` hook lints the lines an edit adds, and blocks a line which breaks a rule. Fix it and retry.
-2. The `Bash` hook refuses a command which writes a `.md`, `.h`, `.cpp` or `.cppm` file. A `/tmp` path is exempt.
+2. The `Bash` hook refuses a command which writes a `.md`, `.h`, `.cpp` or `.cppm` file. Reading, building and
+   restoring stay allowed, and a `/tmp` path is exempt.
 3. The `Stop` hook lints the markdown diff at the end of the turn.
 
-They check sentence length in prose and comments, and contractions and semicolons also in table cells. In
-code they check comment blocks over 2 lines and `sleep_ms(N)` over 10. A comment fails when it ends on a comma, or when it
-names a number the code beside it sets. Code fences and headings are exempt.
+They check sentence length in prose and comments, and contractions and semicolons also in table cells. In code
+they check comment blocks over 2 lines and `sleep_ms(N)` over 10. A whole-line or trailing comment fails when it
+ends on a comma, or when it names a number the code beside it sets. Code fences and headings are exempt.
 
 ## When to run
 
