@@ -8,7 +8,7 @@ Use the explicit type name when it communicates ownership, lifetime, precision,
 or the ReCpp abstraction in use.
 
 ```cpp
-rpp::cfuture<> future = rpp::async_task(run_work);
+rpp::future<> future = rpp::async(run_work);
 rpp::TimePoint deadline = rpp::TimePoint::now() + rpp::millis(100);
 ```
 

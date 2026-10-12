@@ -1,9 +1,9 @@
 #pragma once
 /**
- * Single-threaded coroutine tasks - structured-concurrency alternatives to cfuture<T> that resume
+ * Single-threaded coroutine tasks - structured-concurrency alternatives to rpp::future<T> that resume
  * their awaiter on the SAME (event-loop) thread the task completes on, without spawning a thread
  * for the continuation. Two flavours share one implementation via a compile-time policy:
- *   - rpp::task<T>      EAGER  - body runs at construction (like cfuture); launches work now.
+ *   - rpp::task<T>      EAGER  - body runs at construction (like rpp::future); launches work now.
  *   - rpp::deferred<T>  LAZY   - body runs only when first awaited (or explicitly started).
  *
  * Copyright (c) 2026, Jorma Rebane
@@ -20,14 +20,14 @@
 namespace rpp
 {
     /**
-     * @brief Single-threaded coroutine result. Unlike `rpp::cfuture<T>`, awaiting one never spawns
+     * @brief Single-threaded coroutine result. Unlike `rpp::future<T>`, awaiting one never spawns
      *        a thread — the awaiter resumes on whatever thread the task body completes on (its loop).
      *
      * Two flavours, identical API, selected at the type level:
      *   - `rpp::task<T>` (EAGER): the body runs at CONSTRUCTION up to its first background leaf
      *     (e.g. `event_loop::run_async`), which dispatches the real work and suspends. The work is
      *     launched immediately at the call site, regardless of when you co_await — matching the
-     *     immediacy callers expect from `cfuture`. This is "eager", never "deferred-until-the-loop".
+     *     immediacy callers expect from `rpp::future`. This is "eager", never "deferred-until-the-loop".
      *   - `rpp::deferred<T>` (LAZY): the body does NOT run until the result is first awaited (or
      *     started via `deferred::start()`). Awaiting starts it via symmetric transfer, so the delay
      *     between `co_await` and launch is a few cycles, not a scheduler round-trip.
@@ -35,8 +35,8 @@ namespace rpp
      * Both RESUME ON THE LOOP (no thread spawn): awaiting registers a continuation; on completion
      * the task resumes it via symmetric transfer on the thread the body finished on. Because the
      * leaves post their resume back to the event loop, a chain completes on the loop thread — so
-     * `co_await` lands you back on the loop with no off-loop hop (the whole point versus cfuture,
-     * whose awaiter does `fut.wait(); cont.resume()` on a detached pool thread — off-loop).
+     * `co_await` lands you back on the loop with no off-loop hop (the whole point versus rpp::future,
+     * whose awaiter resumes on a pool thread, off the loop).
      *
      * NOT a future: there is intentionally no `get()` / `wait()`. These are for coroutine code
      * (`co_await`); a top-level task is driven by `event_loop::run_until_done()`. Use

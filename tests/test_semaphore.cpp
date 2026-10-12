@@ -1,6 +1,6 @@
 #include <rpp/semaphore.h>
 #include <rpp/coroutines.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/thread_pool.h> // draining the pool between test cases
 #include <rpp/timer.h>
 #include <rpp/tests.h>
@@ -563,7 +563,7 @@ TestImpl(test_semaphore)
     TestCase(co_await_semaphore_notified)
     {
         rpp::semaphore sem;
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto result = co_await sem.await(millis(500));
             AssertEqual(result, rpp::semaphore::notified);
@@ -579,7 +579,7 @@ TestImpl(test_semaphore)
     TestCase(co_await_semaphore_timeout)
     {
         rpp::semaphore sem;
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto result = co_await sem.await(millis(20));
             AssertEqual(result, rpp::semaphore::timeout);
@@ -593,7 +593,7 @@ TestImpl(test_semaphore)
         rpp::semaphore sem;
         sem.notify(); // pre-signal
 
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto result = co_await sem.await(millis(100));
             AssertEqual(result, rpp::semaphore::notified);
@@ -607,7 +607,7 @@ TestImpl(test_semaphore)
     {
         rpp::semaphore_once_flag flag;
         flag.notify();
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             AssertEqual(co_await flag.await(millis(100)), rpp::semaphore::notified);
             AssertEqual(co_await flag.await(millis(100)), rpp::semaphore::notified);

@@ -4,13 +4,13 @@
  * Distributed under MIT Software License
  */
 #include "config.h"
-#include "future.h"
+#include "async.h" // rpp::future, rpp::IsFuture
 #include "timer.h" // rpp::Duration
 #include "timepoint.h" // rpp::Duration
 #include "delegate.h" // rpp::delegate
-#include "future_types.h" // rpp::cfuture, rpp::coro_handle
+#include "future_types.h" // rpp::coro_handle
 #include "thread_pool.h" // rpp::parallel_task_detached
-#include <type_traits> // std::is_same_v
+#include <future> // std::future, which std_future_awaiter awaits
 
 
 namespace rpp
@@ -24,7 +24,7 @@ namespace rpp
      * A more complex example with nested coroutines:
      * @code
      *     using namespace rpp::coro_operators;
-     *     co_await [&]() -> cfuture<string> {
+     *     co_await [&]() -> rpp::future<string> {
      *         std::string localPath = co_await downloadFile(url);
      *         co_return localPath;
      *     };
@@ -136,12 +136,8 @@ namespace rpp
             {
                 try {
                     f = action(); // get the future from the lambda
-                    if constexpr (std::is_same_v<Future, rpp::future<decltype(f.get())>>)
-                    {
-                        // The continuation can resume and destroy this awaiter before registration returns.
-                        if (f.await_suspend(cont)) return;
-                    }
-                    else f.wait(); // Legacy futures have no completion hook.
+                    // The continuation can resume and destroy this awaiter before registration returns.
+                    if (f.await_suspend(cont)) return;
                 } catch (...) { ex = std::current_exception(); }
                 // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
                 cont.resume(); // call await_resume() and continue on this background thread
@@ -243,7 +239,7 @@ namespace rpp
          * @note The delegate must return a future type
          * @code
          *     using namespace rpp::coro_operators;
-         *     rpp::delegate<cfuture<string>()> action = [&]() -> cfuture<string> {
+         *     rpp::delegate<rpp::future<string>()> action = [&]() -> rpp::future<string> {
          *         string localPath = co_await downloadFile(url);
          *         co_return localPath;
          *     };
@@ -275,7 +271,7 @@ namespace rpp
          * @note The lambda must return a future type
          * @code
          *     using namespace rpp::coro_operators;
-         *     string path = co_await [&]() -> cfuture<string> {
+         *     string path = co_await [&]() -> rpp::future<string> {
          *         string localPath = co_await downloadFile(url);
          *         co_return localPath;
          *     };
@@ -285,18 +281,6 @@ namespace rpp
         RPP_CORO_WRAPPER inline auto operator co_await(FF&& action) noexcept -> functor_awaiter_fut<decltype(action())>
         {
             return functor_awaiter_fut<decltype(action())>{ std::move(action) };
-        }
-
-        template<typename T>
-        inline rpp::cfuture<T>& operator co_await(rpp::cfuture<T>& future) noexcept
-        {
-            return future;
-        }
-
-        template<typename T>
-        rpp::cfuture<T>&& operator co_await(rpp::cfuture<T>&& future) noexcept
-        {
-            return (rpp::cfuture<T>&&)future;
         }
 
         template<typename T>

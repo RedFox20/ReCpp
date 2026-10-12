@@ -67,7 +67,7 @@ if (BUILD_MODULE_CONSUMER_TESTS)
     mama_target_modules(RppLiteralsModuleOnly)
     target_link_libraries(RppLiteralsModuleOnly PRIVATE ${MAMA_LIBS})
 
-    # the rpp.future surface, which no other target reaches
+    # rpp::future across the rpp.threading and rpp.future imports
     add_executable(RppFutureModuleOnly future_module_only.cpp)
     target_include_directories(RppFutureModuleOnly PRIVATE ${MAMA_INCLUDES})
     mama_target_modules(RppFutureModuleOnly)

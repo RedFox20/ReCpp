@@ -30,6 +30,30 @@ namespace rpp
     template<class Loop>
     concept IsEventLoop = requires(Loop& loop, rpp::delegate<void()>&& callback) { loop.post(std::move(callback)); };
 
+    /// Matches `rpp::future<T>` by the return type of `get()`
+    template<typename F>
+    concept IsFuture = requires(F f) {
+        requires std::is_same_v<F, rpp::future<decltype(f.get())>>;
+    };
+
+    /// Matches any type `IsFuture` rejects
+    template<typename F>
+    concept NotFuture = !IsFuture<F>;
+
+    /// Matches a callable which takes no argument and returns a future
+    template<typename F>
+    concept IsFunctionReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && IsFuture<decltype(f())>;
+    };
+
+    /// Matches a callable which takes no argument and returns anything but a future
+    template<typename F>
+    concept IsFunctionNotReturningFuture = requires(F f)
+    {
+        requires IsFunction<F> && NotFuture<decltype(f())>;
+    };
+
     namespace detail
     {
         /// A step which runs once, after the result it follows arrives
@@ -372,6 +396,9 @@ namespace rpp
             else return new loop_step_node<Loop..., In, R, Body>{loop..., std::move(in), std::move(out), make};
         }
 
+        // the analyzer skips the promise constructor of a coroutine frame, so it reads `state` as uninitialized
+        // NOLINTBEGIN(clang-analyzer-core.CallAndMessage)
+
         /// Coroutine hooks of future<T>. ~promise() publishes after the locals end, but before the parameters do.
         /// So it keeps `inline_next` false, and the next step starts as a pool task outside the frame
         template<class T>
@@ -397,6 +424,7 @@ namespace rpp
         {
             void return_void() noexcept { this->state->value.emplace(); }
         };
+        // NOLINTEND(clang-analyzer-core.CallAndMessage)
 
         /// The result of `Task` on the value of a future<T>. It has no type when `Task` cannot take that value
         template<class T, class Task> struct step_result : std::invoke_result<Task&, T> {};

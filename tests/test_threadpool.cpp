@@ -1,6 +1,6 @@
 #include <rpp/tests.h>
 #include <rpp/thread_pool.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
 #include <rpp/threads.h> // thread naming
@@ -35,7 +35,7 @@ namespace
         rpp::semaphore cleanup_finished;
     };
 
-    // @tparam R return type of the task, so the void and non-void async_task paths
+    // @tparam R return type of the task, so the void and non-void rpp::async paths
     //         can be exercised by the same marker.
     template<class R = void>
     struct worker_cleanup_marker_task
@@ -637,18 +637,18 @@ TestImpl(test_threadpool)
         AssertThat((int)completed, 4 * TASKS_PER_THREAD);
     }
 
-    // Nested async_task().get() — the exact pattern from the RadioMicrohard deadlock.
+    // Nested rpp::async().get(), the exact pattern from the RadioMicrohard deadlock.
     // Outer pool worker blocks on inner future, requiring the pool to spawn/reuse
     // a different worker. Tests 2-deep and 3-deep nesting.
-    TestCase(nested_async_task_get_no_deadlock)
+    TestCase(nested_async_get_no_deadlock)
     {
         rpp::Timer t;
 
         // 2-deep: outer task blocks waiting for inner task
         for (int i = 0; i < 100; ++i)
         {
-            int r = rpp::async_task([]() -> int {
-                return rpp::async_task([]() -> int { return 42; }).get();
+            int r = rpp::async([]() -> int {
+                return rpp::async([]() -> int { return 42; }).get();
             }).get();
             AssertThat(r, 42);
         }
@@ -656,21 +656,21 @@ TestImpl(test_threadpool)
         // 3-deep: requires 3 concurrent workers minimum
         for (int i = 0; i < 50; ++i)
         {
-            int r = rpp::async_task([]() -> int {
-                return rpp::async_task([]() -> int {
-                    return rpp::async_task([]() -> int { return 99; }).get();
+            int r = rpp::async([]() -> int {
+                return rpp::async([]() -> int {
+                    return rpp::async([]() -> int { return 99; }).get();
                 }).get();
             }).get();
             AssertThat(r, 99);
         }
 
         if (t.elapsed_ms() >= 10'000)
-            AssertFailed("nested async_task deadlock — took %lldms\n", t.elapsed_ms());
+            AssertFailed("nested rpp::async deadlock, took %lldms\n", t.elapsed_ms());
     }
 
     TestCase(pool_task_handle_fire_and_forget_race)
     {
-        // Tests the async_task fire-and-forget pattern where
+        // Tests the rpp::async fire-and-forget pattern where
         // the pool_task_handle temporary is destroyed on the main thread
         // while the worker thread may still be in signal_finish_and_cleanup.
         //
@@ -683,7 +683,7 @@ TestImpl(test_threadpool)
 
         for (int i = 0; i < ITERATIONS; ++i)
         {
-            auto future = rpp::async_task([&completed]() noexcept -> int {
+            auto future = rpp::async([&completed]() noexcept -> int {
                 completed.fetch_add(1, std::memory_order_relaxed);
                 return 0;
             });
@@ -766,10 +766,10 @@ TestImpl(test_threadpool)
         AssertThat((int)state->marker.load(std::memory_order_acquire), worker_cleanup_state::MARKER);
     }
 
-    TestCase(async_task_future_not_ready_before_worker_cleanup)
+    TestCase(async_future_not_ready_before_worker_cleanup)
     {
         std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
-        rpp::cfuture<> future = rpp::async_task(worker_cleanup_marker_task<>{state});
+        rpp::future<> future = rpp::async(worker_cleanup_marker_task<>{state});
 
         state->cleanup_started.wait();
         const bool future_was_ready_during_cleanup = future.await_ready();
@@ -782,13 +782,11 @@ TestImpl(test_threadpool)
         AssertThat(future_was_ready_during_cleanup, false);
     }
 
-    // async_task writes the destroy-then-publish sequence out THREE times: void, non-void
-    // and the catch handler. The test above covers void only, so a regression can land in
-    // either of the other two copies while every existing test stays green.
-    TestCase(async_task_nonvoid_future_not_ready_before_worker_cleanup)
+    // a value result and an exception also wait until the worker destroys the task
+    TestCase(async_nonvoid_future_not_ready_before_worker_cleanup)
     {
         std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
-        rpp::cfuture<int> future = rpp::async_task(worker_cleanup_marker_task<int>{state});
+        rpp::future<int> future = rpp::async(worker_cleanup_marker_task<int>{state});
 
         state->cleanup_started.wait();
         const bool future_was_ready_during_cleanup = future.await_ready();
@@ -802,10 +800,10 @@ TestImpl(test_threadpool)
 
     // the catch handler is the third copy of the sequence, and the exception must still
     // reach the caller after the task was destroyed
-    TestCase(async_task_throwing_task_destroyed_before_future_ready)
+    TestCase(async_throwing_task_destroyed_before_future_ready)
     {
         std::shared_ptr<worker_cleanup_state> state = std::make_shared<worker_cleanup_state>();
-        rpp::cfuture<> future = rpp::async_task(worker_cleanup_marker_task<>{state, /*should_throw*/true});
+        rpp::future<> future = rpp::async(worker_cleanup_marker_task<>{state, /*should_throw*/true});
 
         state->cleanup_started.wait();
         const bool future_was_ready_during_cleanup = future.await_ready();
@@ -817,7 +815,7 @@ TestImpl(test_threadpool)
         AssertThrows(future.get(), std::runtime_error);
     }
 
-    TestCase(async_task_exception_state_cleanup_race)
+    TestCase(async_exception_state_cleanup_race)
     {
         thread_pool& pool = thread_pool::global();
         AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
@@ -826,7 +824,7 @@ TestImpl(test_threadpool)
         // the exception must reach the caller every time, with no deadlock and no race
         for (int iteration = 0; iteration != 20; ++iteration)
         {
-            rpp::cfuture<> future = rpp::async_task([] {
+            rpp::future<> future = rpp::async([] {
                 throw std::runtime_error("task failed");
             });
             AssertThrows(future.get(), std::runtime_error);
@@ -836,12 +834,11 @@ TestImpl(test_threadpool)
         AssertThat(pool.wait_until_idle(rpp::seconds(1)), wait_result::finished);
     }
 
-    // the worker must free the future state safely after the waiter released it,
-    // which is the order TSAN reports as a race under libc++, see BUGS.md C15
+    // the worker must free the future state safely after the waiter released it
     TestCase(pool_task_frees_the_promise_after_the_waiter_released)
     {
-        rpp::cpromise<void> promise;
-        rpp::cfuture<> future = promise.get_future();
+        rpp::promise<void> promise;
+        rpp::future<> future = promise.get_future();
 
         // the worker publishes the value, then keeps the promise until the waiter is gone
         pool_task_handle task = rpp::parallel_task([p = std::move(promise)]() mutable
@@ -851,21 +848,20 @@ TestImpl(test_threadpool)
         }); // the worker destroys the delegate here, and the promise dies with it
 
         future.get(); // the waiter releases its reference before the worker releases its own
-        // a TSAN build symbolizes the suppressed report on the worker, so allow a long wait
         AssertThat(task.wait(rpp::seconds(1)), wait_result::finished);
     }
 
     // A copyable result with a throwing move must still be published successfully. The
     // subsequent move out of the future propagates that exception to the caller.
-    TestCase(async_task_survives_a_throwing_result_move_ctor)
+    TestCase(async_survives_a_throwing_result_move_ctor)
     {
-        rpp::cfuture<throwing_move_result> future = rpp::async_task([]{ return throwing_move_result{}; });
+        rpp::future<throwing_move_result> future = rpp::async([]{ return throwing_move_result{}; });
         AssertThrows(future.get(), std::runtime_error);
     }
 
-    TestCase(async_task_moves_a_result_when_copy_throws)
+    TestCase(async_moves_a_result_when_copy_throws)
     {
-        rpp::cfuture<copy_throws_move_succeeds_result> future = rpp::async_task([] {
+        rpp::future<copy_throws_move_succeeds_result> future = rpp::async([] {
             return copy_throws_move_succeeds_result{worker_cleanup_state::RESULT};
         });
         AssertThat(future.get().value, worker_cleanup_state::RESULT);

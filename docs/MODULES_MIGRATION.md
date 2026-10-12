@@ -60,9 +60,9 @@ see **B15**. The generator selftest still pins all three knobs.
 
 **gcc-14 cannot compile `std::promise` in an importer, and six modules carried that before
 L7.** Any module whose global module fragment includes `<future>` breaks such a consumer,
-No export list changes the crash, so `test_modules_future.cpp` names the `future.h`
-factories in an unevaluated context. **B16** holds the reproducer. Three headers reach
-`<future>` now, and `rpp.future` carries all three.
+No export list changes the crash, so `test_modules_future.cpp` names `std::future` only in
+an unevaluated context. **B16** holds the reproducer. One header reaches `<future>` now,
+`coroutines.h`, and `rpp.future` carries it.
 
 **An importer which includes `<string>` first reads a different module.** `rpp.file_io`
 passed every gate and still broke that consumer, so `std_string_module_only.cpp` holds the
@@ -1123,7 +1123,7 @@ B23 are struck through, because a fix replaced each one.
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
 | ~~B23~~ | gcc-14 | The whole modules build, on C++23, from a clean configure. gcc ran out of module source locations on 44 modules, then mis-merged a global module declaration | Fixed. Eight header groups cut one translation unit from 39 imports to 8, and both standards build clean. A C++23 modules CI row now covers it. See `BUGS.md` C28 |
-| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries the only three headers which reach `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules_future.cpp` still names `cfuture` unevaluated |
+| **B16** | gcc-14 | An importer of a module whose fragment includes `<future>` crashes on `std::promise` at `-O1` and above, at `propagate_necessity` | `rpp.future` carries `coroutines.h`, the only header which reaches `<future>`, so eight modules are clean. `RppPromiseModuleOnly` gates it, and `test_modules_future.cpp` names `std::future` only unevaluated |
 | ~~B18~~ | gcc-14 | An importer which built an `rpp::concurrent_queue` crashed at `-O1` and above, at `nonnull_arg_p`, through `rpp.threading` and `rpp` too | Fixed. `__builtin_memmove` names no declaration for gcc to attach to the module, and `RppQueueModuleOnly` builds that shape at `-O2`. See `BUGS.md` C27 |
 | **B19** | gcc-14 | A module which exports `std::exception_ptr` writes an interface no importer can read | No module exports a std name. An importer includes `<exception>` |
 | **B20** | gcc-14 | A module which exports `std::swap` after including `<future>` loses the generic `std::swap`, and the interface fails | No module exports a std name, so nothing reaches this |
@@ -1177,11 +1177,10 @@ already used, so the public signature names no std type.
 
 ### 11.2 Open design follow-ups
 
-**`rpp::cfuture` derives from `std::future`, which binds the whole group.**
-[`FUTURE_MIGRATION.md`](FUTURE_MIGRATION.md) holds that plan. It adds `rpp::future` and
-`rpp::promise`, which own their shared state and name no std type. It leaves `cfuture` in
-the header for a consumer which includes. Removing `<future>` from the group fragment is
-what removes B28 condition 1.
+**`std_future_awaiter` keeps `<future>` in the `rpp.future` fragment.**
+[`FUTURE_MIGRATION.md`](FUTURE_MIGRATION.md) added `rpp::future` and `rpp::promise`, which own
+their shared state and name no std type, and ReCpp 2.2 removed `cfuture`. Moving
+`std_future_awaiter` out of the group fragment is what removes B28 condition 1.
 
 **A modules build should import its std names, not include them.** A translation unit
 built with modules still writes `#include <vector>` and `#include <future>` today. The

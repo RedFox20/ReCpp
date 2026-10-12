@@ -11,8 +11,8 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ### B35. A `noexcept` error handler does not compile
 `rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
 `first_arg_type` fails on a `noexcept` lambda. A handler such as
-`[](const std::runtime_error&) noexcept { return 2; }` fails in `rpp::future::then()` and
-`cfuture::then()`, where g++ 14.4 reports `'operator()' is not a member of`. The same handler
+`[](const std::runtime_error&) noexcept { return 2; }` fails in `rpp::future::then()`,
+where g++ 14.4 reports `'operator()' is not a member of`. The same handler
 without `noexcept` compiles, and so does a `noexcept` task.
 
 ### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
@@ -134,9 +134,9 @@ instantiates in the importer, and it drags the libstdc++ internals there with it
 | a template future factory | nothing | `must '#include <typeinfo>'` |
 
 Both compilers answer the same way, because `std::promise::set_value` builds a
-`std::function`, and `_M_manager` names `typeid` inside it. `rpp.future` is templated
-through `cfuture<T>`, so no importer of it reaches zero includes. It starts at
-`<typeinfo>` and `<new>`, and on gcc-14 it may add `<vector>`, `<string>` and
+`std::function`, and `_M_manager` names `typeid` inside it. Before 2.2, `rpp.future` was
+templated through `cfuture<T>`, so no importer of it reached zero includes. It started at
+`<typeinfo>` and `<new>`, and on gcc-14 it could add `<vector>`, `<string>` and
 `<functional>` and nothing else.
 
 **The defaulted `operator==` of `exception_ptr` is the cause, at `exception_ptr.h:169`.**
@@ -194,18 +194,19 @@ meets this crash. The `consumer-gcc14-headers` CI row pins that path.
 variable of the same name for a mama build. A build which takes it prints a warning and
 names the include set above. Use it to test the module path on gcc-14, never to ship one.
 
-**`~cfuture()` carries condition 3 on its own.** The destructor calls `get()` to drain a
-ready future, so a consumer instantiates `get()` by holding a `cfuture<T>` at all. Naming
-the type is enough, and no explicit `get()` call has to appear.
+**`std_future_awaiter<T>` is the last path to condition 3.** ReCpp 2.2 removed `cfuture`,
+whose destructor called `get()`, so holding one was enough. In `rpp.future` only
+`std_future_awaiter<T>::await_resume()` calls `std::future::get()` now.
 
-So the restriction bounds one type, not the group. A consumer which names no `cfuture`
+So the restriction bounds one awaiter, not the group. A consumer which awaits no `std::future`
 imports `rpp.future` beside any include. `RppCoroModuleOnly` pins that on gcc-14. It
 includes `<memory>` and drives `event_loop`, `time_awaiter` and `functor_awaiter`.
-`RppFutureModuleOnly` holds the other half, where a `cfuture` restricts the include set.
+`RppFutureModuleOnly` drives `rpp::future`, and on gcc-14 it keeps to the include set above,
+because no run has measured it beside `<memory>` there.
 
 **This is a gcc-14 limit, not a limit of the module.** gcc-15, clang-21 and MSVC build and
 run `RppFutureModuleOnly` with no such restriction, and the `RPP_B28_FREE` block in that
-file drives the exact shape gcc-14 rejects. So the group works on every other tier 1
+file drives `<memory>` beside a future call. So the group works on every other tier 1
 compiler, and it keeps `<future>` out of the eight modules beside it either way.
 
 MSVC needs the opposite. It parses `<thread>` from the fragment and fails without
@@ -279,42 +280,16 @@ A consumer which throws across the boundary needs no `<exception>`. A thrown `in
 Give it one to watch the build fail.
 
 ### B27. A `then()` exception handler reads a string the async state frees
-`ubuntu-cpp20-tsan-clang18` reported one race in `test_future::except_handlers_catch_first`.
-Thread T107 runs `~invalid_argument` inside the libc++ `std::async` state and calls `free`.
-Thread T100 reads the same address through `bcmp`, under the `e.what()` compare of the
-handler. All 557 cases passed, and TSAN alone sets exit code 66.
+TSAN reports a free of an exception message on one thread while a handler reads `e.what()` on
+another. libc++ keeps the message in a refcounted `__libcpp_refstring`, and libstdc++ keeps it in
+a COW string. Both refcounts live in an uninstrumented library, so TSAN cannot see what orders the two.
 
-The handler takes `std::domain_error e` by value (`test_future.cpp:143`). libc++ holds the
-message in a refcounted buffer which a copy shares, so the copy and the async state point at
-one allocation. Whether the refcount is the defect or the report is a false positive needs a
-read of `__libcpp_refstring`.
+`rpp::future` reaches it when a caller passes `std::make_exception_ptr(std::runtime_error{"x"})` to
+`set_exception()`, then frees it while a handler reads `e.what()`. 3 of 5 clang-18 TSAN runs
+reported it, and 0 of 5 with the exception built before the race. `test_sanitizers.cpp:23-24`
+suppresses the destructor frames of this pair.
 
-This is not B17. That one names `thread_pool.cpp:359` and `tests.cpp:726` in
-`test_threadpool::parallel_task_reentrance`, and neither stack appears here.
-
-Four other TSAN jobs passed on the same commit, which are `cpp20-tsan-gcc13`,
-`cpp23-tsan-gcc13`, `cpp23-tsan-clang18` and `cpp26-tsan-gcc14`. Only libc++ reports it.
-
-The job passed on c5a9d9b, the next commit, so this is one sighting and the rate is below one
-run. B17 reported on the same commit instead, which is a different race in another test.
-
-A second sighting came on 78c9827 in `ubuntu-cpp23-tsan-clang18`, in
-`test_future::cross_thread_exception_propagation`. The libc++ `std::async` worker frees the
-exception in `__cxa_end_catch` after the main thread read `e.what()`. TSAN does not see the
-libc++abi refcount which orders the two.
-
-`cfuture` keeps this shape, because libc++ `__assoc_state::move()` rethrows a copy of the stored
-exception, as C31 did in `rpp::future`. `rpp::future` reaches it when a caller passes
-`std::make_exception_ptr(std::runtime_error{"x"})` to `set_exception()`, then frees it while a
-handler reads `e.what()`. 3 of 5 clang-18 TSAN runs reported it, and 0 of 5 with the exception
-built before the race. `test_sanitizers.cpp:23-24` suppresses the destructor frames of this pair.
-
-gcc-13 with libstdc++ reports it too, in `test_future::continue_with_logs_an_error_which_no_handler_takes`.
-A pool worker runs `~logic_error` in the `async_task` body at `future.h:138` and frees the message.
-Another worker read it through `vsnprintf` under `_LogWarning`, from `run_logging_errors()` at
-`future.h:75`. The B10 recipe hit it 3 of 80 times on the commit which adds `sem::flag_word`,
-and 0 of 80 on master 5395e95. libstdc++ keeps that message in a COW string whose refcount lives in the
-uninstrumented `libstdc++.so`.
+The earlier sightings named `cfuture` and `test_future`, which ReCpp 2.2 removed. Git holds their stacks.
 
 The suppressed report also stalls the case. On PR #131, 3 of 12 gcc TSAN jobs in `ci.yml` saw no
 warning within one second. A dump at the timeout showed one worker in the libtsan demangler, in
@@ -575,7 +550,7 @@ not enough, because the worker can still free the copy in the task state.
 
 ### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
 `rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
-changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `future.h`, `async.h` and
+changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `async.h` and
 `coroutines.h` pass `g++ -fsyntax-only -DRPP_FREERTOS=1` on an x86 host. No target has run them.
 
 `event_loop.h` still fails there. `event_loop::on_owner_thread()` calls `rpp::get_thread_id()`,
@@ -617,7 +592,7 @@ int main() { std::promise<int> p; p.set_value(7); return p.get_future().get() ==
 ```
 
 **Narrowed to one module.** `future_types.h` reached every rpp header and carried `<future>`
-into all ten. It needed the include for one concept, and `IsFuture` moved to `future.h`.
+into all ten. It needed the include for one concept, `IsFuture`, which `async.h` holds now.
 `rpp.future` now carries the three headers which reach `<future>`, and the other eight
 modules are clean. Measured after the split, each at `-O2`:
 
@@ -627,17 +602,16 @@ modules are clean. Measured after the split, each at `-O2`:
 | `rpp.future` | ICE |
 
 So a consumer meets this defect only when it imports `rpp.future`. Two ways around it.
-Import another module, or include `<rpp/future.h>` in the unit which names `std::promise`.
+Import another module, or include the `rpp.future` headers in the unit which names `std::promise`.
 
 `RppPromiseModuleOnly` in `tests/module_consumer/` is the gate. It imports `rpp.threading`,
 instantiates `std::promise` and runs at `-O2`. It failed to build before the split.
 
-`test_modules_future.cpp` imports `rpp.future`, so it keeps naming the factories unevaluated.
-Delete that workaround when a newer gcc compiles the reproducer above.
+`test_modules_future.cpp` imports `rpp.future`, so it names `std::future` only unevaluated.
 
 Ten headers reached `<future>` before the split, and `future_types.h` was the only direct
-includer. Three reach it now: `future.h`, `event_loop.h` and `coroutines.h`. `future.h`
-includes `<future>` itself, which it always needed, and the other two include `future.h`.
+includer. One reaches it now: `coroutines.h` includes it for `std_future_awaiter`. ReCpp 2.2
+removed `future.h`, so `event_loop.h` no longer reaches it.
 
 No export list removes the crash. Only the fragment which carries `<future>` decides it.
 
@@ -707,10 +681,11 @@ a `heap-use-after-free`:
 CXX20=1 mama gcc tsan build
 for i in $(seq 1 40); do for j in 1 2; do
   taskset -c 0,1 env TSAN_OPTIONS="halt_on_error=0" \
-    packages/ReCpp/linux-tsan/RppTests test_future > /tmp/b10_${i}_$j.log 2>&1 &
+    packages/ReCpp/linux-tsan/RppTests test_async > /tmp/b10_${i}_$j.log 2>&1 &
 done; wait; done
 grep -l 'heap-use-after-free' /tmp/b10_*.log
 ```
+The recipe ran `test_future` before 2.2. `test_async` holds its ported cases, and no run has measured the recipe there.
 
 ### B8. gcc-14 breaks a module for five shapes, and each one has a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.

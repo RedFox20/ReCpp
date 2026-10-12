@@ -44,8 +44,8 @@ action.
 Bad: "Let us think about this. The future continuation path has a few moving
 pieces..."
 
-Good: "Run `CXX20=1 mama gcc tsan build test="nogdb -vv test_future"`, then read
-[future.h:412](src/rpp/future.h#L412)."
+Good: "Run `CXX20=1 mama gcc tsan build test="nogdb -vv test_async"`, then read
+[async.h:412](src/rpp/async.h#L412)."
 
 If the answer is a command, a `file:line` reference, or a code snippet, it goes
 first. Prose comes after, if at all.
@@ -125,7 +125,7 @@ Bad: "I have made some changes to the future continuation path. Among other
 things..."
 
 Good: "`rpp::future<T>::then()` now propagates the exception to the last
-continuation. Verified: `test_future` 24/24 pass under TSAN, no races."
+continuation. Verified: `test_async` 24/24 pass under TSAN, no races."
 
 ### 8. Matter-of-fact tone for errors
 
@@ -134,8 +134,8 @@ fix.
 
 Bad: "Uh oh, the test is failing. There seems to be an issue..."
 
-Good: "`test_future::continuation_after_ready` fails at
-[test_future.cpp:142](tests/test_future.cpp#L142): expected 1 call, got 0. Cause:
+Good: "`test_async::continuation_after_ready` fails at
+[test_async.cpp:142](tests/test_async.cpp#L142): expected 1 call, got 0. Cause:
 `then()` drops the callback when the state is already ready. Fix: run it inline
 on the calling thread."
 

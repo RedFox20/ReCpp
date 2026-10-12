@@ -1,6 +1,6 @@
 #include <rpp/sockets.h>
 #include <rpp/load_balancer.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/minmax.h>
 #include <rpp/timer.h>
 #include <rpp/tests.h>
@@ -409,7 +409,7 @@ TestImpl(test_sockets)
 
         // TEST2: data arrives in the middle of the wait
         {
-            auto f2 = rpp::async_task([&]()
+            auto f2 = rpp::async([&]()
             {
                 rpp::sleep_ms(5);
                 send.sendto(recv_addr, "udp_poll");
@@ -434,7 +434,7 @@ TestImpl(test_sockets)
         //        we should receive the first one after a short wait
         //        and the second one should be detected and received immediately
         {
-            auto f4 = rpp::async_task([&]()
+            auto f4 = rpp::async([&]()
             {
                 rpp::sleep_ms(5);
                 send.sendto(recv_addr, "udp_poll1");
@@ -545,7 +545,7 @@ TestImpl(test_sockets)
 
         // TEST1: first socket receives data
         {
-            auto f1 = rpp::async_task([&]()
+            auto f1 = rpp::async([&]()
             {
                 rpp::sleep_ms(10);
                 send.sendto(recv1_addr, "udp_poll1");
@@ -561,7 +561,7 @@ TestImpl(test_sockets)
 
         // TEST2: second socket receives data
         {
-            auto f2 = rpp::async_task([&]()
+            auto f2 = rpp::async([&]()
             {
                 rpp::sleep_ms(10);
                 send.sendto(recv2_addr, "udp_poll2");
@@ -577,7 +577,7 @@ TestImpl(test_sockets)
 
         // TEST3: both sockets receive data 
         {
-            auto f3 = rpp::async_task([&]()
+            auto f3 = rpp::async([&]()
             {
                 rpp::sleep_ms(10);
                 send.sendto(recv1_addr, "udp_poll1");
@@ -652,7 +652,7 @@ TestImpl(test_sockets)
         recv.set_blocking(false);
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
-        auto task = rpp::async_task([&]()
+        auto task = rpp::async([&]()
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
@@ -705,7 +705,7 @@ TestImpl(test_sockets)
         auto recv1_addr = ipaddress(AF_IPv4, "127.0.0.1", recv1.port());
         auto recv2_addr = ipaddress(AF_IPv4, "127.0.0.1", recv2.port());
 
-        auto task = rpp::async_task([&send, &recv1_addr, &recv2_addr]()
+        auto task = rpp::async([&send, &recv1_addr, &recv2_addr]()
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
@@ -807,7 +807,7 @@ TestImpl(test_sockets)
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         rpp::Timer t;
-        auto sender = rpp::async_task([&send,&recv_addr]()
+        auto sender = rpp::async([&send,&recv_addr]()
         {
             for (int i = 0; i < NUM_MESSAGES; ++i)
             {
@@ -815,7 +815,7 @@ TestImpl(test_sockets)
                 if (i % 100 == 0) rpp::sleep_ms(5); // throttle to avoid kernel dropping packets
             }
         });
-        auto receiver = rpp::async_task([&recv, &t]()
+        auto receiver = rpp::async([&recv, &t]()
         {
             int num_received = 0;
             while (num_received < NUM_MESSAGES && t.elapsed_ms() < 4000)
@@ -828,7 +828,7 @@ TestImpl(test_sockets)
 
         sender.get();
 
-        while (receiver.wait_for(std::chrono::microseconds{0}) != std::future_status::ready)
+        while (!receiver.await_ready())
         {
             if (t.elapsed_ms() > 1000) // timeout
             {
@@ -964,7 +964,7 @@ TestImpl(test_sockets)
         socket a = create_udp_listener(rpp::SO_NonBlock);
         socket_poller poller;
         AssertThat(poller.add(a, socket::PF_Read), 0);
-        rpp::cfuture<void> waker = rpp::async_task([&]{ rpp::sleep_ms(5); poller.wake(); });
+        rpp::future<void> waker = rpp::async([&]{ rpp::sleep_ms(5); poller.wake(); });
         rpp::Timer wall;
         AssertThat(poller.poll(1000), 0); // nothing arrives, so only the wake ends it before the timeout
         AssertLess(wall.elapsed_millis(), 500.0);

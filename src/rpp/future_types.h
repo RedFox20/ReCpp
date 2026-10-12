@@ -15,16 +15,12 @@ namespace rpp
     template<class T>
     class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND future;
 
-    template<class T = void>
-    class NODISCARD RPP_CORO_RETURN_TYPE RPP_CORO_LIFETIMEBOUND cfuture;
-
 
     /// The outcome of a timed wait on a task or a future
     enum class wait_result : int
     {
         finished, // the result is ready, and it can hold an exception
         timeout,  // waiting on task timed out
-        deferred, // the task runs on get(), so no wait can finish it
     };
 
 
@@ -36,6 +32,4 @@ namespace rpp
 
     template<typename Function>
     concept IsFunction = std::is_invocable_v<Function>;
-
-    // IsFuture and the concepts built on it live in future.h, which owns <future>
 }
