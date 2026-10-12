@@ -1,12 +1,14 @@
 ---
 name: recpp-pre-review
-description: Second pass over your own prose before you hand work over. Reload the ste-writing rules, then rewrite every comment, doxygen block, log string, and markdown line the session just added. Always active via .claude/rules/; also invocable as /recpp-pre-review.
+description: Second pass over your own prose before you hand work over. Reload the ste-writing rules, then rewrite every comment, doxygen block, log string, and markdown line the session just added. Always active via .claude/rules/, also invocable as /recpp-pre-review.
 ---
 
 # recpp-pre-review
 
 Run this pass on your own prose before you call the work done. A first draft pads the prose around the code,
-and this pass removes the padding in the same session, with no subagent.
+and this pass removes the padding in the same session, with no subagent. Check each sentence before the write,
+not after, because editing a draft is weaker than composing under the constraint. The review subagent must
+never spend a round on a rule you can fix here in seconds.
 
 ## Hooks
 
@@ -17,8 +19,8 @@ it, because a linter which stops detecting reports nothing.
 2. The `Bash` hook refuses a command which writes a `.md`, `.h`, `.cpp` or `.cppm` file. A `/tmp` path is exempt.
 3. The `Stop` hook lints the markdown diff at the end of the turn.
 
-They check sentence length, contractions and semicolons in prose and table cells. In code they also check
-comment blocks over 2 lines and `sleep_ms(N)` over 10. A comment fails when it ends on a comma, or when it
+They check sentence length in prose and comments, and contractions and semicolons also in table cells. In
+code they check comment blocks over 2 lines and `sleep_ms(N)` over 10. A comment fails when it ends on a comma, or when it
 names a number the code beside it sets. Code fences and headings are exempt.
 
 ## When to run
@@ -43,11 +45,11 @@ names a number the code beside it sets. Code fences and headings are exempt.
 | 1 | Comment over 2 lines | Cut to one line. Move the story to BUGS.md |
 | 2 | Comment names a session, an agent, a date or a fix history | Delete that clause. A `see BUGS.md C15` pointer may stay |
 | 3 | Comment paraphrases the code below it | Delete the comment |
-| 4 | Comment repeats a constant the code beside it sets | Drop the number, keep the reason. A platform fact may stay |
+| 4 | Comment repeats a constant the code beside it sets | Drop the number, keep the reason. A platform fact which no line sets may stay |
 | 5 | Sentence over 20 words in an instruction, 25 in a description | Split it |
 | 6 | Semicolon or contraction | Write two sentences, or the full form |
 | 7 | Passive voice with a known actor, an "-ing" main verb or a nominalization | Use active voice and the plain verb |
-| 8 | Long word (utilize, ensure, prior to) or marketing word | Use the short word, or give the number |
+| 8 | Long word (utilize, facilitate, ensure, prior to, regarding) or marketing word | Use the short word, or give the number |
 | 9 | One thing under two names | Pick one name and use it everywhere |
 | 10 | Public declaration with no doxygen | Add a one-line `///` |
 | 11 | Comment defends a design decision, or breaks off mid clause | Write one complete sentence with the reason |
