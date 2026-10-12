@@ -74,10 +74,10 @@ TestImpl(test_sanitizers)
         AssertNotEqual(global, nullptr);
         const char* patterns = global();
         AssertNotEqual(patterns, nullptr);
-        AssertNotEqual(strstr(patterns, "race:std::__future_base"), nullptr);
+        AssertNotEqual(strstr(patterns, "race:std::__exception_ptr"), nullptr);
     #elif RPP_TSAN_BUILD
         // clang links its runtime statically, so the linker binds the hook and dlsym never sees it
-        AssertNotEqual(strstr(__tsan_default_suppressions(), "race:std::__future_base"), nullptr);
+        AssertNotEqual(strstr(__tsan_default_suppressions(), "race:std::__exception_ptr"), nullptr);
     #else
         AssertTrue(true); // only a TSAN build carries the hook
     #endif
