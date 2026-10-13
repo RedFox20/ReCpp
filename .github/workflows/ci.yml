@@ -310,7 +310,18 @@ jobs:
             exit 1
           fi
 
-      # run_test.py builds without a sanitizer, so the TSAN row stops after the step above
+      # mama puts -fsanitize=thread in CMAKE_CXX_FLAGS, and a plain CMake project can put it in the per-config flags
+      - name: Configure ReCpp with TSAN in the per-config flags
+        if: matrix.san == 'tsan'
+        shell: bash
+        run: |
+          CXX_NAME=$(echo ${{ matrix.cc }} | sed 's/^gcc/g++/')
+          # cmake writes a plain message() to stderr
+          CC=${{ matrix.cc }} CXX=$CXX_NAME cmake -S . -B "$RUNNER_TEMP/tsan-config" -G Ninja -DCXX20=ON \
+              -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -fsanitize=thread" 2>&1 | tee cfg.log
+          grep -q "RPP MODULES: off" cfg.log || { echo "FAIL: TSAN in the per-config flags still built modules"; exit 1; }
+
+      # run_test.py builds without a sanitizer, so the TSAN row stops after the steps above
       - name: Import the exported modules with ${{ matrix.cc }}
         if: matrix.san == ''
         shell: bash
