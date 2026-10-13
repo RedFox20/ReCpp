@@ -92,6 +92,8 @@ compiler at configure time.
 | Clang | 21+ |
 | Generator | Ninja (required) |
 
+GCC under `-fsanitize=thread` also takes the header path, because it rejects every module unit, see `BUGS.md` B36.
+
 ### Building with modules
 
 Enable the `BUILD_WITH_MODULES` option alongside C++20:

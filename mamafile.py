@@ -9,7 +9,7 @@ class ReCpp(mama.BuildTarget):
 
     def settings(self):
         # one raw string literal, because mama reads it without running this file. See AGENTS.md Versioning
-        self.version = '2.2.0'
+        self.version = '2.2.1'
         # if no preference, prefer gcc since its support is better in 2023
         self.prefer_gcc()
         if os.getenv('NO_NINJA'):
@@ -32,6 +32,11 @@ class ReCpp(mama.BuildTarget):
         try: parts = tuple(int(p) for p in version.split('.')[:2])
         except ValueError: return ''
         return version if parts and parts < MODULES_MIN_GCC[:len(parts)] else ''
+
+
+    def gcc_with_tsan(self) -> bool:
+        """@returns True for GCC under -fsanitize=thread, which rejects every module unit, see BUGS.md B36."""
+        return bool(getattr(self.config, 'gcc', False) and 'thread' in (getattr(self.config, 'sanitize', None) or ''))
 
 
     def warn_gcc_below_modules_minimum(self):
@@ -66,8 +71,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
-        # a consumer compiles the exported .cppm itself, so a GCC under the minimum must receive none
-        if self.gcc_below_modules_minimum(): self.no_export_modules()
+        # a consumer compiles the exported .cppm itself, so a GCC which cannot build them must receive none
+        if self.gcc_below_modules_minimum() or self.gcc_with_tsan(): self.no_export_modules()
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
