@@ -34,9 +34,12 @@ class ReCpp(mama.BuildTarget):
         return version if parts and parts < MODULES_MIN_GCC[:len(parts)] else ''
 
 
-    def gcc_with_tsan(self) -> bool:
-        """@returns True for GCC under -fsanitize=thread, which rejects a module unit that reaches <memory>, see BUGS.md B36."""
-        return bool(getattr(self.config, 'gcc', False) and 'thread' in (getattr(self.config, 'sanitize', None) or ''))
+    def cmake_took_header_path(self) -> bool:
+        """@returns True when the CMake configure of this build compiles no module unit, such as GCC TSAN, see BUGS.md B36."""
+        try:
+            with open(self.build_dir('CMakeCache.txt'), encoding='utf-8', errors='ignore') as f:
+                return 'RPP_MODULES_BUILT:INTERNAL=OFF' in f.read()
+        except OSError: return False # an artifactory package has no cache, and it keeps its archived modules
 
 
     def warn_gcc_below_modules_minimum(self):
@@ -72,7 +75,7 @@ class ReCpp(mama.BuildTarget):
 
     def package(self):
         # a consumer compiles the exported .cppm itself, so a GCC which cannot build them must receive none
-        if self.gcc_below_modules_minimum() or self.gcc_with_tsan(): self.no_export_modules()
+        if self.gcc_below_modules_minimum() or self.cmake_took_header_path(): self.no_export_modules()
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)
