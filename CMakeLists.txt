@@ -328,6 +328,14 @@ set(RPP_MODULES_MIN_GCC   15)     # gcc-14 crashed an importer of rpp.future bef
 set(RPP_MODULES_MIN_CLANG 21)     # Clang 18 mis-resolves the facade using-declarations
 set(RPP_MODULES_MIN_MSVC  19.34)  # VS 2022 17.4
 
+# A sanitizer flag reaches the compiler through the global, per-config or directory flags, so the TSAN gate reads all
+get_directory_property(RPP_DIR_COMPILE_OPTIONS COMPILE_OPTIONS) # includes a parent project's add_compile_options
+set(RPP_ALL_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RPP_DIR_COMPILE_OPTIONS}")
+foreach(RPP_CONFIG IN LISTS CMAKE_BUILD_TYPE CMAKE_CONFIGURATION_TYPES) # a multi-config generator ignores the build type
+    string(TOUPPER "${RPP_CONFIG}" RPP_CONFIG)
+    string(APPEND RPP_ALL_CXX_FLAGS " ${CMAKE_CXX_FLAGS_${RPP_CONFIG}}")
+endforeach()
+
 # Every reason a build cannot carry modules, collected so the message can name it.
 set(RPP_NO_MODULES "")
 if(CMAKE_VERSION VERSION_LESS "3.28")
@@ -339,6 +347,9 @@ elseif(NOT CMAKE_GENERATOR MATCHES "Ninja|Visual Studio")
     set(RPP_NO_MODULES "generator '${CMAKE_GENERATOR}' cannot scan module dependencies")
 elseif(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC} AND NOT RPP_MODULES_ALLOW_GCC14)
     set(RPP_NO_MODULES "GCC ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_GCC}, and RPP_MODULES_ALLOW_GCC14 is off")
+elseif(GCC AND RPP_ALL_CXX_FLAGS MATCHES "-fsanitize=[^ ;]*thread")
+    # libstdc++ includes tsan_interface.h under TSAN, and GCC rejects its TU-local constant in a module, see BUGS.md B36
+    set(RPP_NO_MODULES "GCC under -fsanitize=thread rejects a module unit which reaches <memory>")
 elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG})
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
@@ -370,6 +381,7 @@ elseif(BUILD_WITH_MODULES)
 else()
     set(RPP_BUILD_MODULES OFF)
 endif()
+set(RPP_MODULES_BUILT ${RPP_BUILD_MODULES} CACHE INTERNAL "mamafile.py exports .cppm files only when this is ON")
 
 if(RPP_BUILD_MODULES)
     message("RPP EXPERIMENTAL: C++20 Modules enabled (${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION})")

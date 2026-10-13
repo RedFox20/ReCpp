@@ -9,7 +9,7 @@ class ReCpp(mama.BuildTarget):
 
     def settings(self):
         # one raw string literal, because mama reads it without running this file. See AGENTS.md Versioning
-        self.version = '2.2.0'
+        self.version = '2.2.1'
         # if no preference, prefer gcc since its support is better in 2023
         self.prefer_gcc()
         if os.getenv('NO_NINJA'):
@@ -32,6 +32,14 @@ class ReCpp(mama.BuildTarget):
         try: parts = tuple(int(p) for p in version.split('.')[:2])
         except ValueError: return ''
         return version if parts and parts < MODULES_MIN_GCC[:len(parts)] else ''
+
+
+    def cmake_took_header_path(self) -> bool:
+        """@returns True when the CMake configure of this build compiles no module unit, such as GCC TSAN, see BUGS.md B36."""
+        try:
+            with open(self.build_dir('CMakeCache.txt'), encoding='utf-8', errors='ignore') as f:
+                return 'RPP_MODULES_BUILT:INTERNAL=OFF' in f.read()
+        except OSError: return False # an artifactory package has no cache, and it keeps its archived modules
 
 
     def warn_gcc_below_modules_minimum(self):
@@ -66,8 +74,8 @@ class ReCpp(mama.BuildTarget):
 
 
     def package(self):
-        # a consumer compiles the exported .cppm itself, so a GCC under the minimum must receive none
-        if self.gcc_below_modules_minimum(): self.no_export_modules()
+        # a consumer compiles the exported .cppm itself, so a GCC which cannot build them must receive none
+        if self.gcc_below_modules_minimum() or self.cmake_took_header_path(): self.no_export_modules()
         self.link_compile_commands()
         self.export_include('src/rpp', build_dir=False,
                             includes_filter=['.h','.natvis'], as_includes_root=True)

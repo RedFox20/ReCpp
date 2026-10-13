@@ -8,6 +8,38 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B37. gcc-15 TSAN reports a race on each coroutine frame which another thread resumes
+Under g++ 15.2 TSAN, 21 cases in `test_async`, `test_coroutines`, `test_concurrent_queue`, `test_event_loop` and
+`test_semaphore` report 31 races. Each report is a 2-byte read of the coroutine frame on the thread which resumes it.
+The previous write comes from the coroutine body, on the thread which suspended it. All 730 cases pass, and g++ 13.3
+builds the same tree and flags with 0 reports.
+
+One report from `test_async::coroutine_launchers_await_modern_value_futures`:
+
+```
+Read of size 2 by thread T1 'rpp_task_1':
+  #0 await_modern_launcher                          tests/test_async.cpp:68
+  #1 std::coroutine_handle<void>::resume()
+  #2 functor_awaiter_fut<future<int>>::await_suspend()::{lambda()#1}  src/rpp/coroutines.h:142
+  #5 rpp::pool_worker::run()                        src/rpp/thread_pool.cpp:331
+Previous write of size 2 by main thread:
+  #0 await_modern_launcher                          (the coroutine body)
+  #1 test_coroutine_launchers_await_modern_value_futures()  tests/test_async.cpp:76
+Location: heap block of size 120, the coroutine frame, allocated by the main thread
+```
+
+Find out whether g++ 15 writes this frame field after `await_suspend()` hands the handle to the worker. The other
+cause is a happens-before edge which TSAN misses.
+
+### B36. GCC under `-fsanitize=thread` rejects a module unit which reaches `<memory>`
+Under TSAN, the libstdc++ header `shared_ptr_atomic.h` includes `<sanitizer/tsan_interface.h>`. That header
+declares `static const unsigned __tsan_mutex_not_static`, which has internal linkage. g++ 15.2 then reports that
+`_Sp_atomic<T>::_Atomic_count` exposes this TU-local entity. It fails each `.cppm` which exports a name whose
+declaration reaches `<memory>`. No warning flag turns the error off.
+
+`BUILD_WITH_MODULES=AUTO` takes the header path for GCC under `-fsanitize=thread`, and the mamafile exports no
+`.cppm` there. Remove the gate when a GCC release builds `rpp-text.cppm` under TSAN.
+
 ### B35. A `noexcept` error handler does not compile
 `rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
 `first_arg_type` fails on a `noexcept` lambda. A handler such as

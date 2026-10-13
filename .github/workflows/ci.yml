@@ -242,6 +242,10 @@ jobs:
           # on it. The runner image stops at gcc-14, so a PPA carries gcc-15. See BUGS.md B28
           - { name: consumer-gcc15,         compiler: gcc,   cc: gcc-15,   expect: modules, llvm_apt: "false",
               gcc_ppa: "true" }
+          # gcc-15 under -fsanitize=thread rejects a module unit which reaches <memory>, so a TSAN consumer must
+          # get the header path. This row builds the way a TSAN project builds, see BUGS.md B36
+          - { name: consumer-gcc15-tsan,    compiler: gcc,   cc: gcc-15,   expect: headers, llvm_apt: "false",
+              gcc_ppa: "true", san: tsan }
     steps:
       - uses: actions/checkout@v4
 
@@ -280,9 +284,11 @@ jobs:
         run: |
           JOBS=$(nproc)
           cd tests/consumer
+          # TSAN aborts on these runners unless setarch -R turns off address space randomization
+          NO_ASLR=$([[ -n "${{ matrix.san }}" ]] && echo "setarch $(uname -m) -R" || echo "")
           # ninja reads the affinity mask, and it ignores the jobs= mama passes to make
-          CXX20=1 taskset -c 0-$((JOBS - 1)) mama ${{ matrix.compiler }} verbose build test jobs=$JOBS 2>&1 \
-            | tee build.log
+          CXX20=1 $NO_ASLR taskset -c 0-$((JOBS - 1)) mama ${{ matrix.compiler }} verbose ${{ matrix.san }} \
+            build test jobs=$JOBS 2>&1 | tee build.log
           # AUTO turns modules off and keeps going, so without this the job would still pass
           # if ReCpp stopped enabling modules when another project builds it
           if [[ "${{ matrix.expect }}" == "modules" ]] && ! grep -q "C++20 Modules enabled" build.log; then
@@ -297,14 +303,33 @@ jobs:
                  -exec grep -H "CMAKE_CXX_COMPILER:\|CLANG_SCAN_DEPS" {} \; 2>/dev/null | head
             exit 1
           fi
-          # the other direction: a compiler below the minimum must never reach the module path
+          # the other direction: a toolchain which cannot build modules must never reach the module path
           if [[ "${{ matrix.expect }}" == "headers" ]] && grep -q "C++20 Modules enabled" build.log; then
-            echo "FAIL: ReCpp built modules on a compiler below the modules minimum"
+            echo "FAIL: ReCpp built modules where this row expects the header path"
             grep -i "MODULES" build.log
             exit 1
           fi
+          # a consumer compiles an exported .cppm itself, so the package must ship none where the build took headers
+          if [[ "${{ matrix.expect }}" == "headers" ]] && ! grep -q "ReCpp exports 0 module units" build.log; then
+            echo "FAIL: ReCpp exports module units where this row expects the header path"
+            grep "ReCpp exports" build.log
+            exit 1
+          fi
 
+      # mama puts -fsanitize=thread in CMAKE_CXX_FLAGS, and a plain CMake project can put it in the per-config flags
+      - name: Configure ReCpp with TSAN in the per-config flags
+        if: matrix.san == 'tsan'
+        shell: bash
+        run: |
+          CXX_NAME=$(echo ${{ matrix.cc }} | sed 's/^gcc/g++/')
+          # cmake writes a plain message() to stderr
+          CC=${{ matrix.cc }} CXX=$CXX_NAME cmake -S . -B "$RUNNER_TEMP/tsan-config" -G Ninja -DCXX20=ON \
+              -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -fsanitize=thread" 2>&1 | tee cfg.log
+          grep -q "RPP MODULES: off" cfg.log || { echo "FAIL: TSAN in the per-config flags still built modules"; exit 1; }
+
+      # run_test.py builds without a sanitizer, so the TSAN row stops after the steps above
       - name: Import the exported modules with ${{ matrix.cc }}
+        if: matrix.san == ''
         shell: bash
         run: |
           # matrix.expect names the path this compiler must take, and run_test.py fails on the other.
@@ -327,6 +352,7 @@ jobs:
       # C++23 costs gcc more module source locations than C++20, see BUGS.md C28. A layout
       # which reads back on C++20 can still fail here, see BUGS.md B24, and only this step covers it
       - name: Import the exported modules as C++23 with ${{ matrix.cc }}
+        if: matrix.san == ''
         shell: bash
         run: |
           JOBS=$(nproc)
