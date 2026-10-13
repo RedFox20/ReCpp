@@ -35,7 +35,7 @@ class ReCpp(mama.BuildTarget):
 
 
     def gcc_with_tsan(self) -> bool:
-        """@returns True for GCC under -fsanitize=thread, which rejects every module unit, see BUGS.md B36."""
+        """@returns True for GCC under -fsanitize=thread, which rejects a module unit that reaches <memory>, see BUGS.md B36."""
         return bool(getattr(self.config, 'gcc', False) and 'thread' in (getattr(self.config, 'sanitize', None) or ''))
 
 

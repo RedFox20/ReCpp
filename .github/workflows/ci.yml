@@ -242,7 +242,7 @@ jobs:
           # on it. The runner image stops at gcc-14, so a PPA carries gcc-15. See BUGS.md B28
           - { name: consumer-gcc15,         compiler: gcc,   cc: gcc-15,   expect: modules, llvm_apt: "false",
               gcc_ppa: "true" }
-          # gcc-15 rejects every module unit under -fsanitize=thread, so a TSAN consumer must
+          # gcc-15 under -fsanitize=thread rejects a module unit which reaches <memory>, so a TSAN consumer must
           # get the header path. This row builds the way a TSAN project builds, see BUGS.md B36
           - { name: consumer-gcc15-tsan,    compiler: gcc,   cc: gcc-15,   expect: headers, llvm_apt: "false",
               gcc_ppa: "true", san: tsan }

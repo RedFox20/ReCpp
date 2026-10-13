@@ -341,7 +341,7 @@ elseif(GCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_GCC} AN
     set(RPP_NO_MODULES "GCC ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_GCC}, and RPP_MODULES_ALLOW_GCC14 is off")
 elseif(GCC AND CMAKE_CXX_FLAGS MATCHES "-fsanitize=[^ ]*thread")
     # libstdc++ includes tsan_interface.h under TSAN, and GCC rejects its TU-local constant in a module, see BUGS.md B36
-    set(RPP_NO_MODULES "GCC rejects every module unit under -fsanitize=thread")
+    set(RPP_NO_MODULES "GCC under -fsanitize=thread rejects a module unit which reaches <memory>")
 elseif(CLANG AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${RPP_MODULES_MIN_CLANG})
     set(RPP_NO_MODULES "Clang ${CMAKE_CXX_COMPILER_VERSION} is older than ${RPP_MODULES_MIN_CLANG}")
 elseif(MSVC AND MSVC_VERSION VERSION_LESS 1934)
