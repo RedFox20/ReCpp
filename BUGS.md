@@ -9,23 +9,23 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ## Open
 
 ### B37. gcc-15 TSAN reports a race on each coroutine frame which another thread resumes
-Under g++ 15.2 TSAN, 22 cases in `test_async`, `test_coroutines`, `test_concurrent_queue`, `test_event_loop` and
-`test_semaphore` report 27 races. Each report is a 2-byte read of the coroutine frame on the thread which resumes it.
-The previous write comes from the coroutine body, on the thread which suspended it. All 754 cases pass, and g++ 13.3
-builds the same tree with 0 reports.
+Under g++ 15.2 TSAN, 21 cases in `test_async`, `test_coroutines`, `test_concurrent_queue`, `test_event_loop` and
+`test_semaphore` report 31 races. Each report is a 2-byte read of the coroutine frame on the thread which resumes it.
+The previous write comes from the coroutine body, on the thread which suspended it. All 730 cases pass. On master
+8b37bc8, g++ 15.2 gave 27 such reports and g++ 13.3 gave 0, with the same flags.
 
 One report from `test_async::coroutine_launchers_await_modern_value_futures`:
 
 ```
 Read of size 2 by thread T1 'rpp_task_1':
-  #0 await_modern_launcher                          tests/test_async.cpp:69
+  #0 await_modern_launcher                          tests/test_async.cpp:68
   #1 std::coroutine_handle<void>::resume()
-  #2 functor_awaiter_fut<future<int>>::await_suspend()::{lambda()#1}  src/rpp/coroutines.h:147
+  #2 functor_awaiter_fut<future<int>>::await_suspend()::{lambda()#1}  src/rpp/coroutines.h:142
   #5 rpp::pool_worker::run()                        src/rpp/thread_pool.cpp:331
 Previous write of size 2 by main thread:
   #0 await_modern_launcher                          (the coroutine body)
-  #1 test_coroutine_launchers_await_modern_value_futures()  tests/test_async.cpp:77
-Location: heap block of size 144, the coroutine frame, allocated by the main thread
+  #1 test_coroutine_launchers_await_modern_value_futures()  tests/test_async.cpp:76
+Location: heap block of size 120, the coroutine frame, allocated by the main thread
 ```
 
 Find out whether g++ 15 writes this frame field after `await_suspend()` hands the handle to the worker. The other
