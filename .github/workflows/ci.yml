@@ -309,6 +309,12 @@ jobs:
             grep -i "MODULES" build.log
             exit 1
           fi
+          # a consumer compiles an exported .cppm itself, so the package must ship none where the build took headers
+          if [[ "${{ matrix.expect }}" == "headers" ]] && ! grep -q "ReCpp exports 0 module units" build.log; then
+            echo "FAIL: ReCpp exports module units where this row expects the header path"
+            grep "ReCpp exports" build.log
+            exit 1
+          fi
 
       # mama puts -fsanitize=thread in CMAKE_CXX_FLAGS, and a plain CMake project can put it in the per-config flags
       - name: Configure ReCpp with TSAN in the per-config flags

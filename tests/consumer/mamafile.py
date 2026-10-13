@@ -18,6 +18,8 @@ class RppConsumer(mama.BuildTarget):
 
     def test(self, args):
         self.check_dependency_built_no_tests()
+        # the CI header rows read this line, so a package which ships .cppm beside a header build fails them
+        console(f"ReCpp exports {len(self.get_dependency('ReCpp').target.exported_modules)} module units")
         self.run_program(self.source_dir('bin'), self.source_dir('bin/RppConsumer'))
 
     def check_dependency_built_no_tests(self):
