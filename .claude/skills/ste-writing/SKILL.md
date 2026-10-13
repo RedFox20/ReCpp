@@ -6,7 +6,8 @@ description: Write prose in ASD-STE100 Simplified Technical English. Applies to 
 # ste-writing
 
 Write prose in ASD-STE100 Simplified Technical English: docs, README.md, commit and PR text, release notes,
-comments, doxygen, `Log*` and `ThrowErr()` strings. Not code, identifiers or command syntax. Adapted from
+comments, doxygen, `Log*` and `ThrowErr()` strings. Not code, identifiers or command syntax. Not marketing copy,
+an essay or other text which needs a voice, because STE strips voice. Adapted from
 [woosal1337/blog](https://github.com/woosal1337/blog), ep01.
 
 - **One name for one thing.** "future", not "promise" or "async result". "event loop", not "loop thread" or
