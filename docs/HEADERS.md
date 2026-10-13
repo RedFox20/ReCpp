@@ -12,8 +12,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `paths.h` | Path manipulation, directory listing, filesystem helpers |
 | `delegate.h` | Fast function delegates and multicast events |
 | `async.h` | Composable futures which own their shared state, with no `<future>` include |
-| `future.h` | Composable futures with continuations and coroutines |
-| `future_types.h` | Supporting types for futures |
+| `future_types.h` | Coroutine handle aliases, `wait_result` and the `IsFunction` concept |
 | `coroutines.h` | C++20 coroutine awaiters and co_await operators |
 | `event_loop.h` | Single-threaded coroutine event loop |
 | `task.h` | Single-threaded coroutine tasks which resume on the completing thread |

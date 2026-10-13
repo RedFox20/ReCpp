@@ -1,8 +1,9 @@
 # rpp::future, a module future which owns its own state
 
-The helpers now accept `rpp::future`: `event_loop::pump_until_ready`, `run_until_ready`,
-`run_async`, and `run_tasks`. Legacy `cfuture` and std future interop remain available
-until downstream migrations merge. The sections below record the original design.
+ReCpp 2.2 removed `cfuture`, `cpromise`, `async_task`, `rpp/future.h`, `std_future_awaiter` and the
+`std::future` path of `event_loop::run_async`, see [#144](https://github.com/RedFox20/ReCpp/issues/144).
+`rpp::future` is the only future now, and no ReCpp header includes `<future>`. The sections below record
+the original design.
 
 `rpp::cfuture<T>` derives from `std::future<T>`. That one line sets the cost of most
 lines below it.

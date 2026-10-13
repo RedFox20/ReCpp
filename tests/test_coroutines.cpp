@@ -1,5 +1,5 @@
 #include <rpp/coroutines.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h>
 
@@ -36,7 +36,7 @@ TestImpl(test_coroutines)
         return value;
     }
 
-    static rpp::cfuture<void> duration_coro(int millis)
+    static rpp::future<void> duration_coro(int millis)
     {
         co_await rpp::millis(millis);
     }
@@ -58,7 +58,7 @@ TestImpl(test_coroutines)
     }
 
 
-    static rpp::cfuture<std::string> string_coro()
+    static rpp::future<std::string> string_coro()
     {
         co_await rpp::millis(1);
         co_return "string from coro";
@@ -69,7 +69,7 @@ TestImpl(test_coroutines)
     }
 
 
-    cfuture<void> void_coro(std::string* result)
+    rpp::future<void> void_coro(std::string* result)
     {
         co_await rpp::millis(1);
         set_locked(*result, co_await string_coro());
@@ -85,12 +85,12 @@ TestImpl(test_coroutines)
     }
 
 
-    static cfuture<std::string> as_async(std::string s)
+    static rpp::future<std::string> as_async(std::string s)
     {
         co_await rpp::millis(1);
         co_return s;
     }
-    static cfuture<std::string> multi_stage_coro()
+    static rpp::future<std::string> multi_stage_coro()
     {
         std::string s = co_await as_async("123_");
         s += co_await as_async("456_");
@@ -103,26 +103,26 @@ TestImpl(test_coroutines)
     }
 
 
-    static cfuture<std::string> future_string_coro()
+    static rpp::future<std::string> future_string_coro()
     {
-        co_return co_await async_task([] {
+        co_return co_await rpp::async([] {
             return "future string"s;
         });
     }
-    TestCase(await_on_async_task)
+    TestCase(await_on_async)
     {
         AssertThat(future_string_coro().get(), "future string"s);
     }
 
 
-    static cfuture<std::string> exceptional_coro()
+    static rpp::future<std::string> exceptional_coro()
     {
         co_await rpp::millis(1);
 
         throw std::runtime_error{"aargh!"};
         co_return "aargh!";
     }
-    static cfuture<std::string> exception_handling_coro()
+    static rpp::future<std::string> exception_handling_coro()
     {
         std::string s = co_await as_async("abc");
         bool exceptionWasThrown = false;
@@ -147,7 +147,7 @@ TestImpl(test_coroutines)
     }
 
 
-    static cfuture<std::vector<int>> destructor_sequence_coro()
+    static rpp::future<std::vector<int>> destructor_sequence_coro()
     {
         rpp::mutex m;
         std::vector<int> destructor_ids;
@@ -164,7 +164,7 @@ TestImpl(test_coroutines)
         };
 
         rpp::Timer t1;
-        co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        co_await [&m, &destructor_ids]() -> rpp::future<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr1 {m, destructor_ids, 1};
             co_await rpp::millis(10);
@@ -177,7 +177,8 @@ TestImpl(test_coroutines)
         }
 
         rpp::Timer t2;
-        std::string fstr = co_await [&m, &destructor_ids]() -> cfuture<std::string> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        std::string fstr = co_await [&m, &destructor_ids]() -> rpp::future<std::string>
         {
             destructor_recorder dr2 {m, destructor_ids, 2};
             co_await rpp::millis(5);
@@ -192,7 +193,7 @@ TestImpl(test_coroutines)
         }
 
         rpp::Timer t3;
-        co_await [&m, &destructor_ids]() -> cfuture<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+        co_await [&m, &destructor_ids]() -> rpp::future<void> // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         {
             destructor_recorder dr3 {m, destructor_ids, 3};
             co_return;
@@ -217,7 +218,7 @@ TestImpl(test_coroutines)
     }
 
 
-    static cfuture<void> functor_nonfuture_void_coro()
+    static rpp::future<void> functor_nonfuture_void_coro()
     {
         std::string result = "default";
         // tests functor_awaiter<void>, lambda is converted to rpp::delegate<void()>
@@ -233,7 +234,7 @@ TestImpl(test_coroutines)
     }
 
 
-    static cfuture<void> functor_nonfuture_string_coro()
+    static rpp::future<void> functor_nonfuture_string_coro()
     {
         // tests functor_awaiter<T> with a return value, lambda is converted to rpp::delegate<std::string()>
         std::string result = co_await [&]() -> std::string {
@@ -248,46 +249,13 @@ TestImpl(test_coroutines)
         functor_nonfuture_string_coro().get();
     }
 
-    static cfuture<void> std_future_void_coro()
+    static rpp::future<void> future_void_coro()
     {
         co_await rpp::millis(10);
         co_return;
     }
-    TestCase(std_future_void_coro)
+    TestCase(future_void_coro)
     {
-        std_future_void_coro().get();
+        future_void_coro().get();
     }
-
-
-    static cfuture<std::string> std_future_string_coro()
-    {
-        std::string s = co_await std::async(std::launch::async, [] {
-            return "future string"s;
-        });
-        co_return s;
-    }
-    TestCase(std_future_string_coro)
-    {
-        std::string s = std_future_string_coro().get();
-        AssertThat(s, "future string"s);
-    }
-
-
-    static cfuture<std::string> std_future_lambda_coro()
-    {
-        // await on a lambda which returns a future
-        std::string s = co_await []() -> std::future<std::string> {
-            return std::async(std::launch::async, [] {
-                return "future string"s;
-            });
-        };
-        co_return s;
-    }
-
-    TestCase(std_future_lambda_coro)
-    {
-        std::string s = std_future_lambda_coro().get();
-        AssertThat(s, "future string"s);
-    }
-
 };

@@ -1,6 +1,6 @@
 #include <rpp/event_loop.h>
 #include <rpp/coroutines.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/thread_pool.h>
 #include <rpp/timer.h>
 #include <rpp/threads.h>
@@ -140,10 +140,10 @@ TestImpl(test_event_loop)
         AssertThat(answer, 42);
 
         // ── 2. Await a lambda coroutine ─────────────────────────────
-        // Lambda coroutines compose naturally: co_await a cfuture-returning
+        // Lambda coroutines compose naturally: co_await a future-returning
         // lambda just like co_await run_async.  The lambda does its own
         // run_async internally and resumes on the main thread.
-        std::string msg = co_await loop->run_async([this,answer]() -> rpp::cfuture<std::string> {
+        std::string msg = co_await loop->run_async([this,answer]() -> rpp::future<std::string> {
             std::string raw = co_await loop->run_async([answer]() -> std::string {
                 rpp::sleep_ms(5); // simulate slow I/O
                 return "result_" + std::to_string(answer);
@@ -182,7 +182,7 @@ TestImpl(test_event_loop)
 
     // ─── Showcase: event_task as a top-level coroutine ──────────
     // event_task is a lightweight coroutine return type designed for
-    // event_loop-driven coroutines.  Unlike cfuture<T>, it does not
+    // event_loop-driven coroutines.  Unlike rpp::future<T>, it does not
     // carry a return value — it is fire-and-forget with exception
     // propagation.  The event loop drives it via run_until_idle().
     TestCase(event_task_showcase)
@@ -203,7 +203,7 @@ TestImpl(test_event_loop)
 
             // 2. Await a lambda coroutine — composes naturally with event_task.
             //    The lambda does its own run_async and resumes on main thread.
-            std::string msg = co_await ev->run_async([this,ev,val]() -> rpp::cfuture<std::string> {
+            std::string msg = co_await ev->run_async([this,ev,val]() -> rpp::future<std::string> {
                 std::string raw = co_await ev->run_async([val]() -> std::string {
                     rpp::sleep_ms(2);
                     return "result_" + std::to_string(val);
@@ -335,7 +335,7 @@ TestImpl(test_event_loop)
         //   This avoids any reliance on wall-clock timing.
         std::atomic<bool> b_resumed{false};
 
-        auto coro_a = [&]() -> rpp::cfuture<int>
+        auto coro_a = [&]() -> rpp::future<int>
         {
             co_await loop->run_async([&] {
                 spin_until([&]{ return b_resumed.load(); });
@@ -344,7 +344,7 @@ TestImpl(test_event_loop)
             co_return 10;
         };
 
-        auto coro_b = [&]() -> rpp::cfuture<int>
+        auto coro_b = [&]() -> rpp::future<int>
         {
             co_await loop->run_async([&] { rpp::sleep_ms(2); });
             // On loop thread: signal A's bg task that B has been resumed.
@@ -377,7 +377,7 @@ TestImpl(test_event_loop)
         std::atomic<bool> slow_bg_running{false};
         std::atomic<bool> fast_completed_while_slow_suspended{false};
 
-        auto coro_slow = [&]() -> rpp::cfuture<std::string>
+        auto coro_slow = [&]() -> rpp::future<std::string>
         {
             std::string result = co_await loop->run_async([&]() -> std::string {
                 slow_bg_running.store(true);
@@ -388,7 +388,7 @@ TestImpl(test_event_loop)
             co_return result;
         };
 
-        auto coro_fast = [&]() -> rpp::cfuture<std::string>
+        auto coro_fast = [&]() -> rpp::future<std::string>
         {
             // Wait in background until the slow task has confirmed it is running
             // before proceeding.  This makes the assertion deterministic: we no
@@ -486,7 +486,7 @@ TestImpl(test_event_loop)
     TestCase(run_once_basic)
     {
         std::atomic<int> resume_count{0};
-        auto coro = [&]() -> rpp::cfuture<int>
+        auto coro = [&]() -> rpp::future<int>
         {
             int v = co_await loop->run_async([]() -> int {
                 rpp::sleep_ms(5);
@@ -497,7 +497,7 @@ TestImpl(test_event_loop)
             co_return v;
         };
 
-        rpp::cfuture<int> future = coro();
+        rpp::future<int> future = coro();
 
         // pumps the loop until the future resolves, instead of polling has_pending_work()
         AssertThat(loop->pump_until_ready(future, rpp::millis(500)), true);
@@ -540,7 +540,7 @@ TestImpl(test_event_loop)
         constexpr int N = 20;
         std::atomic<int> total_resumes{0};
 
-        auto make_coro = [&](int id) -> rpp::cfuture<int>
+        auto make_coro = [&](int id) -> rpp::future<int>
         {
             int result = co_await loop->run_async([id]() -> int {
                 rpp::sleep_ms(1 + (id % 5));
@@ -553,7 +553,7 @@ TestImpl(test_event_loop)
             co_return result;
         };
 
-        std::vector<rpp::cfuture<int>> futures;
+        std::vector<rpp::future<int>> futures;
         futures.reserve(N);
         for (int i = 0; i < N; ++i)
         {
@@ -578,7 +578,7 @@ TestImpl(test_event_loop)
         constexpr int N = 8;
         constexpr int STAGES = 4;
         std::atomic<int> total_resumes{0};
-        auto make_coro = [&](int id) -> rpp::cfuture<int>
+        auto make_coro = [&](int id) -> rpp::future<int>
         {
             int accum = 0;
             for (int stage = 0; stage < STAGES; ++stage)
@@ -595,7 +595,7 @@ TestImpl(test_event_loop)
             co_return accum;
         };
 
-        std::vector<rpp::cfuture<int>> futures;
+        std::vector<rpp::future<int>> futures;
         futures.reserve(N);
         for (int i = 0; i < N; ++i)
         {
@@ -638,7 +638,7 @@ TestImpl(test_event_loop)
         std::atomic<bool> bg_started{false};
         std::atomic<bool> bg_may_finish{false};
 
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
@@ -676,7 +676,7 @@ TestImpl(test_event_loop)
             assert_on_main_thread();
         });
 
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
@@ -700,10 +700,10 @@ TestImpl(test_event_loop)
         AssertThat(rpp::contains(**log, "coro_resume"), true);
     }
 
-    // ─── await_future: wait for a cfuture on event loop ─────────
+    // ─── await_future: wait for a future on event loop ──────────
     TestCaseCoro(await_future_basic)
     {
-        auto producer = [&]() -> rpp::cfuture<int>
+        auto producer = [&]() -> rpp::future<int>
         {
             co_return co_await loop->run_async([]() -> int {
                 rpp::sleep_ms(5);
@@ -719,11 +719,7 @@ TestImpl(test_event_loop)
     // ─── await_future: already-ready future resumes immediately ─
     TestCaseCoro(await_future_already_ready)
     {
-        std::promise<int> prom;
-        auto std_future = prom.get_future();
-        prom.set_value(42);
-
-        rpp::cfuture<int> ready_future {std::move(std_future)};
+        rpp::future<int> ready_future = rpp::ready_future(42);
 
         int val = co_await loop->run_async(ready_future);
         assert_on_main_thread();
@@ -765,7 +761,7 @@ TestImpl(test_event_loop)
     {
         std::atomic<int> resumes{0};
 
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
@@ -821,7 +817,7 @@ TestImpl(test_event_loop)
         std::atomic<bool> bg_started{false};
         std::atomic<bool> bg_may_finish{false};
 
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->run_async([&]() {
                 bg_started.store(true);
@@ -895,7 +891,7 @@ TestImpl(test_event_loop)
     TestCase(wait_on_all_drains)
     {
         std::atomic<bool> callback_ran{false};
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->run_async([&]() {
                 rpp::sleep_ms(5);
@@ -1633,7 +1629,7 @@ TestImpl(test_event_loop)
     }
 
     // ─── Helper: launch a coroutine OFF the loop thread ─────────
-    // Runs `make_coro` (a factory returning rpp::cfuture<void>) on a fresh
+    // Runs `make_coro` (a factory returning rpp::future<void>) on a fresh
     // background thread, so the coroutine's synchronous prefix (up to its first
     // co_await) executes OFF the loop thread. Then drives the loop on this
     // (owner) thread until the coroutine completes, bounded by a 2s wall budget
@@ -1642,11 +1638,8 @@ TestImpl(test_event_loop)
     uint64 start_coro_on_background_thread(MakeCoro make_coro)
     {
         std::atomic<uint64> launcher_tid{0};
-        rpp::cfuture<void> fut;
-        // The task returns void and assigns the coroutine future instead of returning it.
-        // Returning it would instantiate std::future<cfuture<void>>::get(), a non-coroutine
-        // returning a coro type, which no RPP_CORO_WRAPPER can annotate inside libstdc++.
-        rpp::async_task([&]
+        rpp::future<void> fut;
+        rpp::async([&]
         {
             launcher_tid = rpp::get_thread_id();
             fut = make_coro(); // start the coroutine here, off the loop thread
@@ -1664,10 +1657,10 @@ TestImpl(test_event_loop)
     {
         std::atomic<uint64> resume_tid{0};
         uint64 launcher = start_coro_on_background_thread(
-            [&]() -> rpp::cfuture<void>
+            [&]() -> rpp::future<void>
             {
-                // make_ready_future is resolved before the await even begins
-                co_await loop->run_async(rpp::make_ready_future(42));
+                // ready_future is resolved before the await even begins
+                co_await loop->run_async(rpp::ready_future(42));
                 resume_tid = rpp::get_thread_id();
             });
         AssertNotEqual(launcher, main_tid); // sanity: coroutine really started off the loop
@@ -1680,7 +1673,7 @@ TestImpl(test_event_loop)
     {
         std::atomic<uint64> resume_tid{0};
         uint64 launcher = start_coro_on_background_thread(
-            [&]() -> rpp::cfuture<void>
+            [&]() -> rpp::future<void>
             {
                 co_await loop->resume_on_loop();
                 resume_tid = rpp::get_thread_id();
@@ -1705,39 +1698,26 @@ TestImpl(test_event_loop)
     TestCase(run_until_ready_pumps_future_on_owner_thread)
     {
         // the closure must outlive the coroutine, which reads its captures after the suspend
-        auto coro = [&]() -> rpp::cfuture<int>
+        auto coro = [&]() -> rpp::future<int>
         {
             int v = co_await loop->run_async([] { rpp::sleep_ms(5); return 7; });
             co_return v * 6;
         };
-        rpp::cfuture<int> fut = coro();
+        rpp::future<int> fut = coro();
         int result = loop->run_until_ready(fut);
         AssertThat(result, 42);
-    }
-
-    // no pump makes a deferred future ready, so reporting a timeout would throw on a future
-    // whose get() resolves it at once
-    TestCase(run_until_ready_resolves_a_deferred_future)
-    {
-        bool ran = false;
-        rpp::cfuture<int> fut = std::async(std::launch::deferred, [&] { ran = true; return 42; });
-
-        AssertThat(loop->pump_until_ready(fut, rpp::millis(20)), true);
-        AssertThat(ran, false); // the pump must not have run it
-        AssertThat(fut.get(), 42);
-        AssertThat(ran, true);
     }
 
     // pump_until_ready returns false on timeout instead of blocking on get().
     TestCase(pump_until_ready_times_out_without_blocking)
     {
         // the closure must outlive the coroutine, which reads its captures after the suspend
-        auto coro = [&]() -> rpp::cfuture<int>
+        auto coro = [&]() -> rpp::future<int>
         {
             co_await loop->run_async([] { rpp::sleep_ms(200); return 1; });
             co_return 1;
         };
-        rpp::cfuture<int> fut = coro();
+        rpp::future<int> fut = coro();
         rpp::Timer wall;
         bool ready = loop->pump_until_ready(fut, rpp::millis(20));
         double pump_ms = wall.elapsed_millis();
@@ -1765,12 +1745,12 @@ TestImpl(test_event_loop)
         clock.warp_forward(rpp::millis(400)); // the pump deadline below is built in this frame
         rpp::semaphore gate; // holds the worker until the pump budget is measured
         // the closure must outlive the coroutine, which reads its captures after the suspend
-        auto coro = [&]() -> rpp::cfuture<int>
+        auto coro = [&]() -> rpp::future<int>
         {
             co_await loop->run_async([&]{ gate.wait(); return 1; });
             co_return 1;
         };
-        rpp::cfuture<int> fut = coro();
+        rpp::future<int> fut = coro();
 
         // the pump runs this on its first run_once(), so the detach lands after `end` is built
         loop->post([this]{ loop->set_time_source(nullptr); });
@@ -1890,17 +1870,17 @@ TestImpl(test_event_loop)
     {
         std::atomic<uint64> resume_tid{0};
         // the closure must outlive the coroutine, which reads its captures after the suspend
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             co_await loop->delay(rpp::millis(5));
             resume_tid = rpp::get_thread_id();
         };
-        rpp::cfuture<void> fut;
-        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        rpp::future<void> fut;
+        rpp::async([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
         AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
         AssertThat(loop->pending_waiters(), 0);
         loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
-        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        fut.get(); // ready in the success path, and a future must be consumed before it dies
         AssertThat(resume_tid.load(), main_tid);
     }
 
@@ -1912,17 +1892,17 @@ TestImpl(test_event_loop)
         std::atomic<uint64> resume_tid{0};
         bool ready = true;
         // the closure must outlive the coroutine, which reads its captures after the suspend
-        auto coro = [&]() -> rpp::cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             ready = co_await loop->wait_readable(client, rpp::millis(5));
             resume_tid = rpp::get_thread_id();
         };
-        rpp::cfuture<void> fut;
-        rpp::async_task([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
+        rpp::future<void> fut;
+        rpp::async([&]{ fut = coro(); }).get(); // the coroutine suspended on the worker before this returns
         AssertThat(loop->pending_completions(), 1); // the registration waits in the queue
         AssertThat(loop->pending_waiters(), 0);
         loop_until(rpp::seconds(1), [&]{ return fut.await_ready(); });
-        fut.get(); // ready in the success path, and a cfuture must be consumed before it dies
+        fut.get(); // ready in the success path, and a future must be consumed before it dies
         AssertThat(ready, false);
         AssertThat(resume_tid.load(), main_tid);
     }
@@ -1933,7 +1913,7 @@ TestImpl(test_event_loop)
         fork_wait_readable(rpp::seconds(1));
         AssertThat(loop->pending_waiters(), 1);
         AssertThat(loop->background_tasks(), 0);
-        rpp::cfuture<void> sender = rpp::async_task([&]{ rpp::sleep_ms(5); peer.send("hi", 2); });
+        rpp::future<void> sender = rpp::async([&]{ rpp::sleep_ms(5); peer.send("hi", 2); });
         rpp::Duration spent = loop_until(rpp::seconds(1), [&]{ return wait_done.load(); });
         sender.get();
         AssertThat(wait_ready, true);
@@ -1978,7 +1958,7 @@ TestImpl(test_event_loop)
         connect_pair();
         fork_wait_readable(rpp::seconds(1)); // nothing arrives, so the poll sits here
         std::atomic_bool posted { false };
-        rpp::cfuture<void> poster = rpp::async_task([&]{ rpp::sleep_ms(5); loop->post([&]{ posted = true; }); });
+        rpp::future<void> poster = rpp::async([&]{ rpp::sleep_ms(5); loop->post([&]{ posted = true; }); });
         rpp::Timer wall;
         loop->run_once(rpp::seconds(1));
         const double waited_ms = wall.elapsed_millis();

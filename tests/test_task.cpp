@@ -9,7 +9,7 @@
 using namespace rpp;
 
 // rpp::task<T> is eager (starts at construction) and resumes its awaiter on whatever thread the
-// body completes on — never a background worker (unlike a bare `co_await cfuture<T>`).
+// body completes on, never a background worker (unlike a bare `co_await rpp::future<T>`).
 // The leaves here use loop.run_async(), which hops to a pool worker and posts the resume back to
 // the loop, so a task chain over those leaves stays on the loop thread end-to-end.
 

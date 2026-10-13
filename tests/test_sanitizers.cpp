@@ -17,13 +17,9 @@
 // freed after the last reader released looks like a race. See BUGS.md C25.
 extern "C" __attribute__((visibility("default"))) // -fvisibility=hidden hides it from libtsan.so
 const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifier)
-    return "race:std::__1::promise\n"           // libc++ puts every promise in namespace __1
-           "race:std::__future_base\n"          // libstdc++ keeps the shared state here
-           "race:std::__exception_ptr\n"        // and the exception refcount here
+    return "race:std::__exception_ptr\n"        // libstdc++ keeps the exception refcount here
            "race:std::runtime_error::~runtime_error\n"
-           "race:std::range_error::~range_error\n"
-           // the report for this one names no library frame, so only the test scopes it
-           "race:test_future::test_except_handler_chaining\n";
+           "race:std::range_error::~range_error\n";
 }
 #endif
 
@@ -78,10 +74,10 @@ TestImpl(test_sanitizers)
         AssertNotEqual(global, nullptr);
         const char* patterns = global();
         AssertNotEqual(patterns, nullptr);
-        AssertNotEqual(strstr(patterns, "race:std::__future_base"), nullptr);
+        AssertNotEqual(strstr(patterns, "race:std::__exception_ptr"), nullptr);
     #elif RPP_TSAN_BUILD
         // clang links its runtime statically, so the linker binds the hook and dlsym never sees it
-        AssertNotEqual(strstr(__tsan_default_suppressions(), "race:std::__future_base"), nullptr);
+        AssertNotEqual(strstr(__tsan_default_suppressions(), "race:std::__exception_ptr"), nullptr);
     #else
         AssertTrue(true); // only a TSAN build carries the hook
     #endif

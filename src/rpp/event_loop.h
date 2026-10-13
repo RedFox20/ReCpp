@@ -9,13 +9,12 @@
  * Distributed under MIT Software License
  */
 #include "atomic_timepoint.h" // rpp::AtomicTimeSource (optional warpable clock)
-#include "async.h" // rpp::future
+#include "async.h" // rpp::future, rpp::IsFuture
 #include "collections.h" // rpp::erase_if
 #include "concurrent_queue.h"
 #include "config.h"
 #include "debugging.h"
-#include "future_types.h" // rpp::cfuture, rpp::coro_handle, rpp::suspend_never
-#include "future.h" // rpp::IsFuture
+#include "future_types.h" // rpp::coro_handle, rpp::suspend_never
 #include "task.h" // rpp::task<T> (driven to completion by run_until_done)
 #include "thread_pool.h" // parallel_task, pool_task_handle
 #include "timepoint.h" // rpp::Duration
@@ -129,7 +128,7 @@ namespace rpp
      * @code
      *     rpp::event_loop loop;
      *
-     *     rpp::cfuture<std::string> fetchData() {
+     *     rpp::future<std::string> fetchData() {
      *         std::string raw = co_await loop.run_async([&]{
      *             return downloadFile(url);  // runs on thread pool
      *         });
@@ -523,25 +522,10 @@ namespace rpp
          * and other components' tasks are left running.
          *
          * @warning Must be called on the loop's owner thread.
-         * @returns true if `fut` became ready within `timeout`; false on timeout (never blocks past it).
+         * @returns true when `fut` is ready within `timeout`, and false on a timeout or an invalid future
          */
-        // TODO: remove the cfuture helpers in phase two, see https://github.com/RedFox20/ReCpp/issues/144.
-        template<typename T>
-        bool pump_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
-        {
-            return pump_future(fut, timeout);
-        }
-
-        /// Pumps this loop until `fut` finishes. @returns false on timeout or an invalid future
         template<typename T>
         bool pump_until_ready(rpp::future<T>& fut, rpp::Duration timeout = rpp::seconds(15))
-        {
-            return pump_future(fut, timeout);
-        }
-
-    private:
-        template<typename Future>
-        bool pump_future(Future& fut, rpp::Duration timeout)
         {
             time_frame frame = get_time_source_frame();
             rpp::TimePoint end = frame.now() + timeout;
@@ -551,25 +535,13 @@ namespace rpp
                     return false;
                 run_once(rpp::millis(5)); // block-wait briefly for the next continuation, then run it
             }
-            // if the future is deferred, .get() needs to be called to trigger the continuation
             return fut.valid() && fut.await_ready();
         }
-
-    public:
 
         /**
          * @brief Pumps the loop until `fut` is ready (see pump_until_ready), then returns its value.
          * @throws std::runtime_error if `fut` does not become ready within `timeout` (never blocks).
          */
-        template<typename T>
-        T run_until_ready(rpp::cfuture<T>& fut, rpp::Duration timeout = rpp::seconds(15))
-        {
-            if (!pump_until_ready(fut, timeout))
-                throw std::runtime_error("event_loop::run_until_ready timed out");
-            return fut.get();
-        }
-
-        /// Pumps this loop and collects `fut`. @throws std::runtime_error on timeout
         template<typename T>
         T run_until_ready(rpp::future<T>& fut, rpp::Duration timeout = rpp::seconds(15))
         {
@@ -766,92 +738,6 @@ namespace rpp
             }
         };
 
-        /**
-         * @brief Awaiter that runs a future on the thread pool and resumes 
-         *        the coroutine on the event loop thread when the future is ready.
-         */
-        template<IsFuture Future> struct RPP_CORO_RETURN_TYPE background_awaiter_fut
-        {
-            event_loop& loop;
-            rpp::delegate<Future()> action;
-            Future f {};
-            std::exception_ptr ex {};
-
-            background_awaiter_fut(event_loop& loop, rpp::delegate<Future()> action) noexcept
-                : loop{loop}, action{std::move(action)} {}
-            bool await_ready() const noexcept { return false; }
-            void await_suspend(rpp::coro_handle<> cont) noexcept
-            {
-                loop.start_in_background([this, cont]() mutable
-                {
-                    try { 
-                        f = action(); // get the future from the lambda
-                        f.wait(); // wait for the nested coroutine to finish (can throw)
-                    } catch (...) { ex = std::current_exception(); }
-                    // WARNING: do not deallocate action here, it can lead to a race-condition + memory corruption
-                    loop.post_resume(cont);
-                });
-            }
-            // similar to future<T>, either gets the result T, or throws the caught exception
-            auto await_resume()
-            {
-                // release resources before resuming the coroutine
-                action = {};
-                if (ex) std::rethrow_exception(ex);
-                return f.get();
-            }
-        };
-
-        /**
-         * @brief Awaiter that waits for a cfuture on a background thread,
-         *        then resumes the coroutine on the event loop thread.
-         */
-        template<typename T>
-        struct RPP_CORO_RETURN_TYPE future_awaiter
-        {
-            event_loop& loop;
-            rpp::cfuture<T> fut;
-            std::exception_ptr ex {};
-
-            future_awaiter(event_loop& loop, rpp::cfuture<T>&& fut) noexcept
-                : loop{loop}, fut{std::move(fut)} {}
-            future_awaiter(event_loop& loop, std::future<T>&& fut) noexcept
-                : loop{loop}, fut{std::move(fut)} {}
-
-            bool await_ready() const noexcept
-            {
-                return false; // always suspend; a ready future would otherwise resume inline off-loop
-            }
-            void await_suspend(rpp::coro_handle<> cont) noexcept
-            {
-                // already resolved (ready or invalid): hop to the loop thread, no worker needed
-                if (!fut.valid() || fut.wait_for(rpp::Duration::zero()) != wait_result::timeout)
-                {
-                    // nothing to wait on; resume immediately on loop thread
-                    loop.post_resume(cont);
-                    return;
-                }
-                loop.start_in_background([this, cont]() mutable
-                {
-                    try {
-                        if (fut.valid())
-                            fut.wait();
-                    } catch (...) { ex = std::current_exception(); }
-                    loop.post_resume(cont);
-                });
-            }
-            auto await_resume()
-            {
-                if (ex) std::rethrow_exception(ex);
-                if (!fut.valid())
-                {
-                    if constexpr (std::is_void_v<T>) return;
-                    else return T{};
-                }
-                return fut.get();
-            }
-        };
-
         /// Awaits a future without a blocking worker. The loop drains this wait before it ends
         template<typename T>
         struct RPP_CORO_RETURN_TYPE async_future_awaiter
@@ -879,7 +765,6 @@ namespace rpp
                     }
                 };
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
-                // Only future exposes a completion hook. A pending cfuture needs a waiting worker because std hides its state.
                 // A pending state owns this continuation. start() deletes it before the loop can resume the coroutine.
                 detail::start_after(fut.state, new resume_on_loop{loop, cont});
             }
@@ -931,7 +816,7 @@ namespace rpp
          *     });
          *     // After co_await, we are back on the event loop thread
          * 
-         *     std::string result2 = co_await loop.run_async([&]() -> rpp::cfuture<std::string> {
+         *     std::string result2 = co_await loop.run_async([&]() -> rpp::future<std::string> {
          *         auto input = prepareExpensiveInput();
          *         std::string output = co_await loop.run_async([&]{
          *            return expensiveComputation(input);
@@ -945,26 +830,20 @@ namespace rpp
          */
         // The awaiter takes ownership of futures and delegates, including lvalues.
         // NOLINTBEGIN(bugprone-move-forwarding-reference)
-        template<typename FutureOrCallback>
+        template<typename FutureOrCallback> requires IsFuture<std::decay_t<FutureOrCallback>> || IsFunction<FutureOrCallback>
         RPP_CORO_WRAPPER auto run_async(FutureOrCallback&& fut_or_cb) noexcept
         {
             using Decayed = std::decay_t<FutureOrCallback>;
-            if constexpr (requires { requires std::is_same_v<Decayed, rpp::future<typename Decayed::value_type>>; })
+            if constexpr (IsFuture<Decayed>)
             {
                 using T = typename Decayed::value_type;
                 return async_future_awaiter<T>{ *this, std::move(fut_or_cb) };
             }
-            else if constexpr (IsFuture<Decayed>) // rpp::cfuture<R> or std::future<R>
-            {
-                using T = decltype(fut_or_cb.get());
-                return future_awaiter<T>{ *this, std::move(fut_or_cb) };
-            }
             else // lambda[]()->R or rpp::delegate<R()>
             {
                 using R = decltype(fut_or_cb());
-                if constexpr (requires { requires std::is_same_v<R, rpp::future<typename R::value_type>>; })
+                if constexpr (IsFuture<R>)
                     return async_launcher_awaiter<typename R::value_type>{ *this, std::move(fut_or_cb) };
-                else if constexpr (IsFuture<R>) return background_awaiter_fut<R>{ *this, std::move(fut_or_cb) };
                 else if constexpr (std::is_void_v<R>) return background_awaiter_void{ *this, std::move(fut_or_cb) };
                 else                                  return background_awaiter<R>{ *this, std::move(fut_or_cb) };
             }

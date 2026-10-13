@@ -53,7 +53,6 @@ export namespace rpp {
     using rpp::task;
     using rpp::deferred;
     using rpp::future;
-    using rpp::cfuture;
     using rpp::wait_result;
     using rpp::coro_handle;
     using rpp::suspend_never;
@@ -65,6 +64,10 @@ export namespace rpp {
     using rpp::exclusive_lock;
     using rpp::close_sync;
     using rpp::IsEventLoop;
+    using rpp::IsFuture;
+    using rpp::NotFuture;
+    using rpp::IsFunctionReturningFuture;
+    using rpp::IsFunctionNotReturningFuture;
     using rpp::promise;
     using rpp::async;
     using rpp::ready_future;

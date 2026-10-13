@@ -2,7 +2,6 @@
 #include <rpp/coroutines.h>
 #include <rpp/delegate.h> // rpp::delegate, which an event loop runs
 #include <rpp/event_loop.h>
-#include <rpp/future.h> // rpp::IsFuture and callable concepts
 #include <rpp/minmax.h> // rpp::min, rpp::max
 #include <rpp/scope_guard.h> // rpp::make_scope_guard
 #include <rpp/semaphore.h>
@@ -13,6 +12,7 @@
 #include <atomic>
 #include <cstdint> // std::uintptr_t
 #include <exception> // std::current_exception, std::exception_ptr
+#include <future> // std::future, which IsFuture and run_async reject
 #include <map>
 #include <stdexcept>
 #include <string> // std::string
@@ -32,7 +32,7 @@ TestImpl(test_async)
 {
     TestInit(test_async) {}
 
-    TestCase(future_concepts_include_modern_futures)
+    TestCase(future_concepts_match_only_rpp_future)
     {
         AssertThat(IsFuture<future<int>>, true);
         AssertThat(IsFuture<future<>>, true);
@@ -40,16 +40,15 @@ TestImpl(test_async)
         AssertThat(IsFunctionReturningFuture<delegate<future<int>()>>, true);
         AssertThat(IsFunctionReturningFuture<delegate<future<void>()>>, true);
         AssertThat(IsFunctionNotReturningFuture<delegate<future<int>()>>, false);
-        AssertThat(IsFuture<cfuture<int>>, true);
-        AssertThat(IsFuture<cfuture<void>>, true);
-        AssertThat(IsFuture<std::future<int>>, true);
-        AssertThat(IsFuture<std::future<void>>, true);
+        AssertThat(IsFuture<std::future<int>>, false);
+        AssertThat(IsFuture<std::future<void>>, false);
         AssertThat(IsFuture<int>, false);
         AssertThat(IsFunctionNotReturningFuture<delegate<int()>>, true);
+        AssertThat(IsFunctionNotReturningFuture<delegate<std::future<int>()>>, true);
     }
 
     template<typename Launcher>
-    static cfuture<int> await_modern_launcher(Launcher launch)
+    static rpp::future<int> await_modern_launcher(Launcher launch)
     {
         using Awaiter = decltype(rpp::coro_operators::operator co_await(std::move(launch)));
         using Result = decltype(std::declval<Awaiter&>().await_resume());
@@ -108,7 +107,7 @@ TestImpl(test_async)
             RPP_CORO_WRAPPER future<int> operator()() const { return pending.get_future(); }
         };
         std::vector<promise<int>> pending(8);
-        std::vector<cfuture<int>> results;
+        std::vector<rpp::future<int>> results;
         for (size_t i = 0; i < pending.size(); ++i)
         {
             if (i % 2 == 0)
@@ -122,10 +121,10 @@ TestImpl(test_async)
         // The launchers release their workers before these producers publish.
         const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
         bool all_pending = true;
-        for (cfuture<int>& result : results) all_pending &= !result.await_ready();
+        for (rpp::future<int>& result : results) all_pending &= !result.await_ready();
         for (size_t i = 0; i < pending.size(); ++i) pending[i].set_value(static_cast<int>(i));
         std::vector<int> values;
-        for (cfuture<int>& result : results) values.push_back(result.get());
+        for (rpp::future<int>& result : results) values.push_back(result.get());
         AssertThat(idle, wait_result::finished);
         AssertThat(all_pending, true);
         for (size_t i = 0; i < values.size(); ++i) AssertThat(values[i], static_cast<int>(i));
@@ -141,10 +140,10 @@ TestImpl(test_async)
         promise<void> first;
         promise<void> second;
         promise<void> failed;
-        cfuture<int> a = await_modern_launcher(launcher{first});
+        rpp::future<int> a = await_modern_launcher(launcher{first});
         delegate<future<void>()> action = launcher{second};
-        cfuture<int> b = await_modern_launcher(std::move(action));
-        cfuture<int> c = await_modern_launcher(launcher{failed});
+        rpp::future<int> b = await_modern_launcher(std::move(action));
+        rpp::future<int> c = await_modern_launcher(launcher{failed});
         // The launchers release their workers before these producers publish.
         const wait_result idle = thread_pool::global().wait_until_idle(rpp::seconds(1));
         const bool all_pending = !a.await_ready() && !b.await_ready() && !c.await_ready();
@@ -264,19 +263,27 @@ TestImpl(test_async)
         AssertThat(completed.load(), true);
     }
 
-    TestCase(run_tasks_keeps_the_legacy_launcher)
+    template<typename F>
+    static constexpr bool loop_awaits = requires(rpp::event_loop& loop, F f) { loop.run_async(std::move(f)); };
+
+    TestCase(run_async_takes_an_rpp_future_or_a_callable)
     {
-        struct launcher
-        {
-            RPP_CORO_WRAPPER cfuture<void> operator()(int& item) const
-            {
-                return rpp::async_task([&item] { ++item; });
-            }
-        };
-        std::vector<int> items {1, 2};
-        rpp::run_tasks(items, launcher{});
-        AssertThat(items[0], 2);
-        AssertThat(items[1], 3);
+        AssertThat(loop_awaits<future<int>>, true);
+        AssertThat(loop_awaits<delegate<int()>>, true);
+        AssertThat(loop_awaits<std::future<int>>, false); // a std::future has no completion hook, so a worker would block
+
+        // a callable which returns a std::future yields that future, and no worker waits for it
+        using Yield = decltype(std::declval<rpp::event_loop&>().run_async(delegate<std::future<int>()>{}).await_resume());
+        AssertThat((std::is_same_v<Yield, std::future<int>>), true);
+    }
+
+    template<typename F>
+    static constexpr bool co_awaits = requires(F f) { rpp::coro_operators::operator co_await(std::move(f)); };
+
+    TestCase(co_await_takes_no_std_future)
+    {
+        AssertThat(co_awaits<delegate<int()>>, true);
+        AssertThat(co_awaits<std::future<int>>, false);
     }
 
     static rpp::event_task await_on_loop(rpp::event_loop& loop, future<int> result, int& value, rpp::uint64& thread)
@@ -837,7 +844,7 @@ TestImpl(test_async)
         AssertThrows((void)f.get(), std::logic_error);
     }
 
-    // std::promise gives its future after set_value(), and a port from cpromise relies on that order
+    // std::promise gives its future after set_value(), and a port from std::promise relies on that order
     TestCase(a_promise_gives_one_future_and_publishes_once)
     {
         promise<int> p;

@@ -1,6 +1,6 @@
 #include <rpp/concurrent_queue.h>
 #include <rpp/coroutines.h>
-#include <rpp/future.h>
+#include <rpp/async.h>
 #include <rpp/timer.h>
 #include <rpp/scope_guard.h>
 #include <rpp/semaphore.h>
@@ -176,7 +176,7 @@ TestImpl(test_concurrent_queue)
     {
         constexpr int MAX_SIZE = 40'000;
         concurrent_queue<std::string> queue;
-        cfuture<> producer = rpp::async_task([&queue] {
+        rpp::future<> producer = rpp::async([&queue] {
             for (int i = 0; i < MAX_SIZE; ++i)
                 queue.push("item");
         });
@@ -231,7 +231,7 @@ TestImpl(test_concurrent_queue)
 
         // count the number of tasks that were atomically processed
         std::atomic_int numProcessed = 0;
-        cfuture<> worker = rpp::async_task([&queue, &numProcessed]
+        rpp::future<> worker = rpp::async([&queue, &numProcessed]
         {
             std::string item;
             while (queue.pop_atomic_start(item))
@@ -262,13 +262,13 @@ TestImpl(test_concurrent_queue)
     {
         concurrent_queue<std::string> queue;
 
-        cfuture<> producer = rpp::async_task([&queue] {
+        rpp::future<> producer = rpp::async([&queue] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
         });
 
-        cfuture<> consumer = rpp::async_task([&queue] {
+        rpp::future<> consumer = rpp::async([&queue] {
             std::string item1 = *queue.wait_pop();
             AssertThat(item1, "item1");
             std::string item2 = *queue.wait_pop();
@@ -289,7 +289,7 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         rpp::semaphore_flag popped_all; // the producer pushed everything first, so only the consumer signals
 
-        cfuture<> producer = rpp::async_task([&queue,&popped_all] {
+        rpp::future<> producer = rpp::async([&queue,&popped_all] {
             queue.push("item1");
             queue.push("item2");
             queue.push("item3");
@@ -300,7 +300,7 @@ TestImpl(test_concurrent_queue)
             queue.notify_one(); // notify consumer
         });
 
-        cfuture<> consumer = rpp::async_task([&queue,&popped_all] {
+        rpp::future<> consumer = rpp::async([&queue,&popped_all] {
             std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
             AssertTrue(queue.wait_pop(item1));
             AssertThat(item1, "item1");
@@ -386,7 +386,7 @@ TestImpl(test_concurrent_queue)
     {
         if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         producer_queue queue;
-        rpp::cfuture<> slow_producer = rpp::async_task([&] {
+        rpp::future<> slow_producer = rpp::async([&] {
             queue.barrier_push_after_delay_ms("item1", 10);
             queue.barrier_push_after_delay_ms("item2", 10);
             queue.barrier_push_after_delay_ms("item3", 10);
@@ -468,7 +468,7 @@ TestImpl(test_concurrent_queue)
     {
         if (has_coarse_timer()) return; // the coarse tick overshoots these bounds
         producer_queue queue;
-        rpp::cfuture<> slow_producer = rpp::async_task([&] {
+        rpp::future<> slow_producer = rpp::async([&] {
             queue.barrier_push_after_delay_ms("item1", 5);
             queue.barrier_push_after_delay_ms("item2", 5);
             queue.barrier_push_after_delay_ms("item3", 5);
@@ -499,7 +499,7 @@ TestImpl(test_concurrent_queue)
         // wait_pop with a large virtual timeout, then fast-forward time from another thread
         std::string item;
         rpp::Timer real_timer;
-        rpp::cfuture<> warper = rpp::async_task([&] {
+        rpp::future<> warper = rpp::async([&] {
             spin_sleep_for_ms(10); // let the consumer start waiting
             ts.warp_forward(rpp::seconds(10)); // fast-forward past the timeout
         });
@@ -524,7 +524,7 @@ TestImpl(test_concurrent_queue)
         auto until = ts.time_now() + rpp::seconds(1);
         std::string item;
         rpp::Timer real_timer;
-        rpp::cfuture<> warper = rpp::async_task([&] {
+        rpp::future<> warper = rpp::async([&] {
             spin_sleep_for_ms(10); // let the consumer start waiting
             ts.warp_forward(rpp::seconds(1)); // fast-forward past the deadline
         });
@@ -546,7 +546,7 @@ TestImpl(test_concurrent_queue)
         AtomicTimeSource ts;
 
         // push an item after a short delay
-        rpp::cfuture<> producer = rpp::async_task([&] {
+        rpp::future<> producer = rpp::async([&] {
             spin_sleep_for_ms(10);
             queue.push("hello");
         });
@@ -569,7 +569,7 @@ TestImpl(test_concurrent_queue)
         AtomicTimeSource ts;
 
         auto until = ts.time_now() + rpp::seconds(1);
-        rpp::cfuture<> producer = rpp::async_task([&] {
+        rpp::future<> producer = rpp::async([&] {
             spin_sleep_for_ms(10);
             queue.push("world");
         });
@@ -591,7 +591,7 @@ TestImpl(test_concurrent_queue)
     {
         std::atomic_bool finished = false;
         producer_queue queue;
-        rpp::cfuture<> slow_producer = rpp::async_task([&] {
+        rpp::future<> slow_producer = rpp::async([&] {
             queue.barrier_push_after_delay_ms("item1", 15); // wait a bit longer
             queue.barrier_push_after_delay_ms("item2", 10);
             queue.barrier_push_after_delay_ms("item3", 10);
@@ -665,7 +665,7 @@ TestImpl(test_concurrent_queue)
     {
         if (has_coarse_timer()) return; // the coarse tick overshoots these intervals
         producer_queue queue;
-        rpp::cfuture<> slow_producer = rpp::async_task([&] {
+        rpp::future<> slow_producer = rpp::async([&] {
             queue.barrier_push_after_delay_ms("item1", 10);
             queue.barrier_push_after_delay_ms("item2", 10);
             queue.barrier_push_after_delay_ms("item3", 10);
@@ -739,14 +739,14 @@ TestImpl(test_concurrent_queue)
             concurrent_queue<std::string> queue;
             rpp::Timer t;
 
-            rpp::cfuture<> producer = rpp::async_task([&] {
+            rpp::future<> producer = rpp::async([&] {
                 for (int i = 0; i < num_items; ++i) {
                     queue.push("item");
                     if (i % 1000 == 0) // yield every 1000 items
                         std::this_thread::yield();
                 }
             });
-            rpp::cfuture<> consumer = rpp::async_task([&] {
+            rpp::future<> consumer = rpp::async([&] {
                 int num_received = 0;
                 std::string item;
                 // std::deque<std::string> items;
@@ -790,14 +790,14 @@ TestImpl(test_concurrent_queue)
             concurrent_queue<std::string> queue;
             rpp::Timer t;
 
-            rpp::cfuture<> producer = rpp::async_task([&] {
+            rpp::future<> producer = rpp::async([&] {
                 for (int i = 0; i < num_items; ++i) {
                     queue.push("item");
                     if (i % 1000 == 0) // yield every 1000 items
                         std::this_thread::yield();
                 }
             });
-            rpp::cfuture<> consumer = rpp::async_task([&] {
+            rpp::future<> consumer = rpp::async([&] {
                 int num_received = 0;
                 std::string item;
                 while (num_received < num_items) {
@@ -830,7 +830,7 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             std::string item;
             bool got = co_await queue.await_pop(item, Duration::from_millis(200));
@@ -848,7 +848,7 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_timeout)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             std::string item;
             bool got = co_await queue.await_pop(item, Duration::from_millis(10));
@@ -863,7 +863,7 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         queue.push("ready");
 
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             std::string item;
             bool got = co_await queue.await_pop(item, Duration::from_millis(50));
@@ -878,7 +878,7 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_available_after_delay)
     {
         concurrent_queue<int> queue;
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             bool available = co_await queue.await(Duration::from_millis(200));
             AssertThat(available, true);
@@ -895,7 +895,7 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_optional)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto item = co_await queue.await_pop(Duration::from_millis(200));
             AssertThat(item.has_value(), true);
@@ -912,7 +912,7 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_optional_timeout)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto item = co_await queue.await_pop(Duration::from_millis(10));
             AssertThat(item.has_value(), false);
@@ -926,7 +926,7 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<int> queue;
         queue.push(99);
 
-        auto coro = [&]() -> cfuture<void>
+        auto coro = [&]() -> rpp::future<void>
         {
             auto item = co_await queue.await_pop(Duration::from_millis(50));
             AssertThat(item.has_value(), true);

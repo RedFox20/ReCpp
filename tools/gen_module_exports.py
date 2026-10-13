@@ -82,7 +82,6 @@ NO_CONFIG = {'semaphore.h': frozenset({'!RPP_BARE_METAL'}),
              'concurrent_queue.h': frozenset({'!RPP_BARE_METAL'}),
              'thread_pool.h': frozenset({'!RPP_BARE_METAL'}),
              'async.h': frozenset({'!RPP_BARE_METAL'}),
-             'future.h': frozenset({'!RPP_BARE_METAL'}),
              'event_loop.h': frozenset({'!RPP_BARE_METAL'}),
              'coroutines.h': frozenset({'!RPP_BARE_METAL'})}
 
@@ -425,9 +424,8 @@ GROUP_HEADERS = {
     'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
                   'thread_pool.h', 'threads.h', 'task.h', 'future_types.h',
                   'atomic_shared_ptr.h', 'close_sync.h', 'async.h'),
-    # every header which reaches <future>. gcc-14 crashes an importer of any module whose
-    # fragment carries it, so they sit alone and rpp.threading stays safe. See BUGS.md B16
-    'future': ('future.h', 'event_loop.h', 'coroutines.h'),
+    # the event loop and the awaiters. This group kept <future> out of rpp.threading before 2.2, see BUGS.md B16
+    'future': ('event_loop.h', 'coroutines.h'),
     'testing': ('tests.h',),
 }
 GROUPS = tuple(GROUP_HEADERS)
