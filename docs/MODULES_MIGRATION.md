@@ -1110,8 +1110,8 @@ Every entry here stops a build, each has a reproducer in `BUGS.md`, and each car
 workaround in the tree. Each workaround costs a consumer something, so retest every row
 whenever the toolchain moves, and delete the one the new compiler makes unnecessary. B18 and
 B23 are struck through, because a fix replaced each one. gcc-14 builds no modules unless
-`RPP_MODULES_ALLOW_GCC14` is on. So a gcc-14 row matters again only when that floor drops, or
-when a project sets the option.
+`RPP_MODULES_ALLOW_GCC14` is on. So a gcc-14 row matters again only when `RPP_MODULES_MIN_GCC`
+drops, or when a project sets the option.
 
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
@@ -1144,8 +1144,8 @@ later instantiation or corrupts the interface. `RppStdModuleOnly` caught each on
 with `rpp.std`. No module exports a std name now, so the shape has no way back in.
 
 Two more failures stop the same consumer, and a third stopped it before 2.2. None is a
-compiler bug. A declaration in a
-global module fragment reaches an importer only when an exported declaration names it:
+compiler bug. A declaration in a global module fragment reaches an importer only when an
+exported declaration names it:
 
 | What dies | Where it surfaces | What carries it now |
 |---|---|---|
