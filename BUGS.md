@@ -40,6 +40,10 @@ declaration reaches `<memory>`. No warning flag turns the error off.
 `BUILD_WITH_MODULES=AUTO` takes the header path for GCC under `-fsanitize=thread`, and the mamafile exports no
 `.cppm` there. Remove the gate when a GCC release builds `rpp-text.cppm` under TSAN.
 
+The gate reads the global, per-config and directory flags at configure time. A parent which adds the flag with
+`target_compile_options(ReCpp ...)` after `add_subdirectory` runs too late for it, so that parent sets
+`BUILD_WITH_MODULES=OFF`.
+
 ### B35. A `noexcept` error handler does not compile
 `rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
 `first_arg_type` fails on a `noexcept` lambda. A handler such as
