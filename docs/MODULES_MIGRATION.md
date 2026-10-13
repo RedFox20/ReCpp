@@ -1085,10 +1085,10 @@ Then port one real consumer. A downstream project which pulls ReCpp through
 ## 11. Changeset 7: CI, docs and measurement
 
 1. The modules jobs are in `.github/workflows/ci.yml`: gcc-15 at C++20 and C++23, and
-   clang-21. The consumer job builds gcc-15, clang-21 and MSVC, and a gcc-15 TSAN row
-   which must take the header path. The runner image carries neither compiler, so a
-   gcc-15 job registers the toolchain PPA, and a clang-21 job registers apt.llvm.org.
-   Five CI traps are handled and worth keeping: TSAN needs
+   clang-21. The consumer job builds gcc-15 and clang-21 on modules, and gcc-14 and a
+   gcc-15 TSAN row on headers. The `consumer-msvc` job builds MSVC. The runner image
+   carries neither gcc-15 nor clang-21, so a gcc-15 job registers the toolchain PPA, and
+   a clang-21 job registers apt.llvm.org. Five CI traps are handled and worth keeping: TSAN needs
    `setarch -R` to start, ninja ignores `jobs=` so a Ninja job needs `taskset`,
    `run_clang_tidy` has to find the compile database under `linux-clang`,
    `clang-scan-deps` ships in `clang-tools-N` and not in `clang-N`, and a modules
@@ -1109,8 +1109,9 @@ Then port one real consumer. A downstream project which pulls ReCpp through
 Every entry here stops a build, each has a reproducer in `BUGS.md`, and each carries a
 workaround in the tree. Each workaround costs a consumer something, so retest every row
 whenever the toolchain moves, and delete the one the new compiler makes unnecessary. B18 and
-B23 are struck through, because a fix replaced each one. gcc-14 builds no modules while
-`RPP_MODULES_MIN_GCC` is 15, so a gcc-14 row matters again only when that floor drops.
+B23 are struck through, because a fix replaced each one. gcc-14 builds no modules unless
+`RPP_MODULES_ALLOW_GCC14` is on. So a gcc-14 row matters again only when that floor drops, or
+when a project sets the option.
 
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
@@ -1142,7 +1143,8 @@ B19, B20 and B21 share one shape: an `export using` inside namespace `std` eithe
 later instantiation or corrupts the interface. `RppStdModuleOnly` caught each one, and it went
 with `rpp.std`. No module exports a std name now, so the shape has no way back in.
 
-Three more failures stop the same consumer, and none is a compiler bug. A declaration in a
+Two more failures stop the same consumer, and a third stopped it before 2.2. None is a
+compiler bug. A declaration in a
 global module fragment reaches an importer only when an exported declaration names it:
 
 | What dies | Where it surfaces | What carries it now |
@@ -1225,7 +1227,7 @@ A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono
 | A `[[clang::coro_return_type]]` reaches a non-coroutine (finding 16) | clang-21 refuses the file, headers and modules alike | ReCpp supports no `std::future` since 2.2, so no `rpp::future` passes through one. `rpp::future` marks its coroutine wrappers `RPP_CORO_WRAPPER`. |
 | The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | `BUGS.md` B27 tracks it. `e.what()` reads a message the future shared state may free on another thread. |
 | Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-15 and fails on clang-21 | Build every tier 1 compiler in CI. The macro-free compile check finds it early. |
-| A consumer writes its import above its includes | Hundreds of std redefinition errors on GCC, 2601 on gcc-15 for one `<string>` (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
+| A consumer writes its import above its includes | Hundreds to thousands of std redefinition errors on GCC, 2601 on gcc-15 for one `<string>` (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
 | Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI, which regenerates every group and fails on a stale one. |
 | Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `tests/module_consumer/`. |
 | Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:185`](../CMakeLists.txt#L185)). GCC under `-fsanitize=thread` rejects a module unit, see `BUGS.md` B36 | Keep the modules jobs out of the sanitizer matrix. `AUTO` takes the header path for GCC TSAN, and `consumer-gcc15-tsan` gates it. |
