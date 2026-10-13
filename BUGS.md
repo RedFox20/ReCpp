@@ -11,8 +11,8 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 ### B37. gcc-15 TSAN reports a race on each coroutine frame which another thread resumes
 Under g++ 15.2 TSAN, 21 cases in `test_async`, `test_coroutines`, `test_concurrent_queue`, `test_event_loop` and
 `test_semaphore` report 31 races. Each report is a 2-byte read of the coroutine frame on the thread which resumes it.
-The previous write comes from the coroutine body, on the thread which suspended it. All 730 cases pass. On master
-8b37bc8, g++ 15.2 gave 27 such reports and g++ 13.3 gave 0, with the same flags.
+The previous write comes from the coroutine body, on the thread which suspended it. All 730 cases pass, and g++ 13.3
+builds the same tree and flags with 0 reports.
 
 One report from `test_async::coroutine_launchers_await_modern_value_futures`:
 
