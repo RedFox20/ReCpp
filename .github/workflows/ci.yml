@@ -322,10 +322,15 @@ jobs:
         shell: bash
         run: |
           CXX_NAME=$(echo ${{ matrix.cc }} | sed 's/^gcc/g++/')
-          # cmake writes a plain message() to stderr
-          CC=${{ matrix.cc }} CXX=$CXX_NAME cmake -S . -B "$RUNNER_TEMP/tsan-config" -G Ninja -DCXX20=ON \
-              -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -fsanitize=thread" 2>&1 | tee cfg.log
-          grep -q "RPP MODULES: off" cfg.log || { echo "FAIL: TSAN in the per-config flags still built modules"; exit 1; }
+          configure() {
+            # cmake writes a plain message() to stderr
+            CC=${{ matrix.cc }} CXX=$CXX_NAME cmake -S . -B "$RUNNER_TEMP/tsan-$1" "${@:2}" -DCXX20=ON \
+                "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O2 -g -fsanitize=thread" 2>&1 | tee cfg.log
+            grep -q "RPP MODULES: off" cfg.log || { echo "FAIL: $1 with TSAN in the per-config flags built modules"; exit 1; }
+          }
+          configure single -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          # under a multi-config generator CMAKE_BUILD_TYPE holds the config list, so the gate must read each entry
+          configure multi -G "Ninja Multi-Config"
 
       # run_test.py builds without a sanitizer, so the TSAN row stops after the steps above
       - name: Import the exported modules with ${{ matrix.cc }}

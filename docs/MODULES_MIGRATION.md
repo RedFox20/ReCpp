@@ -29,13 +29,13 @@ gate, #65 changeset 6.
 6 landed. The generator drives all nine groups. 4 is done through the generator
 `--check`. 5 is finished. Section 11 lists what 7 owes.
 
-**Next:** nothing in this plan. Every remaining item is a follow-up to it, and section 11.1
-holds the list.
+**Next:** nothing in this plan. Section 11.2 holds the follow-ups, and section 11.1 holds the
+compiler defects to retest when a compiler moves.
 
 **The follow-ups, ranked.** B16 no longer reaches a module. Since 2.2 no header reaches
 `<future>`, so all nine modules are clean, and `RppPromiseModuleOnly` gates it.
 B8 costs one trait, which a module importer does not get and an includer does. B19, B20, B21 and B22 are dormant. No module exports a std name, and
-dropping `rpp.std` retired that shape for good.
+dropping `rpp.std` retired that shape for good. B36 keeps GCC under TSAN on the header path.
 
 **Why groups and not forty-four modules.** The tree shipped one module per header
 first. gcc-14 then ran out of module source locations in any translation unit which imported
@@ -119,7 +119,7 @@ only it can offer, the vector overload an explicit `rpp::sort<T>(v)` names, and 
 `element_range` overload whose by-value parameter lets a const view sort its mutable
 elements. Asking which module should carry a name is worth doing per layer.
 
-**Open questions:** `BUGS.md` B2, B5, B9, B10, B15 and B16. B8 keeps three workarounds open,
+**Open questions:** `BUGS.md` B2, B5, B9, B10, B15, B16, B28 and B36. B8 keeps three workarounds open,
 and each one goes away when a newer gcc reads the module back. B6 closed as C25, so the TSAN jobs no
 longer fail on the exception refcount race.
 
@@ -531,7 +531,7 @@ Consumers compile ReCpp's `.cppm` files themselves. Finding 7 adds a second
 rule: **keep the `.cppm` files out of the installed static library**, so that a
 consumer's own module object never collides with an archived copy.
 
-### D7. Two compiler tiers. Only gcc-14 and clang-21 carry modules.
+### D7. Two compiler tiers. Only gcc-15, clang-21 and MSVC 19.34 carry modules.
 
 ReCpp builds on 8 compilers today, and their module support ranges from good to
 absent. Splitting them into tiers keeps the migration honest, and it stops a
@@ -539,23 +539,23 @@ weak toolchain from setting the ceiling for the strong ones.
 
 | Tier | Compilers | What they get |
 |---|---|---|
-| **1, modules** | gcc-14+, clang-21+, MSVC 19.34+ | every module, and the module-only consumer checks |
-| **2, headers only** | clang-18, gcc-13, Android NDK clang, the MIPS gcc-12 cross build | the classic `#include` path, unchanged and fully supported |
+| **1, modules** | gcc-15+, clang-21+, MSVC 19.34+ | every module, and the module-only consumer checks |
+| **2, headers only** | clang-18, gcc-13, gcc-14, Android NDK clang, the MIPS gcc-12 cross build, and GCC under TSAN | the classic `#include` path, unchanged and fully supported |
 
 This is a support decision, not a language one. D1 already makes it free:
 `libReCpp.a` and every header behave the same either way, so a tier 2 compiler
-loses nothing but the `import` syntax. `BUILD_WITH_MODULES` stays **OFF** by
-default is `AUTO`. [`CMakeLists.txt`](../CMakeLists.txt#L274) hardcodes the first
-supported version of each family, GCC 14, Clang 21 and MSVC 19.34, and it also
-checks CMake 3.28, C++20 and the generator. `AUTO` turns modules on wherever the
+loses nothing but the `import` syntax. `BUILD_WITH_MODULES` defaults to `AUTO`.
+[`CMakeLists.txt`](../CMakeLists.txt#L327) hardcodes the first
+supported version of each family: GCC 15, Clang 21 and MSVC 19.34. It also
+checks CMake 3.28, C++20, the generator and a GCC TSAN flag. gcc-14 left tier 1 for
+`BUGS.md` B28, and GCC under TSAN for B36. `AUTO` turns modules on wherever the
 toolchain supports them, so a CI job needs no flag. `ON` demands them and names
 the exact reason when it cannot. Without that guard, clang-18 reports the
 ambiguity of section 2.1 and gcc-13 fails deep inside a dyndep scan.
 
-**Verification status: both tier 1 compilers are measured.** gcc-14.2 comes from
-apt. clang-21.1.5 comes from the LLVM GitHub release tarball, because the agent
-proxy blocks apt.llvm.org and `mama install-clang-21` needs a `sudo` this
-container does not have.
+**Verification status.** The table records the gcc-14.2 and clang-21.1.5 run which set
+the tiers. gcc-14.2 came from apt, and clang-21.1.5 from the LLVM GitHub release tarball.
+CI now builds the modules on gcc-15, clang-21 and MSVC.
 
 | Claim | gcc-14.2 | clang-21.1.5 |
 |---|---|---|
@@ -567,19 +567,10 @@ container does not have.
 | `import` inside a global module fragment | accepted | accepted, even with `-pedantic-errors` |
 | the full modules test suite | **498/498** | **498/498** |
 
-Two results need their footnote.
-
-**Only gcc-14 needs the include order.** clang-21 compiles both orders cleanly.
-The rule in AGENTS.md still holds for every file, because a portable file has to
-satisfy the stricter compiler.
-
-**clang-21 needed one fix outside the module work, and this branch carries it.**
-`tests/test_event_loop.cpp` passed a `cfuture<void>` through `rpp::async_task`,
-which instantiates `std::future<cfuture<void>>::get()`. clang-21 rejects that:
-the function returns a `[[clang::coro_return_type]]` without being a coroutine.
-The headers-only clang-21 build failed the same way, so modules were never the
-cause. A raw `std::thread` plus `join()` replaces it, and clang-21 now passes
-498/498 in both modes.
+**Only GCC needs the include order.** clang-21 compiles both orders cleanly. gcc-15
+still rejects one `<string>` after `import rpp.text;` with 2601 errors. The rule in
+AGENTS.md holds for every file, because a portable file has to satisfy the stricter
+compiler.
 
 **Build note for a tarball toolchain.** A prebuilt LLVM release needs
 `-DCMAKE_CXX_FLAGS=-resource-dir=$(clang++ -print-resource-dir)`. Without it
@@ -1093,9 +1084,11 @@ Then port one real consumer. A downstream project which pulls ReCpp through
 
 ## 11. Changeset 7: CI, docs and measurement
 
-1. Both modules jobs are in `.github/workflows/ci.yml`, gcc-14 and clang-21. The
-   clang-21 one registers apt.llvm.org itself, because the runner image carries no
-   such package. Five CI traps are handled and worth keeping: TSAN needs
+1. The modules jobs are in `.github/workflows/ci.yml`: gcc-15 at C++20 and C++23, and
+   clang-21. The consumer job builds gcc-15 and clang-21 on modules, and gcc-14 and a
+   gcc-15 TSAN row on headers. The `consumer-msvc` job builds MSVC. The runner image
+   carries neither gcc-15 nor clang-21, so a gcc-15 job registers the toolchain PPA, and
+   a clang-21 job registers apt.llvm.org. Five CI traps are handled and worth keeping: TSAN needs
    `setarch -R` to start, ninja ignores `jobs=` so a Ninja job needs `taskset`,
    `run_clang_tidy` has to find the compile database under `linux-clang`,
    `clang-scan-deps` ships in `clang-tools-N` and not in `clang-N`, and a modules
@@ -1116,7 +1109,9 @@ Then port one real consumer. A downstream project which pulls ReCpp through
 Every entry here stops a build, each has a reproducer in `BUGS.md`, and each carries a
 workaround in the tree. Each workaround costs a consumer something, so retest every row
 whenever the toolchain moves, and delete the one the new compiler makes unnecessary. B18 and
-B23 are struck through, because a fix replaced each one.
+B23 are struck through, because a fix replaced each one. gcc-14 builds no modules unless
+`RPP_MODULES_ALLOW_GCC14` is on. So a gcc-14 row matters again only when `RPP_MODULES_MIN_GCC`
+drops, or when a project sets the option.
 
 | Bug | Compiler | What dies | What guards it today |
 |---|---|---|---|
@@ -1128,8 +1123,9 @@ B23 are struck through, because a fix replaced each one.
 | **B21** | gcc-14 | A module which exports `std::get` breaks `std::unique_ptr` in every importer | No module exports a std name. An importer includes `<tuple>` |
 | **B22** | gcc-14 | An importer which reaches `std::shared_ptr` through a module fails to link, because no object carries `_Sp_counted_base<_S_atomic>::_M_release()` | No module exports a std name. An importer includes `<memory>` |
 | **B8** | gcc-14 | Five separate shapes, each breaking one module | `NO_EXPORT` and `RE_EXPORT` in the generator carry the entries |
+| **B36** | gcc-15 | Under `-fsanitize=thread`, a module unit which reaches `<memory>` fails with `exposes TU-local entity '__tsan_mutex_not_static'` | `AUTO` takes the header path, and the package exports no `.cppm`. The `consumer-gcc15-tsan` CI row gates it |
 
-Three of the five that remain are silent traps rather than loud ones. B19 and B21 compile the
+Three of the remaining rows are silent traps rather than loud ones. B19 and B21 compile the
 interface and fail every consumer afterwards, and B22 reaches the linker. So a green build here
 does not prove the next consumer compiles, and item 4 of section 12 tracks that risk.
 
@@ -1147,14 +1143,15 @@ B19, B20 and B21 share one shape: an `export using` inside namespace `std` eithe
 later instantiation or corrupts the interface. `RppStdModuleOnly` caught each one, and it went
 with `rpp.std`. No module exports a std name now, so the shape has no way back in.
 
-Two more failures stop the same consumer, and neither is a compiler bug. A declaration in a
-global module fragment reaches an importer only when an exported declaration names it:
+Two more failures stop the same consumer, and a third stopped it before 2.2. None is a
+compiler bug. A declaration in a global module fragment reaches an importer only when an
+exported declaration names it:
 
 | What dies | Where it surfaces | What carries it now |
 |---|---|---|
 | `s != "x"` and `s + "y"` on an exported `std::string` | The importer reports `no match for 'operator!='` | No module exports `std::string`. The importer includes `<string>` |
 | `std::vector` construction | `stl_construct.h` reports `no matching function for call to 'operator new(sizetype, void*)'` | The importer includes `<new>` |
-| Any call into the future machinery of `rpp.future` | The importer reports `must '#include <typeinfo>' before using 'typeid'` | libstdc++ names `typeid` inside `<future>`. The importer includes `<typeinfo>` |
+| Any call into the future machinery of `rpp.future`, before 2.2 | The importer reported `must '#include <typeinfo>' before using 'typeid'` | libstdc++ named `typeid` inside `<future>`, which no fragment carries since 2.2. A gcc-15 importer of `rpp.threading` and `rpp.future` builds with `<new>` alone |
 
 So an export list of type names alone does not make a module usable. Every free function an
 exported type needs by argument-dependent lookup belongs in the list beside the type.
@@ -1167,11 +1164,10 @@ human, and `std::cv_status` came in that way. Dropping `rpp.std` retired the gat
 It also matches the literal `std::` spelling, so an alias hides a name from it. `rpp::ustrview`
 takes a `string_view_t`, which is `std::u16string_view`, and a reviewer found that one.
 
-One return type drove that question and no longer exists. `rpp::cfuture::wait_for` returned
-`std::future_status`, which lives in `<future>`, and B20 makes that header fatal beside an
-exported `std::swap`. Exporting it measured 18% on every importer of `rpp.std`, 166 ms against
-196 ms. The overload returns `rpp::wait_result` now, which `thread_pool::wait_until_idle`
-already used, so the public signature names no std type.
+One return type drove that question. `rpp::cfuture::wait_for` returned `std::future_status`,
+which lives in `<future>`, and B20 makes that header fatal beside an exported `std::swap`.
+Exporting it measured 18% on every importer of `rpp.std`, 166 ms against 196 ms. 2.2 removed
+`cfuture`, and `rpp::future::wait_for` returns `rpp::wait_result`, so no public signature names it.
 
 ### 11.2 Open design follow-ups
 
@@ -1181,7 +1177,7 @@ removed `cfuture` and `std_future_awaiter`, so no fragment carries `<future>` an
 is gone. A gcc-14 run of the module consumers decides whether `RPP_MODULES_MIN_GCC` can drop.
 
 **A modules build should import its std names, not include them.** A translation unit
-built with modules still writes `#include <vector>` and `#include <future>` today. The
+built with modules still writes `#include <vector>` and `#include <new>` today. The
 target is an `import` for every std name. An `#include` then stays only for a shallow
 header which carries a macro, such as `rpp/tests.macros.h`.
 
@@ -1192,31 +1188,31 @@ This waits on `import std;`, and that sets the compiler floor:
 | gcc-14 | no | it rejects `-fmodules` outright, and it ships no `bits/std.cc` |
 | gcc-15 | yes | `bits/std.cc` ships, and a unit which imports std and builds a `std::vector` compiles |
 
-Two includes survive the change either way. An importer of `rpp.future` keeps `<typeinfo>`
-and `<new>`, because a template instantiates in the importer and libstdc++ names `typeid`
-there. See `BUGS.md` **B28**.
+Today an importer of `rpp.threading` and `rpp.future` includes `<new>`, because a template
+runs placement new in the importer. It needs no `<typeinfo>` on gcc-15, because 2.2 removed the
+`<future>` which named `typeid`. See `BUGS.md` **B28**.
 
 **A public header earns each heavy std include, or it drops it.** A header include reaches
 every module fragment which carries that header, and B28 lists which ones then crash a
-gcc-14 importer. Counted over `src/rpp/*.h`:
+gcc-14 importer. Counted over `src/rpp/*.h` in 2.2:
 
 | Header | Public header sites | On the B28 ICE list |
 |---|---|---|
 | `<functional>` | 0 | no |
 | `<chrono>` | 0 | yes |
-| `<future>` | 1 | it is the condition 1 carrier |
+| `<future>` | 0 | it was the condition 1 carrier |
 | `<thread>` | 1 | yes |
-| `<memory>` | 4 | yes |
-| `<stdexcept>` | 4 | yes |
-| `<exception>` | 5 | yes |
+| `<memory>` | 5 | yes |
+| `<stdexcept>` | 6 | yes |
+| `<exception>` | 6 | yes |
 
 `<functional>` already sits at zero, because `rpp::delegate` replaced it. That is the shape
-the rest should reach. `<future>` leaves in the future plan, and `<thread>` has one site.
+the rest should reach. `<future>` reached zero in 2.2, and `<thread>` has one site.
 
 **The weight is in the last three rows, not the first.** `<exception>`, `<stdexcept>` and
-`<memory>` hold 13 of the 15 public header slots, and every one of them makes gcc-14 crash
-an importer. A pass over those three buys more than the two headers which already read as
-the obvious offenders.
+`<memory>` hold 17 of the 18 public header slots, and every one of them makes gcc-14 crash
+an importer. `<memory>` also carries B36, so it decides whether GCC under TSAN can build a
+module again. A pass over those three buys more than any other header.
 
 A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono>` and
 `<thread>` appear in four `.cpp` files between them, and none of those sites matter here.
@@ -1228,13 +1224,13 @@ A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono
 | Risk | Impact | Response |
 |---|---|---|
 | Changeset 1b breaks a downstream build | a downstream project fails to compile after a dependency bump | Build one downstream project against the branch before merging 1b. A break there is a latent bug the removal exposed. |
-| A `[[clang::coro_return_type]]` reaches a non-coroutine (finding 16) | clang-21 refuses the file, headers and modules alike | Never pass an `rpp::cfuture` through `std::future` or `std::async`. The fix is on this branch. A future case needs `RPP_CORO_WRAPPER`, which `config.h` already defines and nothing used until now. |
-| The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | Track it as its own bug. `e.what()` reads a message the future shared state may free on another thread. |
-| Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-14 and fails on clang-21 | Build both tier 1 compilers in CI from L0. The macro-free compile check finds it early. |
-| A consumer writes its import above its includes | Hundreds of std redefinition errors on gcc-14 (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
+| A `[[clang::coro_return_type]]` reaches a non-coroutine (finding 16) | clang-21 refuses the file, headers and modules alike | ReCpp supports no `std::future` since 2.2, so no `rpp::future` passes through one. `rpp::future` marks its coroutine wrappers `RPP_CORO_WRAPPER`. |
+| The `test_coroutines.cpp` race (finding 17) | TSAN fires on 2 of 6 parallel runs, and it predates this work | `BUGS.md` B27 tracks it. `e.what()` reads a message the future shared state may free on another thread. |
+| Compiler divergence on reachability, hidden friends and argument-dependent lookup | A module works on gcc-15 and fails on clang-21 | Build every tier 1 compiler in CI. The macro-free compile check finds it early. |
+| A consumer writes its import above its includes | Hundreds to thousands of std redefinition errors on GCC, 2601 on gcc-15 for one `<string>` (section 2.1) | Document the order in README.md. The error is loud at compile time, so it never reaches a binary. |
 | Export lists rot | A new API is invisible to importers, and nobody notices | `gen_module_exports.py --check` in CI, which regenerates every group and fails on a stale one. |
-| Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `examples/module_consumer/`. |
-| Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` already disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:154`](../CMakeLists.txt#L154)) | Keep the modules job separate from the sanitizer matrix. |
+| Duplicate module initializer symbol (finding 7) | Link failure in a consumer that compiles the `.cppm` and links `libReCpp.a` | Keep `.cppm` objects out of the shipped archive. Cover it in `tests/module_consumer/`. |
+| Sanitizer interaction | `BUILD_WITH_MEM_SAFETY` disables `/fsanitize=address` on MSVC because of modules ([`CMakeLists.txt:185`](../CMakeLists.txt#L185)). GCC under `-fsanitize=thread` rejects a module unit, see `BUGS.md` B36 | Keep the modules jobs out of the sanitizer matrix. `AUTO` takes the header path for GCC TSAN, and `consumer-gcc15-tsan` gates it. |
 
 ---
 
@@ -1242,7 +1238,7 @@ A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono
 
 1. `tools/check_includes.py self-contained --check` exits 0.
 2. `cmake -DBUILD_TESTS=ON -DBUILD_WITH_MODULES=ON` builds `RppTests`, which carries
-   the module checks, and it passes every test on gcc-14 and clang-21. Every
+   the module checks, and it passes every test on gcc-15 and clang-21. Every
    tier 2 compiler still passes the headers-only build.
 3. Every public header joins one group in `GROUP_HEADERS`, and `gen_module_exports.py
    --all --check` reports no difference.
@@ -1265,4 +1261,4 @@ A `.cpp` include never reaches a fragment, so this counts headers only. `<chrono
 | 7 | CI, docs, measurement | 0.5 | none | gates done |
 
 **Every changeset landed.** The table above is a record, not a plan. What remains is the
-follow-up list in section 11.1, and B16 is the one which reaches a consumer.
+follow-up list in section 11.2, and the defects of section 11.1 to retest when a compiler moves.
