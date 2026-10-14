@@ -86,9 +86,9 @@ namespace rpp
             else // change from local buffer to dynamic
             {
                 Ptr = (char*)malloc(capacity);
-                if (uint bytes = size()) {
+                if (End) {
                     if (!Ptr) { std::terminate(); }
-                    else { memcpy(Ptr, Buf, (size_t)bytes); }
+                    else { memcpy(Ptr, Buf, (size_t)End); }
                 }
             }
         }
@@ -113,7 +113,7 @@ namespace rpp
 
     void binary_stream::ensure_space(int numBytes) noexcept
     {
-        int newlen = size() + numBytes;
+        int newlen = End + numBytes;
         if (newlen > Cap)
         {
             int align = Cap;

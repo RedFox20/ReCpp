@@ -264,14 +264,10 @@ namespace rpp
         if (*ip_and_port == '[') // IPv6 "[2001:db8::1]:8080"
             return AF_IPv6;
 
-        bool was_colon = false;
+        int colons = 0;
         for (const char* p = ip_and_port; *p != '\0'; ++p)
-        {
-            bool is_colon = *p == ':';
-            if (is_colon && was_colon)
-                return AF_IPv6; // IPv6 "::1" or "2001:db8::1"
-            was_colon = is_colon;
-        }
+            if (*p == ':' && ++colons == 2)
+                return AF_IPv6; // IPv6 "::1" or "2001:db8:0:0:1:0:0:1", an IPv4 "host:port" has one colon
         // this is a hostname like "www.example.com", or ip "192.168.1.1:8912", or ":8080"
         return AF_IPv4;
     }

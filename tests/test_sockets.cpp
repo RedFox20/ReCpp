@@ -182,6 +182,14 @@ TestImpl(test_sockets)
         AssertEqual(f.address().str(), "2001:db8:1::ab9:c0a8:102");
     }
 
+    TestCase(ipaddress_detects_full_form_ipv6)
+    {
+        AssertEqual(ipaddress::get_address_family("2001:db8:85a3:0:0:8a2e:370:7334"), AF_IPv6);
+        AssertEqual(ipaddress::get_address_family("fe80::1"), AF_IPv6);
+        AssertEqual(ipaddress::get_address_family("192.168.1.1:8912"), AF_IPv4);
+        AssertEqual(ipaddress::get_address_family(":8080"), AF_IPv4);
+    }
+
     TestCase(ipaddress_from_ip_and_port)
     {
         std::string system_ip = get_system_ip("eth|lan|wlan");

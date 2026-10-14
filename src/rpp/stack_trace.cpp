@@ -545,9 +545,9 @@ namespace rpp
 
         if (entriesToSkip >= count)
             return 0;
-        for (size_t i = 0; i < count; ++i)
+        for (size_t i = entriesToSkip; i < count; ++i)
         {
-            callstack[i] = (uint64_t)cs_temp[entriesToSkip + i];
+            callstack[i - entriesToSkip] = (uint64_t)cs_temp[i];
         }
         return int(count - entriesToSkip);
     }

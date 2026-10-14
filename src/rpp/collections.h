@@ -135,8 +135,13 @@ namespace rpp
         // create an index range [0..count)
         explicit index_range(int count) noexcept : first{0}, sentinel{count}, step{1} {}
 
-        // generic index range [first..sentinel) with step
-        index_range(int first, int sentinel, int step = 1) noexcept : first{first}, sentinel{sentinel}, step{step} {}
+        // generic index range [first..sentinel) with step, the sentinel rounds up to a whole step so iteration stops
+        index_range(int first, int sentinel, int step = 1) noexcept : first{first}, sentinel{sentinel}, step{step}
+        {
+            const long long span = (long long)sentinel - first;
+            if (step == 0 || (span > 0) != (step > 0)) this->sentinel = first; // a step away from the sentinel is empty
+            else if (long long rem = span % step) this->sentinel = int(sentinel + step - rem);
+        }
 
         struct iter
         {
