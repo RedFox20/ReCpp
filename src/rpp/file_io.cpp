@@ -575,18 +575,7 @@ namespace rpp /* ReCpp */
     }
 #endif // RPP_ENABLE_UNICODE
 
-    // ReSharper disable once CppMemberFunctionMayBeConst
-    int file::seek(int filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
-    {
-        if (!Handle)
-            return 0;
-    #if _MSC_VER
-        return SetFilePointer(reinterpret_cast<HANDLE>(Handle), filepos, nullptr, seekmode);
-    #else
-        fseek((FILE*)Handle, filepos, seekmode);
-        return (int)ftell((FILE*)Handle);
-    #endif
-    }
+    int file::seek(int filepos, int seekmode) noexcept { return int(seekl(filepos, seekmode)); }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
     uint64 file::seekl(int64 filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
@@ -595,6 +584,7 @@ namespace rpp /* ReCpp */
             return 0LL;
     #if _MSC_VER
         LARGE_INTEGER newpos, nseek;
+        newpos.QuadPart = -1; // a failed seek leaves newpos unchanged, so seek() reports -1
         nseek.QuadPart = filepos;
         SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode);
         return newpos.QuadPart;
@@ -603,16 +593,7 @@ namespace rpp /* ReCpp */
         return (uint64)ftelli64((FILE*)Handle);
     #endif
     }
-    int file::tell() const noexcept
-    {
-        if (!Handle)
-            return 0;
-    #if _MSC_VER
-        return SetFilePointer(reinterpret_cast<HANDLE>(Handle), 0, nullptr, FILE_CURRENT);
-    #else
-        return (int)ftell((FILE*)Handle);
-    #endif
-    }
+    int file::tell() const noexcept { return int(tell64()); }
 
     int64 file::tell64() const noexcept
     {

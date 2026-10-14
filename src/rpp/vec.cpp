@@ -6,6 +6,10 @@
 
 namespace rpp
 {
+    // the print() and toString() bodies every type shares, with one static buffer per type as before
+    template<int N, class V> static void print_vec(const V& v) { char buffer[N]; puts(v.toString(buffer, N)); }
+    template<int N, class V> static const char* vec_string(const V& v) { static char buffer[N]; return v.toString(buffer, N); }
+
     /////////////////////////////////////////////////////////////////////////////////////
 
     template<class T> static constexpr T inverse_length(const T magnitude, const T& x, const T& y)
@@ -22,22 +26,9 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    void Vector2::print() const
-    {
-        char buffer[32];
-        puts(toString(buffer));
-    }
-    
-    const char* Vector2::toString() const
-    {
-        static char buffer[32];
-        return toString(buffer, sizeof(buffer));
-    }
-    
-    char* Vector2::toString(char* buffer) const
-    {
-        return toString(buffer, 32);
-    }
+    void Vector2::print() const { print_vec<32>(*this); }
+    const char* Vector2::toString() const { return vec_string<32>(*this); }
+    char* Vector2::toString(char* buffer) const { return toString(buffer, 32); }
     
     char* Vector2::toString(char* buffer, int size) const
     {
@@ -122,22 +113,9 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    void Vector2d::print() const
-    {
-        char buffer[32];
-        puts(toString(buffer));
-    }
-    
-    const char* Vector2d::toString() const
-    {
-        static char buffer[32];
-        return toString(buffer, sizeof(buffer));
-    }
-    
-    char* Vector2d::toString(char* buffer) const
-    {
-        return toString(buffer, 32);
-    }
+    void Vector2d::print() const { print_vec<32>(*this); }
+    const char* Vector2d::toString() const { return vec_string<32>(*this); }
+    char* Vector2d::toString(char* buffer) const { return toString(buffer, 32); }
     
     char* Vector2d::toString(char* buffer, int size) const
     {
@@ -222,15 +200,8 @@ namespace rpp
     
     /////////////////////////////////////////////////////////////////////////////////////
 
-    const char* Point::toString() const
-    {
-        static char buf[32]; return toString(buf, 32);
-    }
-
-    char* Point::toString(char* buffer) const
-    {
-        return toString(buffer, 32);
-    }
+    const char* Point::toString() const { return vec_string<32>(*this); }
+    char* Point::toString(char* buffer) const { return toString(buffer, 32); }
 
     char* Point::toString(char* buffer, int size) const
     {
@@ -240,22 +211,9 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    void RectF::print() const
-    {
-        char buffer[64];
-        puts(toString(buffer));
-    }
-
-    const char* RectF::toString() const
-    {
-        static char buffer[64];
-        return toString(buffer, sizeof(buffer));
-    }
-
-    char* RectF::toString(char* buffer) const
-    {
-        return toString(buffer, 64);
-    }
+    void RectF::print() const { print_vec<64>(*this); }
+    const char* RectF::toString() const { return vec_string<64>(*this); }
+    char* RectF::toString(char* buffer) const { return toString(buffer, 64); }
 
     char* RectF::toString(char* buffer, int bufSize) const
     {
@@ -346,22 +304,9 @@ namespace rpp
 
     /////////////////////////////////////////////////////////////////////////////////////
 
-    void Recti::print() const
-    {
-        char buffer[64];
-        puts(toString(buffer));
-    }
-
-    const char* Recti::toString() const
-    {
-        static char buffer[64];
-        return toString(buffer, sizeof(buffer));
-    }
-
-    char* Recti::toString(char* buffer) const
-    {
-        return toString(buffer, 64);
-    }
+    void Recti::print() const { print_vec<64>(*this); }
+    const char* Recti::toString() const { return vec_string<64>(*this); }
+    char* Recti::toString(char* buffer) const { return toString(buffer, 64); }
 
     char* Recti::toString(char* buffer, int bufSize) const
     {
@@ -531,22 +476,9 @@ namespace rpp
         return Vector3{/*roll:*/0.0f, pitch, yaw};
     }
 
-    void Vector3::print() const
-    {
-        char buffer[48];
-        puts(toString(buffer));
-    }
-
-    const char* Vector3::toString() const
-    {
-        static char buffer[48];
-        return toString(buffer, sizeof(buffer));
-    }
-
-    char* Vector3::toString(char* buffer) const
-    {
-        return toString(buffer, 48);
-    }
+    void Vector3::print() const { print_vec<48>(*this); }
+    const char* Vector3::toString() const { return vec_string<48>(*this); }
+    char* Vector3::toString(char* buffer) const { return toString(buffer, 48); }
 
     char* Vector3::toString(char* buffer, int size) const
     {
@@ -645,22 +577,9 @@ namespace rpp
         return x*b.x + y*b.y + z*b.z;
     }
     
-    void Vector3d::print() const
-    {
-        char buffer[48];
-        puts(toString(buffer));
-    }
-    
-    const char* Vector3d::toString() const
-    {
-        static char buffer[48];
-        return toString(buffer, sizeof(buffer));
-    }
-    
-    char* Vector3d::toString(char* buffer) const
-    {
-        return toString(buffer, 48);
-    }
+    void Vector3d::print() const { print_vec<48>(*this); }
+    const char* Vector3d::toString() const { return vec_string<48>(*this); }
+    char* Vector3d::toString(char* buffer) const { return toString(buffer, 48); }
     
     char* Vector3d::toString(char* buffer, int size) const
     {
@@ -720,22 +639,9 @@ namespace rpp
         return x*v.x + y*v.y + z*v.z + w*v.w;
     }
 
-    void Vector4::print() const
-    {
-        char buffer[64];
-        puts(toString(buffer));
-    }
-
-    const char* Vector4::toString() const
-    {
-        static char buffer[64];
-        return toString(buffer, sizeof(buffer));
-    }
-
-    char* Vector4::toString(char* buffer) const
-    {
-        return toString(buffer, 64);
-    }
+    void Vector4::print() const { print_vec<64>(*this); }
+    const char* Vector4::toString() const { return vec_string<64>(*this); }
+    char* Vector4::toString(char* buffer) const { return toString(buffer, 64); }
 
     char* Vector4::toString(char* buffer, int size) const
     {
@@ -1077,22 +983,9 @@ namespace rpp
         return R_z;
     }
 
-    void Matrix3::print() const
-    {
-        char buffer[256];
-        puts(toString(buffer));
-    }
-
-    const char* Matrix3::toString() const
-    {
-        static char buffer[256];
-        return toString(buffer, sizeof(buffer));
-    }
-
-    char* Matrix3::toString(char* buffer) const
-    {
-        return toString(buffer, 256);
-    }
+    void Matrix3::print() const { print_vec<256>(*this); }
+    const char* Matrix3::toString() const { return vec_string<256>(*this); }
+    char* Matrix3::toString(char* buffer) const { return toString(buffer, 256); }
 
     char* Matrix3::toString(char* buffer, int size) const
     {
@@ -1684,22 +1577,9 @@ namespace rpp
         return inverse;
     }
 
-    void Matrix4::print() const
-    {
-        char buffer[256];
-        puts(toString(buffer));
-    }
-    
-    const char* Matrix4::toString() const
-    {
-        static char buffer[256];
-        return toString(buffer, sizeof(buffer));
-    }
-    
-    char* Matrix4::toString(char* buffer) const
-    {
-        return toString(buffer, 256);
-    }
+    void Matrix4::print() const { print_vec<256>(*this); }
+    const char* Matrix4::toString() const { return vec_string<256>(*this); }
+    char* Matrix4::toString(char* buffer) const { return toString(buffer, 256); }
     char* Matrix4::toString(char* buffer, int size) const
     {
         size_t n = size;
