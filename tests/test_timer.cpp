@@ -1,6 +1,7 @@
 #include <rpp/timer.h>
 #include <rpp/proc_utils.h>
 #include <rpp/tests.h>
+#include <ctime> // gmtime_r
 #include <thread>
 #if __linux__ // Android also defines __linux__.
     #include <rpp/file_io.h> // rpp::file
@@ -548,22 +549,33 @@ TestImpl(test_timer)
         AssertEqual(moon.nanos, 500'000'000LL);
     }
 
-    TestCase(timepoint_to_calendar_rejects_narrow_time_t)
+    TestCase(timepoint_to_calendar_past_a_narrow_time_t)
     {
-        // a narrow time_t cannot hold this year, so the split reports invalid instead of a wrapped date
+        // a narrow time_t cannot hold this year, and the calendar still splits it
         constexpr rpp::int64 YEAR_2200_SECONDS = 7'272'378'123LL;
-        rpp::TimePoint far { rpp::Duration::from_seconds(YEAR_2200_SECONDS) };
-        rpp::CalendarTime cal = far.to_calendar();
-        if (cal.is_valid())
+        rpp::TimePoint far { rpp::seconds(YEAR_2200_SECONDS) };
+        AssertThat(far.to_calendar(), (rpp::CalendarTime{ 2200, 6, 15, 1, 2, 3, 0 }));
+    }
+
+#if !_MSC_VER
+    // the integer calendar must agree with gmtime_r() across leap days, centuries and the epoch
+    TestCase(timepoint_to_calendar_matches_gmtime)
+    {
+        for (rpp::int64 secs = -9'000'000'000LL; secs < 9'000'000'000LL; secs += 9'876'541LL)
         {
-            AssertEqual(cal.year, 2200);
-            AssertEqual(cal.month, 6);
-            AssertEqual(cal.day, 15);
-            AssertEqual(cal.hour, 1);
-            AssertEqual(cal.minute, 2);
-            AssertEqual(cal.second, 3);
+            const time_t t = time_t(secs);
+            std::tm tm {};
+            if (rpp::int64(t) != secs || !gmtime_r(&t, &tm))
+                continue; // a narrow time_t has no reference for this date
+            rpp::CalendarTime expected { tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, 0 };
+            rpp::CalendarTime cal = rpp::TimePoint{ rpp::seconds(secs) }.to_calendar();
+            if (cal != expected)
+                AssertFailed("%lld s gives %d-%d-%d %d:%d:%d, gmtime_r gives %d-%d-%d %d:%d:%d", secs,
+                             cal.year, cal.month, cal.day, cal.hour, cal.minute, cal.second, expected.year,
+                             expected.month, expected.day, expected.hour, expected.minute, expected.second);
         }
     }
+#endif
 
     TestCase(timepoint_to_calendar_matches_to_string)
     {
