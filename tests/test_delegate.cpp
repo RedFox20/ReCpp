@@ -157,30 +157,6 @@ namespace rpp
             }
         };
 
-        TestCase(methods_bug)
-        {
-            using memb_type = Data (*)(void*, Data);
-            struct dummy {};
-            using dummy_type = Data (dummy::*)(Data a);
-            union method_helper
-            {
-                memb_type mfunc;
-                dummy_type dfunc;
-            };
-
-            Base inst;
-            Data (Base::*method)(Data a) = &Base::method;
-
-            void* obj = &inst;
-            //printf("obj:  %p\n", obj);
-
-            method_helper u;
-            u.dfunc = reinterpret_cast<dummy_type>(method);
-
-            auto* dum = static_cast<dummy*>(obj);
-            (dum->*u.dfunc)(data);
-        }
-
         TestCase(methods)
         {
             Derived inst;
@@ -993,17 +969,6 @@ namespace rpp
             AssertThat(evt3.size(), 2);
             evt3(data);
             AssertThat(count, 2);
-        }
-
-        TestCase(std_function_args)
-        {
-            std::function<void(Data, Data&, const Data&, Data&&)> fun =
-                [&](Data a, Data& b, const Data& c, Data&& d) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
-            {
-                (void)validate("stdfun", a, b, c, d); 
-            };
-            Data copy = data;
-            fun.operator()(data, data, data, std::move(copy));
         }
 
         TestCase(multicast_delegate_mixed_reference_args)

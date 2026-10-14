@@ -184,19 +184,6 @@ TestImpl(test_debugging)
         AssertThat(log_output, "$ plain str 42");
     }
 
-    //TestCase(log_except)
-    //{
-    //    try
-    //    {
-    //        throw std::runtime_error("aaarghh!! something happened!");
-    //    }
-    //    catch (std::exception& e)
-    //    {
-    //        std::string param = "test@user.com";
-    //        LogExcept(e, "This should trigger a breakpoint in your IDE. Testing log except with params: %s", param);
-    //    }
-    //}
-
     TestCase(log_handler_with_timestamps)
     {
         log_output.clear();

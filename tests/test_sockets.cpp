@@ -1235,31 +1235,21 @@ TestImpl(test_sockets)
         socket remote_client = accept(server);
         remote_client.set_nagle(false); // disable nagle
 
+        int received_chunks = 0;
         for (int i = 0; i < 10; ++i)
         {
-            std::string data = remote_client.recv_str();
+            // the remote sends right after it connects, so the first receive waits for it, as a hang guard
+            std::string data = i == 0 ? remote_client.wait_recv_str(1000) : remote_client.recv_str();
             if (!data.empty())
             {
-                print_info("server: received %d bytes of data from remote_client ", (int)data.length());
+                ++received_chunks;
+                print_info("server: received %d bytes of data from remote_client\n", (int)data.length());
                 AssertThat(data.size(), TransmitSize);
-
-                size_t j = 0;
-                for (; j < data.length(); ++j)
-                {
-                    if (data[j] != '$')
-                    {
-                        print_info("(corrupted at position %d):\n", (int)j);
-                        print_info("%.*s\n", 10, &data[j]);
-                        print_info("^\n");
-                        break;
-                    }
-                }
-                if (j == data.length()) {
-                    print_info("(valid)\n");
-                }
+                AssertThat(data.find_first_not_of('$'), std::string::npos); // no corrupted byte
             }
             rpp::sleep_ms(2);
         }
+        AssertGreater(received_chunks, 0);
 
         print_info("server: closing down\n");
         remote_client.close();
