@@ -8,6 +8,7 @@
 #include <rpp/semaphore.h>
 
 #include <rpp/tests.h>
+#include "parallel_threads.h"
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -226,10 +227,7 @@ TestImpl(test_event_loop)
         loop->run_until_done(task); // drives the loop and rethrows on failure
         AssertThat(task.done(), true);
 
-        AssertThat(log.size(), 3u);
-        AssertThat(log[0], "step1: 42"s);
-        AssertThat(log[1], "step2: result_42"s);
-        AssertThat(log[2], "posted_callback"s);
+        AssertThat(log, (std::vector<std::string>{ "step1: 42"s, "step2: result_42"s, "posted_callback"s }));
     }
 
 
@@ -1329,10 +1327,7 @@ TestImpl(test_event_loop)
         std::atomic_bool stop { false };
         std::atomic_int reads { 0 };
         constexpr int NUM_READERS = 2; // more readers cost the drain far more time, see BUGS.md B26
-        std::vector<std::thread> readers;
-        readers.reserve(NUM_READERS);
-        for (int t = 0; t < NUM_READERS; ++t)
-            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        parallel_threads readers { NUM_READERS, [&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } } };
         spin_until([&]{ return reads.load() != 0; }); // a reader must be live before the first swap
 
         std::unique_ptr<rpp::AtomicTimeSource> live;
@@ -1346,7 +1341,7 @@ TestImpl(test_event_loop)
         live.reset();
 
         stop = true;
-        for (std::thread& r : readers) r.join();
+        readers.join();
         AssertGreater(reads.load(), 0);
     }
 
@@ -1437,10 +1432,7 @@ TestImpl(test_event_loop)
         std::atomic_bool stop { false };
         std::atomic_int reads { 0 };
         constexpr int NUM_READERS = 2; // more readers cost the retire far more time, see BUGS.md B26
-        std::vector<std::thread> readers;
-        readers.reserve(NUM_READERS);
-        for (int t = 0; t < NUM_READERS; ++t)
-            readers.emplace_back([&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } });
+        parallel_threads readers { NUM_READERS, [&]{ while (!stop.load()) { (void)loop->current_time(); reads.fetch_add(1); } } };
         // a reader must be live before the first detach
         spin_until([&]{ return reads.load() != 0; });
 
@@ -1453,7 +1445,7 @@ TestImpl(test_event_loop)
         }
 
         stop = true;
-        for (std::thread& reader : readers) reader.join();
+        readers.join();
         AssertGreater(reads.load(), before); // the readers ran across the detach cycles
     }
 
