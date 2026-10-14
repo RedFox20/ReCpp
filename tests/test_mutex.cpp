@@ -18,14 +18,17 @@ TestImpl(test_mutex)
     {
     }
 
-    class SimpleValue : public rpp::synchronizable<SimpleValue>
+    // the plain accessor pair over a chosen mutex and value, so most cases below vary one of the two
+    template<class Mutex, class Value> class syncable : public rpp::synchronizable<syncable<Mutex, Value>>
     {
-        std::string value;
-        rpp::mutex mutex;
+        Mutex mutex;
+        Value value {};
     public:
-        auto& get_mutex() { return mutex; }
-        auto& get_ref() { return value; }
+        auto& get_mutex() noexcept { return mutex; }
+        auto& get_ref() noexcept { return value; }
     };
+
+    using SimpleValue = syncable<rpp::mutex, std::string>;
 
     // a derived type which forgot the two accessors, so the constraint has something to reject
     class MissingAccessors : public rpp::synchronizable<MissingAccessors>
@@ -73,14 +76,7 @@ TestImpl(test_mutex)
         void unlock() {}
         static LvalueOnlyBool try_lock() { return {}; }
     };
-    class MutexTryLockLvalueOnly : public rpp::synchronizable<MutexTryLockLvalueOnly>
-    {
-        std::string value;
-        LvalueBoolTryLock mutex;
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
-    };
+    using MutexTryLockLvalueOnly = syncable<LvalueBoolTryLock, std::string>;
 
     // a value type whose operator& returns something else, which the guard must not call
     struct OddAddress
@@ -88,14 +84,7 @@ TestImpl(test_mutex)
         int value = 0;
         int* operator&() noexcept { return &value; }
     };
-    class OverloadedAddressOf : public rpp::synchronizable<OverloadedAddressOf>
-    {
-        rpp::mutex mutex;
-        OddAddress value;
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
-    };
+    using OverloadedAddressOf = syncable<rpp::mutex, OddAddress>;
 
     // a try_lock() whose result reads as a bool but cannot be negated, which spin_lock does
     struct NoNegate
@@ -104,24 +93,10 @@ TestImpl(test_mutex)
         bool operator!() const = delete;
     };
     struct ProxyTryLock { void lock() {} void unlock() {} static NoNegate try_lock() { return {}; } };
-    class MutexTryLockNoNegate : public rpp::synchronizable<MutexTryLockNoNegate>
-    {
-        std::string value;
-        ProxyTryLock mutex;
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
-    };
+    using MutexTryLockNoNegate = syncable<ProxyTryLock, std::string>;
 
     // a get_ref() returning a reference to an array, which decays to a pointer in value_type
-    class ArrayRef : public rpp::synchronizable<ArrayRef>
-    {
-        rpp::mutex mutex;
-        int values[3] {};
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return values; }
-    };
+    using ArrayRef = syncable<rpp::mutex, int[3]>;
 
     // an lvalue ref-qualified get_ref(), which the guard only ever calls on an lvalue
     class RefQualified : public rpp::synchronizable<RefQualified>
@@ -155,25 +130,11 @@ TestImpl(test_mutex)
 
     // a try_lock() which returns nothing, so spin_lock would hard-error on `!m.try_lock()`
     struct VoidTryLock { void lock() {} void unlock() {} static void try_lock() {} };
-    class MutexTryLockReturnsVoid : public rpp::synchronizable<MutexTryLockReturnsVoid>
-    {
-        std::string value;
-        VoidTryLock mutex;
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
-    };
+    using MutexTryLockReturnsVoid = syncable<VoidTryLock, std::string>;
 
     // a mutex with no try_lock(), which spin_lock calls before it suspends the thread
     struct NoTryLock { void lock() {} void unlock() {} };
-    class MutexWithoutTryLock : public rpp::synchronizable<MutexWithoutTryLock>
-    {
-        std::string value;
-        NoTryLock mutex;
-    public:
-        auto& get_mutex() noexcept { return mutex; }
-        auto& get_ref() noexcept { return value; }
-    };
+    using MutexWithoutTryLock = syncable<NoTryLock, std::string>;
 
     // whether guard() is callable, which is what SyncableType decides
     template<class T> static constexpr bool has_guard = requires(T t) { t.guard(); };

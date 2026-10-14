@@ -116,215 +116,76 @@ TestImpl(test_timer)
         }
     }
 
+    // every unit view of d names the same span. sec() compares exactly, because both sides divide exact integers
+    static void check_units(rpp::Duration d, rpp::int64 ms, RPP_SOURCE_LOC)
+    {
+        AssertThatLoc(loc, d.sec(), ms / 1000.0);
+        AssertThatLoc(loc, d.millis(), ms);
+        AssertThatLoc(loc, d.micros(), ms * 1'000);
+        AssertThatLoc(loc, d.nanos(), ms * 1'000'000);
+        AssertThatLoc(loc, d, rpp::millis(ms));
+    }
+
     TestCase(duration_conversion)
     {
-        rpp::Duration d0 = rpp::Duration::from_nanos(1'000'000'000);
-        AssertEqual(d0.sec(), 1.0);
-        AssertEqual(d0.millis(), 1'000);
-        AssertEqual(d0.micros(), 1'000'000);
-        AssertEqual(d0.nanos(), 1'000'000'000);
-        AssertEqual(d0, rpp::Duration::from_millis(1000));
-
-        rpp::Duration d1 = rpp::Duration::from_seconds(1.0);
-        AssertEqual(d1.sec(), 1.0);
-        AssertEqual(d1.millis(), 1'000);
-        AssertEqual(d1.micros(), 1'000'000);
-        AssertEqual(d1.nanos(), 1'000'000'000);
-        AssertEqual(d1, rpp::Duration::from_millis(1000));
-
-        rpp::Duration d2 = rpp::Duration::from_millis(500);
-        AssertEqual(d2.sec(), 0.5);
-        AssertEqual(d2.millis(), 500);
-        AssertEqual(d2.micros(), 500'000);
-        AssertEqual(d2.nanos(), 500'000'000);
-        AssertEqual(d2, rpp::Duration::from_millis(500));
-
-        rpp::Duration d3 = rpp::Duration::from_micros(100'000);
-        AssertEqual(d3.sec(), 0.1);
-        AssertEqual(d3.millis(), 100);
-        AssertEqual(d3.micros(), 100'000);
-        AssertEqual(d3.nanos(), 100'000'000);
-        AssertEqual(d3, rpp::Duration::from_millis(100));
-
-        rpp::Duration d4 = rpp::Duration::from_nanos(2'000'000);
-        AssertEqual(d4.sec(), 0.002);
-        AssertEqual(d4.millis(), 2);
-        AssertEqual(d4.micros(), 2'000);
-        AssertEqual(d4.nanos(), 2'000'000);
-        AssertEqual(d4, rpp::Duration::from_millis(2));
+        check_units(rpp::Duration::from_nanos(1'000'000'000), 1'000);
+        check_units(rpp::Duration::from_seconds(1.0), 1'000);
+        check_units(rpp::Duration::from_millis(500), 500);
+        check_units(rpp::Duration::from_micros(100'000), 100);
+        check_units(rpp::Duration::from_nanos(2'000'000), 2);
     }
 
     TestCase(duration_conversion_negative)
     {
-        rpp::Duration d0 = rpp::Duration::from_nanos(-1'000'000'000);
-        AssertEqual(d0.sec(), -1.0);
-        AssertEqual(d0.millis(), -1'000);
-        AssertEqual(d0.micros(), -1'000'000);
-        AssertEqual(d0.nanos(), -1'000'000'000);
-        AssertEqual(d0, rpp::Duration::from_millis(-1000));
-
-        rpp::Duration d1 = rpp::Duration::from_seconds(-1.0);
-        AssertEqual(d1.sec(), -1.0);
-        AssertEqual(d1.millis(), -1'000);
-        AssertEqual(d1.micros(), -1'000'000);
-        AssertEqual(d1.nanos(), -1'000'000'000);
-        AssertEqual(d1, rpp::Duration::from_millis(-1000));
-
-        rpp::Duration d2 = rpp::Duration::from_millis(-500);
-        AssertEqual(d2.sec(), -0.5);
-        AssertEqual(d2.millis(), -500);
-        AssertEqual(d2.micros(), -500'000);
-        AssertEqual(d2.nanos(), -500'000'000);
-        AssertEqual(d2, rpp::Duration::from_millis(-500));
-
-        rpp::Duration d3 = rpp::Duration::from_micros(-100'000);
-        AssertEqual(d3.sec(), -0.1);
-        AssertEqual(d3.millis(), -100);
-        AssertEqual(d3.micros(), -100'000);
-        AssertEqual(d3.nanos(), -100'000'000);
-        AssertEqual(d3, rpp::Duration::from_millis(-100));
-
-        rpp::Duration d4 = rpp::Duration::from_nanos(-2'000'000);
-        AssertEqual(d4.sec(), -0.002);
-        AssertEqual(d4.millis(), -2);
-        AssertEqual(d4.micros(), -2'000);
-        AssertEqual(d4.nanos(), -2'000'000);
-        AssertEqual(d4, rpp::Duration::from_millis(-2));
+        check_units(rpp::Duration::from_nanos(-1'000'000'000), -1'000);
+        check_units(rpp::Duration::from_seconds(-1.0), -1'000);
+        check_units(rpp::Duration::from_millis(-500), -500);
+        check_units(rpp::Duration::from_micros(-100'000), -100);
+        check_units(rpp::Duration::from_nanos(-2'000'000), -2);
     }
 
     TestCase(duration_arithmetic)
     {
         rpp::Duration d1 = rpp::Duration::from_millis(500);
         rpp::Duration d2 = rpp::Duration::from_micros(-250'000);
-        rpp::Duration d3 = d1 + d2; // 250ms
-        AssertEqual(d3.sec(), 0.25);
-        AssertEqual(d3.millis(), 250);
-        AssertEqual(d3.micros(), 250'000);
-        AssertEqual(d3.nanos(), 250'000'000);
-        AssertEqual(d3, rpp::Duration::from_millis(250));
-
-        rpp::Duration d4 = d2 - d1; // -750ms
-        AssertEqual(d4.sec(), -0.75);
-        AssertEqual(d4.millis(), -750);
-        AssertEqual(d4.micros(), -750'000);
-        AssertEqual(d4.nanos(), -750'000'000);
-        AssertEqual(d4, rpp::Duration::from_millis(-750));
-
-        rpp::Duration d5 = d1 + d1; // 1s
-        AssertEqual(d5.sec(), 1.0);
-        AssertEqual(d5.millis(), 1'000);
-        AssertEqual(d5.micros(), 1'000'000);
-        AssertEqual(d5.nanos(), 1'000'000'000);
-        AssertEqual(d5, rpp::Duration::from_millis(1000));
+        check_units(d1 + d2, 250);
+        check_units(d2 - d1, -750);
+        check_units(d1 + d1, 1'000);
     }
 
-    // this tests that all of the Duration::sec() / TimePoint::elapsed_sec() math is correct
+    // moving t2 by one second must move each elapsed reading by exactly one second
+    template<class Elapsed> static void check_one_sec_shift(rpp::Duration one_sec, Elapsed elapsed, RPP_SOURCE_LOC)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
+        spin_sleep_for_us(15);
+        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
+        AssertThatLoc(loc, (t2 + one_sec) - t2, one_sec);
+        AssertThatLoc(loc, t2 - (t2 - one_sec), one_sec);
+        auto e = elapsed(t1, t2);
+        auto one = elapsed(t2, t2 + one_sec);
+        AssertThatLoc(loc, elapsed(t1, t2 + one_sec), one + e);
+        AssertThatLoc(loc, elapsed(t1, t2 - one_sec), e - one);
+    }
+
     TestCase(duration_sec_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
-        const int millis = 10; // wait a few millis
-        spin_sleep_for_ms(millis);
-        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
-
-        double elapsed_sec = t1.elapsed_sec(t2);
-        print_info("elapsed_sec: %fs\n", elapsed_sec);
-        rpp::Duration one_sec = rpp::Duration::from_seconds(1.0);
-        print_info("duration::from_seconds(1.0): %fs\n", one_sec.sec());
-        AssertEqual(one_sec.sec(), 1.0);
-
-        // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + one_sec;
-        double elapsed_sec2 = t1.elapsed_sec(t3);
-        print_info("elapsed_sec2: %fs\n", elapsed_sec2);
-        AssertEqual(elapsed_sec2, 1.0 + elapsed_sec);
-
-        // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - one_sec;
-        double elapsed_sec3 = t1.elapsed_sec(t4);
-        print_info("elapsed_sec3: %fs\n", elapsed_sec3);
-        AssertEqual(elapsed_sec3, -1.0 + elapsed_sec);
+        AssertEqual(rpp::Duration::from_seconds(1.0).sec(), 1.0);
+        check_one_sec_shift(rpp::Duration::from_seconds(1.0), [](auto t1, auto t2) { return t1.elapsed_sec(t2); });
     }
 
-    // this tests that all of the Duration::millis() / TimePoint::elapsed_ms() math is correct
     TestCase(duration_millis_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
-        const int millis = 10; // wait a few millis
-        spin_sleep_for_ms(millis);
-        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
-
-        rpp::Duration elapsed1 = t1.elapsed(t2);
-        print_info("elapsed: %lldns\n", elapsed1.nanos());
-        rpp::Duration one_sec = rpp::Duration::from_millis(1000);
-        print_info("duration::from_millis(1000): %lldms\n", one_sec.millis());
-        AssertEqual(one_sec.millis(), 1'000);
-
-        // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + one_sec;
-        rpp::Duration elapsed2 = t1.elapsed(t3);
-        print_info("elapsed2: %lldns\n", elapsed2.nanos());
-        AssertEqual(elapsed2, one_sec + elapsed1);
-
-        // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - one_sec;
-        rpp::Duration elapsed3 = t1.elapsed(t4);
-        print_info("elapsed3: %lldns\n", elapsed3.nanos());
-        AssertEqual(elapsed3, -one_sec + elapsed1);
+        check_one_sec_shift(rpp::Duration::from_millis(1000), [](auto t1, auto t2) { return t1.elapsed(t2); });
     }
 
-    // this tests that all of the Duration::micros() / TimePoint::elapsed_us() math is correct
     TestCase(duration_micros_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
-        const int microseconds = 15; // wait a few micros
-        spin_sleep_for_us(microseconds);
-        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
-
-        rpp::Duration elapsed1 = t1.elapsed(t2);
-        print_info("elapsed: %lldns\n", elapsed1.nanos());
-        rpp::Duration one_sec = rpp::Duration::from_micros(1'000'000);
-        print_info("duration::from_micros(1'000'000): %lldus\n", one_sec.micros());
-        AssertEqual(one_sec.micros(), 1'000'000);
-
-        // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + one_sec;
-        rpp::Duration elapsed2 = t1.elapsed(t3);
-        print_info("elapsed2: %lldns\n", elapsed2.nanos());
-        AssertEqual(elapsed2, one_sec + elapsed1);
-
-        // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - one_sec;
-        rpp::Duration elapsed3 = t1.elapsed(t4);
-        print_info("elapsed3: %lldns\n", elapsed3.nanos());
-        AssertEqual(elapsed3, -one_sec + elapsed1);
+        check_one_sec_shift(rpp::Duration::from_micros(1'000'000), [](auto t1, auto t2) { return t1.elapsed(t2); });
     }
 
-
-    // this tests that all of the Duration::nanos() / TimePoint::elapsed_ns() math is correct
     TestCase(duration_nanos_arithmetic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
-        const int microseconds = 15; // wait a few micros
-        spin_sleep_for_us(microseconds);
-        rpp::TimePoint t2 = rpp::TimePoint::monotonic_now();
-
-        rpp::int64 elapsed_ns = t1.elapsed_ns(t2);
-        print_info("elapsed_ns: %lldns\n", elapsed_ns);
-        rpp::Duration one_sec = rpp::Duration::from_nanos(1'000'000'000);
-        print_info("duration::from_nanos(1'000'000'000): %lldus\n", one_sec.nanos());
-        AssertEqual(one_sec.nanos(), 1'000'000'000LL);
-
-        // now add fake +1sec to t2 and check elapsed_ns again
-        rpp::TimePoint t3 = t2 + one_sec;
-        rpp::int64 elapsed_ns2 = t1.elapsed_ns(t3);
-        print_info("elapsed_ns2: %lldns\n", elapsed_ns2);
-        AssertEqual(elapsed_ns2, 1'000'000'000 + elapsed_ns);
-
-        // remove fake -1sec from t2 and check again:
-        rpp::TimePoint t4 = t2 - one_sec;
-        rpp::int64 elapsed_ns3 = t1.elapsed_ns(t4);
-        print_info("elapsed_ns3: %lldns\n", elapsed_ns3);
-        AssertEqual(elapsed_ns3, -1'000'000'000 + elapsed_ns);
+        check_one_sec_shift(rpp::Duration::from_nanos(1'000'000'000), [](auto t1, auto t2) { return t1.elapsed_ns(t2); });
     }
 
     TestCase(duration_overflow)
@@ -576,42 +437,30 @@ TestImpl(test_timer)
         AssertLess(diff_us, 100'000);
     }
 
+    /// @returns how far the clock moved across a full spin of `us`
+    static rpp::Duration spin_on(rpp::ClockType clock, int us, RPP_SOURCE_LOC)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(clock);
+        AssertThatLoc(loc, t1.is_valid(), true);
+        spin_sleep_for_us(us, /*full_spin*/true);
+        return rpp::TimePoint::now(clock) - t1;
+    }
+
     TestCase(clock_type_monotonic)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
-        AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(10'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Monotonic);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("Monotonic 10ms elapsed: %lldus\n", elapsed_us);
-        AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 18'000);
+        AssertInRange(spin_on(rpp::ClockType::Monotonic, 10'000).micros(), 9'000, 18'000);
     }
 
     TestCase(clock_type_monotonic_raw)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicRaw);
-        AssertThat(t1.is_valid(), true);
-        spin_sleep_for_us(10'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicRaw);
-        rpp::int64 elapsed_us = (t2 - t1).micros();
-        print_info("MonotonicRaw 10ms elapsed: %lldus\n", elapsed_us);
-        AssertGreaterOrEqual(elapsed_us, 9'000);
-        AssertLessOrEqual(elapsed_us, 18'000);
+        AssertInRange(spin_on(rpp::ClockType::MonotonicRaw, 10'000).micros(), 9'000, 18'000);
     }
 
+    // Windows GetTickCount64 ticks every ~15.6ms, and a virtualized runner can tick slower still.
+    // A 20ms spin once measured 0ms, so the coarse clocks spin across several ticks.
     TestCase(clock_type_monotonic_coarse)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
-        AssertThat(t1.is_valid(), true);
-        // Windows GetTickCount64 ticks every ~15.6ms, and a virtualized runner can tick
-        // slower still. A 20ms spin once measured 0ms, so spin across several ticks.
-        spin_sleep_for_us(80'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::MonotonicCoarse);
-        rpp::int64 elapsed_ms = (t2 - t1).millis();
-        print_info("MonotonicCoarse 80ms elapsed: %lldms\n", elapsed_ms);
-        AssertGreaterOrEqual(elapsed_ms, 10);
-        AssertLessOrEqual(elapsed_ms, 200);
+        AssertInRange(spin_on(rpp::ClockType::MonotonicCoarse, 80'000).millis(), 10, 200);
     }
 
     // no case reads Boottime before this one, so both threads take the first read of its offset
@@ -628,49 +477,33 @@ TestImpl(test_timer)
 
     TestCase(clock_type_boottime)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::Boottime);
-        AssertThat(t1.is_valid(), true);
         // Boottime shares GetTickCount64 on Windows, so it needs the same tick headroom
-        spin_sleep_for_us(80'000, /*full_spin*/true);
-        rpp::TimePoint t2 = rpp::TimePoint::now(rpp::ClockType::Boottime);
-        rpp::int64 elapsed_ms = (t2 - t1).millis();
-        print_info("Boottime 80ms elapsed: %lldms\n", elapsed_ms);
-        AssertGreaterOrEqual(elapsed_ms, 10);
-        AssertLessOrEqual(elapsed_ms, 200);
+        AssertInRange(spin_on(rpp::ClockType::Boottime, 80'000).millis(), 10, 200);
+    }
+
+    // GetProcessTimes and GetThreadTimes report whole scheduler ticks, so one spin can start and end
+    // inside a single tick and read 0. Spin again until a tick lands.
+    static rpp::int64 cpu_spin_us(rpp::ClockType clock, RPP_SOURCE_LOC)
+    {
+        rpp::TimePoint t1 = rpp::TimePoint::now(clock);
+        AssertThatLoc(loc, t1.is_valid(), true);
+        rpp::int64 elapsed_us = 0;
+        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
+        {
+            spin_sleep_for_us(20'000, /*full_spin*/true);
+            elapsed_us = (rpp::TimePoint::now(clock) - t1).micros();
+        }
+        return elapsed_us;
     }
 
     TestCase(clock_type_process_cpu)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ProcessCPU);
-        AssertThat(t1.is_valid(), true);
-
-        // GetProcessTimes reports whole scheduler ticks, so one spin can start and end
-        // inside a single tick and read 0. Spin again until a tick lands.
-        rpp::int64 elapsed_us = 0;
-        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
-        {
-            spin_sleep_for_us(20'000, /*full_spin*/true);
-            elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ProcessCPU) - t1).micros();
-        }
-        print_info("ProcessCPU spin elapsed: %lldus\n", elapsed_us);
-        AssertGreater(elapsed_us, 0);
+        AssertGreater(cpu_spin_us(rpp::ClockType::ProcessCPU), 0);
     }
 
     TestCase(clock_type_thread_cpu)
     {
-        rpp::TimePoint t1 = rpp::TimePoint::now(rpp::ClockType::ThreadCPU);
-        AssertThat(t1.is_valid(), true);
-
-        // GetThreadTimes reports whole scheduler ticks, so one spin can start and end
-        // inside a single tick and read 0. Spin again until a tick lands.
-        rpp::int64 elapsed_us = 0;
-        for (int spins = 0; spins < MAX_CPU_CLOCK_SPINS && elapsed_us == 0; ++spins)
-        {
-            spin_sleep_for_us(20'000, /*full_spin*/true);
-            elapsed_us = (rpp::TimePoint::now(rpp::ClockType::ThreadCPU) - t1).micros();
-        }
-        print_info("ThreadCPU spin elapsed: %lldus\n", elapsed_us);
-        AssertGreater(elapsed_us, 0);
+        AssertGreater(cpu_spin_us(rpp::ClockType::ThreadCPU), 0);
     }
 
     TestCase(clock_type_tai)

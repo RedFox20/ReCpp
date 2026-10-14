@@ -382,9 +382,15 @@ TestImpl(test_sockets)
         AssertThat(buf, msg);
     }
 
-    template<class PollFunc>
-    void run_poll_test(socket& send, socket& recv, const PollFunc& pollin)
+    void run_poll_test(socket_option opt, bool use_poll)
     {
+        socket send = create_udp_listener(opt);
+        socket recv = create_udp_listener(opt);
+        send.set_blocking(opt == rpp::SO_Blocking);
+        recv.set_blocking(opt == rpp::SO_Blocking);
+        auto pollin = [&](int timeout) {
+            return use_poll ? recv.poll(timeout, socket::PF_Read) : recv.select(timeout, socket::SF_Read);
+        };
         auto recv_addr = ipaddress(AF_IPv4, "127.0.0.1", recv.port());
 
         // no data to receive, should return false
@@ -468,53 +474,10 @@ TestImpl(test_sockets)
         }
     }
 
-    TestCase(udp_poll_nonblocking_select)
-    {
-        socket send = create_udp_listener(rpp::SO_NonBlock);
-        socket recv = create_udp_listener(rpp::SO_NonBlock);
-        send.set_blocking(false);
-        recv.set_blocking(false);
-        run_poll_test(send, recv, [&](int timeout)
-        {
-            return recv.select(timeout, socket::SF_Read);
-        });
-    }
-    
-    TestCase(udp_poll_nonblocking_poll)
-    {
-        socket send = create_udp_listener(rpp::SO_NonBlock);
-        socket recv = create_udp_listener(rpp::SO_NonBlock);
-        send.set_blocking(false);
-        recv.set_blocking(false);
-        run_poll_test(send, recv, [&](int timeout)
-        {
-            return recv.poll(timeout, socket::PF_Read);
-        });
-    }
-
-    TestCase(udp_poll_blocking_select)
-    {
-        socket send = create_udp_listener(rpp::SO_Blocking);
-        socket recv = create_udp_listener(rpp::SO_Blocking);
-        send.set_blocking(true);
-        recv.set_blocking(true);
-        run_poll_test(send, recv, [&](int timeout)
-        {
-            return recv.select(timeout, socket::SF_Read);
-        });
-    }
-
-    TestCase(udp_poll_blocking_poll)
-    {
-        socket send = create_udp_listener(rpp::SO_Blocking);
-        socket recv = create_udp_listener(rpp::SO_Blocking);
-        send.set_blocking(true);
-        recv.set_blocking(true);
-        run_poll_test(send, recv, [&](int timeout)
-        {
-            return recv.poll(timeout, socket::PF_Read);
-        });
-    }
+    TestCase(udp_poll_nonblocking_select) { run_poll_test(rpp::SO_NonBlock, /*use_poll*/false); }
+    TestCase(udp_poll_nonblocking_poll)   { run_poll_test(rpp::SO_NonBlock, /*use_poll*/true); }
+    TestCase(udp_poll_blocking_select)    { run_poll_test(rpp::SO_Blocking, /*use_poll*/false); }
+    TestCase(udp_poll_blocking_poll)      { run_poll_test(rpp::SO_Blocking, /*use_poll*/true); }
 
     TestCase(udp_poll_multi)
     {

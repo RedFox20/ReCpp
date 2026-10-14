@@ -1,7 +1,6 @@
 #include <rpp/atomic_timepoint.h>
 #include <rpp/tests.h>
-#include <thread>
-#include <vector>
+#include "parallel_threads.h"
 using namespace rpp;
 
 TestImpl(test_atomic_timepoint)
@@ -108,17 +107,11 @@ TestImpl(test_atomic_timepoint)
         constexpr int increments_per_thread = 10000;
         Duration increment = Duration::from_micros(1);
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_threads);
-        for (int i = 0; i < num_threads; ++i)
+        parallel_threads{ num_threads, [&]
         {
-            threads.emplace_back([&]()
-            {
-                for (int j = 0; j < increments_per_thread; ++j)
-                    dur += increment;
-            });
-        }
-        for (auto& t : threads) t.join();
+            for (int j = 0; j < increments_per_thread; ++j)
+                dur += increment;
+        }}.join();
 
         Duration expected = Duration::from_micros(num_threads * increments_per_thread);
         AssertThat(dur.load(), expected);
@@ -205,17 +198,11 @@ TestImpl(test_atomic_timepoint)
         constexpr int increments_per_thread = 10000;
         Duration increment = Duration::from_micros(1);
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_threads);
-        for (int i = 0; i < num_threads; ++i)
+        parallel_threads{ num_threads, [&]
         {
-            threads.emplace_back([&]()
-            {
-                for (int j = 0; j < increments_per_thread; ++j)
-                    tp += increment;
-            });
-        }
-        for (auto& t : threads) t.join();
+            for (int j = 0; j < increments_per_thread; ++j)
+                tp += increment;
+        }}.join();
 
         TimePoint expected = TimePoint{Duration::from_micros(num_threads * increments_per_thread)};
         AssertThat(tp.load(), expected);
@@ -380,17 +367,11 @@ TestImpl(test_atomic_timepoint)
         constexpr int ops_per_thread = 1000;
         Duration increment = Duration::from_micros(1);
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_threads);
-        for (int i = 0; i < num_threads; ++i)
+        parallel_threads{ num_threads, [&]
         {
-            threads.emplace_back([&]()
-            {
-                for (int j = 0; j < ops_per_thread; ++j)
-                    ts.warp_forward(increment);
-            });
-        }
-        for (auto& t : threads) t.join();
+            for (int j = 0; j < ops_per_thread; ++j)
+                ts.warp_forward(increment);
+        }}.join();
 
         Duration expected = Duration::from_micros(num_threads * ops_per_thread);
         AssertThat(ts.warp_offset(), expected);
@@ -404,17 +385,11 @@ TestImpl(test_atomic_timepoint)
         constexpr int num_threads = 8;
         constexpr int ops_per_thread = 10000;
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_threads);
-        for (int i = 0; i < num_threads; ++i)
+        parallel_threads{ num_threads, [&]
         {
-            threads.emplace_back([&]()
-            {
-                for (int j = 0; j < ops_per_thread; ++j)
-                    ts.set_sync_offset(Duration::from_micros(j));
-            });
-        }
-        for (auto& t : threads) t.join();
+            for (int j = 0; j < ops_per_thread; ++j)
+                ts.set_sync_offset(Duration::from_micros(j));
+        }}.join();
 
         // no warp applied, so total must equal sync
         AssertThat(ts.total_offset(), ts.sync_offset());
@@ -428,28 +403,18 @@ TestImpl(test_atomic_timepoint)
         constexpr int ops_per_thread = 10000;
         Duration warp_increment = Duration::from_micros(1);
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_threads * 2);
-
-        // half the threads warp forward
-        for (int i = 0; i < num_threads; ++i)
         {
-            threads.emplace_back([&]()
+            parallel_threads warpers { num_threads, [&]
             {
                 for (int j = 0; j < ops_per_thread; ++j)
                     ts.warp_forward(warp_increment);
-            });
-        }
-        // other half set sync offset
-        for (int i = 0; i < num_threads; ++i)
-        {
-            threads.emplace_back([&]()
+            }};
+            parallel_threads syncers { num_threads, [&]
             {
                 for (int j = 0; j < ops_per_thread; ++j)
                     ts.set_sync_offset(Duration::from_micros(j));
-            });
-        }
-        for (auto& t : threads) t.join();
+            }};
+        } // both groups join here
 
         // after all threads complete, the invariant must hold
         Duration expected_warp = Duration::from_micros(num_threads * ops_per_thread);
@@ -466,37 +431,19 @@ TestImpl(test_atomic_timepoint)
         Duration increment = Duration::from_micros(1);
         std::atomic<bool> done {false};
 
-        std::vector<std::thread> threads;
-        threads.reserve(num_writers + num_readers);
-
-        // writers warp forward
-        for (int i = 0; i < num_writers; ++i)
+        parallel_threads writers { num_writers, [&]
         {
-            threads.emplace_back([&]()
-            {
-                for (int j = 0; j < ops_per_thread; ++j)
-                    ts.warp_forward(increment);
-            });
-        }
-        // readers call time_now() continuously
-        for (int i = 0; i < num_readers; ++i)
+            for (int j = 0; j < ops_per_thread; ++j)
+                ts.warp_forward(increment);
+        }};
+        parallel_threads readers { num_readers, [&]
         {
-            threads.emplace_back([&]()
-            {
-                while (!done.load(std::memory_order_relaxed))
-                {
-                    // just exercise the read path under contention
-                    TimePoint t = ts.time_now();
-                    (void)t;
-                }
-            });
-        }
-        // wait for writers to finish
-        for (int i = 0; i < num_writers; ++i)
-            threads[i].join();
+            while (!done.load(std::memory_order_relaxed))
+                (void)ts.time_now(); // exercises the read path under contention
+        }};
+        writers.join();
         done.store(true, std::memory_order_relaxed);
-        for (int i = num_writers; i < (int)threads.size(); ++i)
-            threads[i].join();
+        readers.join();
 
         Duration expected_warp = Duration::from_micros(num_writers * ops_per_thread);
         AssertThat(ts.warp_offset(), expected_warp);
