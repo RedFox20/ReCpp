@@ -1986,9 +1986,8 @@ namespace rpp
             // this is not an error, but the socket is no longer connected
             handle_errno(ESOCK(ESHUTDOWN));
 
-            // BUGFIX: if TCP socket is SHUTDOWN, sending is no longer possible
-            //         and polling makes no sense, however there might be data to read
-            return (pollFlags & PF_Read) != 0 && ((revents & POLLIN) != 0 || available() > 0);
+            // a read never blocks after a FIN, and WSAPoll reports the FIN without POLLRDNORM, so recv() reads the close
+            return (pollFlags & PF_Read) != 0;
         }
 
         if ((revents & POLLERR) != 0) // some other socket error

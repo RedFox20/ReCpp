@@ -1017,6 +1017,22 @@ TestImpl(test_sockets)
         AssertTrue(remote.good());
     }
 
+    // WSAPoll reports a peer FIN as POLLHUP alone, and poll() still reports it, see BUGS.md C37
+    TestCase(tcp_poll_reports_a_peer_close)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        socket client = connect("127.0.0.1", server.port());
+        socket remote = accept(server);
+        remote.close(); // sends the FIN
+        AssertTrue(client.poll(1000, socket::PF_Read)); // hang guard, the FIN ends the poll
+        socket* polled[] = { &client };
+        AssertThat(socket::poll(polled, 1, nullptr, 0, 1000), 1);
+
+        char buf[16];
+        AssertThat(client.recv(buf, sizeof(buf)), -1); // recv() reads the FIN and closes the socket
+        AssertFalse(client.good());
+    }
+
     TestCase(tcp_connect_to_nonexisting_server_fails)
     {
         socket client = socket::connect_to({"127.0.0.1", 12345}, 50/*ms*/);
