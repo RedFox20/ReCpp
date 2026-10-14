@@ -830,6 +830,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 
 ## Closed
 
+### C37. `socket::poll()` reported a peer close as a timeout on Windows
+WSAPoll reports a FIN as POLLHUP alone, so `poll()` returned false, and `available()` cleared the `ESHUTDOWN` error.
+A hangup now signals `PF_Read`, so `recv()` reads the close, which `tcp_poll_reports_a_peer_close` pins.
+
 ### C36. The `socket_poller` wake socket took the datagrams of another socket on Windows
 It bound 127.0.0.1 on a port from the unseeded `rand()`, and Windows allows that next to a 0.0.0.0 socket on the port.
 It binds port 0 now, so the OS picks a free port, which `socket_poller_wake_socket_binds_an_os_port` pins.

@@ -1190,6 +1190,7 @@ namespace rpp
          * @param timeoutMillis Timeout in milliseconds to suspend until the socket is signaled
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
+         *          A peer close signals PF_Read, and the next recv() reports the close.
          */
         bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
