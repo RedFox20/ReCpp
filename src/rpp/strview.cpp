@@ -93,17 +93,63 @@ namespace rpp
 
 
     ///////////// string view
-    
-    
-    const char* strview::to_cstr(char* buf, int max) const noexcept
+
+    // strview and ustrview share these bodies, which differ only in the char type
+
+    template<class Char> static const Char* view_to_cstr(const Char* str, int len, Char* buf, int max) noexcept
     {
-        if (str[len] == '\0')
+        if (str[len] == Char(0))
             return str;
         auto n = size_t((len < max) ? len : max - 1);
-        memcpy(buf, str, n);
-        buf[n] = '\0';
+        memcpy(buf, str, sizeof(Char) * n);
+        buf[n] = Char(0);
         return buf;
     }
+
+    template<class View, class Skip> static View& trim_start_if(View& v, Skip skip) noexcept
+    {
+        auto* s = v.str;
+        int n = v.len;
+        for (; n && skip(*s); ++s, --n) {}
+        v.str = s; v.len = n; // result writeout
+        return v;
+    }
+
+    template<class View, class Skip> static View& trim_end_if(View& v, Skip skip) noexcept
+    {
+        int n = v.len;
+        const auto* e = v.str + n;
+        for (; n && skip(*--e); --n) {} // reverse loop while skip() matches
+        v.len = n;
+        return v;
+    }
+
+    template<class Char, class Match> static const Char* scan_forward(const Char* p, int len, Match match) noexcept
+    {
+        for (const Char* e = p + len; p < e; ++p) if (match(*p)) return p;
+        return nullptr;
+    }
+
+    template<class Char, class Match> static const Char* scan_backward(const Char* p, int len, Match match) noexcept
+    {
+        if (len <= 0) return nullptr;
+        for (const Char* e = p + len - 1; e >= p; --e) if (match(*e)) return e;
+        return nullptr;
+    }
+
+    template<class View> static View clamp_substr(const View& v, int index, int length) noexcept
+    {
+        int idx = index;
+        if (idx > v.len)  idx = v.len;
+        else if (idx < 0) idx = 0;
+
+        int remaining = v.len - idx;
+        if (remaining > length)
+            remaining = length;
+        return { v.str + idx, remaining };
+    }
+
+    const char* strview::to_cstr(char* buf, int max) const noexcept { return view_to_cstr(str, len, buf, max); }
 
     struct ringbuf {
         static constexpr int max = 1024;
@@ -186,58 +232,17 @@ namespace rpp
         return 0;
     }
 
-    strview& strview::trim_start() noexcept
-    {
-        const char* s = str;
-        int n = len;
-        for (; n && *s <= ' '; ++s, --n) {} // loop while is whitespace
-        str = s; len = n; // result writeout
-        return *this;
-    }
-
-    strview& strview::trim_start(const char ch) noexcept
-    {
-        const char* s = str;
-        int n = len;
-        for (; n && *s == ch; ++s, --n) {}
-        str = s; len = n; // result writeout
-        return *this;
-    }
-
+    strview& strview::trim_start() noexcept { return trim_start_if(*this, [](char c) { return c <= ' '; }); }
+    strview& strview::trim_start(const char ch) noexcept { return trim_start_if(*this, [ch](char c) { return c == ch; }); }
     strview& strview::trim_start(const char* chars, int nchars) noexcept
     {
-        const char* s = str;
-        int n = len;
-        for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
-        str = s; len = n;
-        return *this;
+        return trim_start_if(*this, [=](char c) { return strcontains(chars, nchars, c); });
     }
-
-    strview& strview::trim_end() noexcept
-    {
-        int n = len;
-        const char* e = str + n;
-        for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
-        len = n;
-        return *this;
-    }
-
-    strview& strview::trim_end(char ch) noexcept
-    {
-        int n = len;
-        const char* e = str + n;
-        for (; n && *--e == ch; --n) {}
-        len = n;
-        return *this;
-    }
-
+    strview& strview::trim_end() noexcept { return trim_end_if(*this, [](char c) { return c <= ' '; }); }
+    strview& strview::trim_end(char ch) noexcept { return trim_end_if(*this, [ch](char c) { return c == ch; }); }
     strview& strview::trim_end(const char* chars, int nchars) noexcept
     {
-        int n = len;
-        const char* e = str + n;
-        for (; n && strcontains(chars, nchars, *--e); --n) {}
-        len = n;
-        return *this;
+        return trim_end_if(*this, [=](char c) { return strcontains(chars, nchars, c); });
     }
 
     const char* strview::find(const char* substr, int sublen) const noexcept
@@ -286,30 +291,14 @@ namespace rpp
         return nullptr;
     }
 
-    const char* strview::rfind(char c) const noexcept
-    {
-        if (len <= 0) return nullptr;
-        const char* p = str;
-        const char* e = p + len - 1;
-        for (; e >= p; --e) if (*e == c) return e;
-        return nullptr;
-    }
-
+    const char* strview::rfind(char c) const noexcept { return scan_backward(str, len, [c](char ch) { return ch == c; }); }
     const char* strview::findany(const char* chars, int n) const noexcept
     {
-        const char* p = str;
-        const char* e = p + len;
-        for (; p < e; ++p) if (strcontains(chars, n, *p)) return p;
-        return nullptr;
+        return scan_forward(str, len, [=](char ch) { return strcontains(chars, n, ch); });
     }
-
     const char* strview::rfindany(const char* chars, int n) const noexcept
     {
-        if (len <= 0) return nullptr;
-        const char* p = str;
-        const char* e = p + len - 1;
-        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
-        return nullptr;
+        return scan_backward(str, len, [=](char ch) { return strcontains(chars, n, ch); });
     }
 
     int strview::count(char ch) const noexcept
@@ -430,28 +419,8 @@ namespace rpp
     }
 
 
-    strview strview::substr(int index, int length) const noexcept
-    {
-        int idx = index;
-        if (idx > len)    idx = len;
-        else if (idx < 0) idx = 0;
-        
-        int remaining = len - idx;
-        if (remaining > length)
-            remaining = length;
-
-        return { str + idx, remaining };
-    }
-
-    strview strview::substr(int index) const noexcept
-    {
-        int idx = index;
-        if (idx > len)    idx = len;
-        else if (idx < 0) idx = 0;
-
-        int remaining = len - idx;
-        return { str + idx, remaining };
-    }
+    strview strview::substr(int index, int length) const noexcept { return clamp_substr(*this, index, length); }
+    strview strview::substr(int index) const noexcept { return clamp_substr(*this, index, len); }
 
 
     double strview::next_double() noexcept
@@ -626,71 +595,36 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////
 
-    string concat(const strview& a, const strview& b)
+    // one allocation for the whole result, as each hand-unrolled overload did
+    template<class String, class... Views> static String concat_views(const Views&... views)
     {
-        string str;
-        auto sa = size_t(a.len), sb = size_t(b.len); // NOLINT
-        str.reserve(sa + sb);
-        str.append(a.str, sa).append(b.str, sb);
-        return str;
-    }
-    string concat(const strview& a, const strview& b, const strview& c)
-    {
-        string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len); // NOLINT
-        str.reserve(sa + sb + sc);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
-        return str;
-    }
-    string concat(const strview& a, const strview& b, const strview& c, const strview& d)
-    {
-        string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len); // NOLINT
-        str.reserve(sa + sb + sc + sd);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
-        return str;
-    }
-    string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
-    {
-        string str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len); // NOLINT
-        str.reserve(sa + sb + sc + sd + se);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
+        String str;
+        str.reserve((size_t(views.len) + ...));
+        (str.append(views.str, size_t(views.len)), ...);
         return str;
     }
 
+    string concat(const strview& a, const strview& b) { return concat_views<string>(a, b); }
+    string concat(const strview& a, const strview& b, const strview& c) { return concat_views<string>(a, b, c); }
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d)
+    {
+        return concat_views<string>(a, b, c, d);
+    }
+    string concat(const strview& a, const strview& b, const strview& c, const strview& d, const strview& e)
+    {
+        return concat_views<string>(a, b, c, d, e);
+    }
+
 #if RPP_ENABLE_UNICODE
-    ustring concat(const ustrview& a, const ustrview& b)
-    {
-        ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len); // NOLINT
-        str.reserve(sa + sb);
-        str.append(a.str, sa).append(b.str, sb);
-        return str;
-    }
-    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c)
-    {
-        ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len); // NOLINT
-        str.reserve(sa + sb + sc);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc);
-        return str;
-    }
+    ustring concat(const ustrview& a, const ustrview& b) { return concat_views<ustring>(a, b); }
+    ustring concat(const ustrview& a, const ustrview& b, const ustrview& c) { return concat_views<ustring>(a, b, c); }
     ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d)
     {
-        ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len); // NOLINT
-        str.reserve(sa + sb + sc + sd);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd);
-        return str;
+        return concat_views<ustring>(a, b, c, d);
     }
     ustring concat(const ustrview& a, const ustrview& b, const ustrview& c, const ustrview& d, const ustrview& e)
     {
-        ustring str;
-        auto sa = size_t(a.len), sb = size_t(b.len), sc = size_t(c.len), sd = size_t(d.len), se = size_t(e.len); // NOLINT
-        str.reserve(sa + sb + sc + sd + se);
-        str.append(a.str, sa).append(b.str, sb).append(c.str, sc).append(d.str, sd).append(e.str, se);
-        return str;
+        return concat_views<ustring>(a, b, c, d, e);
     }
 #endif // RPP_ENABLE_UNICODE
 
@@ -736,68 +670,22 @@ namespace rpp
     ////////////////////// ustrview
 
 #if RPP_ENABLE_UNICODE
-    const char16_t* ustrview::to_cstr(char16_t* buf, int max) const noexcept
-    {
-        if (str[len] == u'\0')
-            return str;
-        auto n = size_t((len < max) ? len : max - 1);
-        memcpy(buf, str, sizeof(char16_t) * n);
-        buf[n] = u'\0';
-        return buf;
-    }
+    const char16_t* ustrview::to_cstr(char16_t* buf, int max) const noexcept { return view_to_cstr(str, len, buf, max); }
 
-    ustrview& ustrview::trim_start() noexcept
-    {
-        const auto* s = str;
-        int n = len;
-        for (; n && *const_cast<char16_t*>(s) <= ' '; ++s, --n) {} // loop while is whitespace
-        str = s; len = n; // result writeout
-        return *this;
-    }
-
+    ustrview& ustrview::trim_start() noexcept { return trim_start_if(*this, [](char16_t c) { return c <= u' '; }); }
     ustrview& ustrview::trim_start(const char16_t ch) noexcept
     {
-        const auto* s = str;
-        int n = len;
-        for (; n && *s == ch; ++s, --n) {}
-        str = s; len = n; // result writeout
-        return *this;
+        return trim_start_if(*this, [ch](char16_t c) { return c == ch; });
     }
-
     ustrview& ustrview::trim_start(const char16_t* chars, int nchars) noexcept
     {
-        const auto* s = str;
-        int n = len;
-        for (; n && strcontains(chars, nchars, *s); ++s, --n) {}
-        str = s; len = n;
-        return *this;
+        return trim_start_if(*this, [=](char16_t c) { return strcontains(chars, nchars, c); });
     }
-
-    ustrview& ustrview::trim_end() noexcept
-    {
-        int n = len;
-        const auto* e = str + n;
-        for (; n && *--e <= ' '; --n) {} // reverse loop while is whitespace
-        len = n;
-        return *this;
-    }
-
-    ustrview& ustrview::trim_end(char16_t ch) noexcept
-    {
-        int n = len;
-        const auto* e = str + n;
-        for (; n && *--e == ch; --n) {}
-        len = n;
-        return *this;
-    }
-
+    ustrview& ustrview::trim_end() noexcept { return trim_end_if(*this, [](char16_t c) { return c <= u' '; }); }
+    ustrview& ustrview::trim_end(char16_t ch) noexcept { return trim_end_if(*this, [ch](char16_t c) { return c == ch; }); }
     ustrview& ustrview::trim_end(const char16_t* chars, int nchars) noexcept
     {
-        int n = len;
-        const auto* e = str + n;
-        for (; n && strcontains(chars, nchars, *--e); --n) {}
-        len = n;
-        return *this;
+        return trim_end_if(*this, [=](char16_t c) { return strcontains(chars, nchars, c); });
     }
 
     int ustrview::compare(const char16_t* s, int n) const noexcept
@@ -826,52 +714,19 @@ namespace rpp
 
     const char16_t* ustrview::rfind(char16_t c) const noexcept
     {
-        if (len <= 0) return nullptr;
-        const char16_t* p = str;
-        const char16_t* e = p + len - 1;
-        for (; e >= p; --e) if (*e == c) return e;
-        return nullptr;
+        return scan_backward(str, len, [c](char16_t ch) { return ch == c; });
     }
-
     const char16_t* ustrview::findany(const char16_t* chars, int n) const noexcept
     {
-        const char16_t* p = str;
-        const char16_t* e = p + len;
-        for (; p < e; ++p) if (strcontains(chars, n, *p)) return p;
-        return nullptr;
+        return scan_forward(str, len, [=](char16_t ch) { return strcontains(chars, n, ch); });
     }
-
     const char16_t* ustrview::rfindany(const char16_t* chars, int n) const noexcept
     {
-        if (len <= 0) return nullptr;
-        const char16_t* p = str;
-        const char16_t* e = p + len - 1;
-        for (; e >= p; --e) if (strcontains(chars, n, *e)) return e;
-        return nullptr;
+        return scan_backward(str, len, [=](char16_t ch) { return strcontains(chars, n, ch); });
     }
 
-    ustrview ustrview::substr(int index, int length) const noexcept
-    {
-        int idx = index;
-        if (idx > len)    idx = len;
-        else if (idx < 0) idx = 0;
-
-        int remaining = len - idx;
-        if (remaining > length)
-            remaining = length;
-
-        return { str + idx, remaining };
-    }
-
-    ustrview ustrview::substr(int index) const noexcept
-    {
-        int idx = index;
-        if (idx > len)    idx = len;
-        else if (idx < 0) idx = 0;
-
-        int remaining = len - idx;
-        return { str + idx, remaining };
-    }
+    ustrview ustrview::substr(int index, int length) const noexcept { return clamp_substr(*this, index, length); }
+    ustrview ustrview::substr(int index) const noexcept { return clamp_substr(*this, index, len); }
 
     bool ustrview::next(ustrview& out, char16_t delim) noexcept
     {

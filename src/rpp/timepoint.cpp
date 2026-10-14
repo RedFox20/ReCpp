@@ -329,36 +329,6 @@ namespace rpp
     }
 #endif
 
-    void sleep_ms(unsigned int millis) noexcept
-    {
-        #if _WIN32
-            win32_sleep_ns(int64(millis) * 1'000'000ll);
-        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(int64(millis) * 1'000'000ll);
-        #elif RPP_FREERTOS
-            freertos_sleep_ns(millis * 1'000'000ull);
-        #elif RPP_STM32_HAL
-            cortex_m_sleep_ns(millis * 1'000'000ull);
-        #else
-            std::this_thread::sleep_for(std::chrono::milliseconds{millis});
-        #endif
-    }
-
-    void sleep_us(unsigned int micros) noexcept
-    {
-        #if _WIN32
-            win32_sleep_ns(int64(micros) * 1'000ll);
-        #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(int64(micros) * 1'000ll);
-        #elif RPP_FREERTOS
-            freertos_sleep_ns(micros * 1'000ull);
-        #elif RPP_STM32_HAL
-            cortex_m_sleep_ns(micros * 1'000ull);
-        #else
-            std::this_thread::sleep_for(std::chrono::microseconds{micros});
-        #endif
-    }
-
     void sleep_ns(int64 nanos) noexcept
     {
         #if _WIN32
@@ -373,6 +343,9 @@ namespace rpp
             std::this_thread::sleep_for(std::chrono::nanoseconds{nanos});
         #endif
     }
+
+    void sleep_ms(unsigned int millis) noexcept { sleep_ns(int64(millis) * 1'000'000); }
+    void sleep_us(unsigned int micros) noexcept { sleep_ns(int64(micros) * 1'000); }
 
     void sleep_for(const Duration& d) noexcept
     {
