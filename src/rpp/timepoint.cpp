@@ -609,16 +609,6 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /** @returns false if the calendar cannot represent this time */
-    static bool gmtime_safe(const time_t& time, std::tm& time_tm) noexcept
-    {
-        #if _MSC_VER || __MINGW32__ // MSVC++ or MinGW
-            return gmtime_s(&time_tm, &time) == 0; // arguments reversed for some reason
-        #else
-            return gmtime_r(&time, &time_tm) != nullptr;
-        #endif
-    }
-
     static std::tm localtime_safe(const time_t& time) noexcept
     {
         std::tm time_tm;
@@ -649,17 +639,23 @@ namespace rpp
             return CalendarTime{ utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, nanos };
     #endif
 
-        // Linux reads the clock with clock_gettime(), which the standard C calendar accepts.
-        // A narrow time_t wraps silently, so reject the value before the cast narrows it
-        time_t secs = time_t(seconds);
-        if (int64(secs) != seconds)
-            return CalendarTime{};
+        // clock_gettime() counts POSIX seconds, so integer math gives the date of gmtime_r().
+        // It needs no tzset lock and no wide time_t.
+        int64 days = seconds / 86400;
+        int64 secs = seconds % 86400;
+        if (secs < 0) { secs += 86400; --days; }
 
-        std::tm tm_utc {};
-        if (!gmtime_safe(secs, tm_utc))
-            return CalendarTime{};
-        return CalendarTime{ tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday,
-                             tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, nanos };
+        // Howard Hinnant's civil_from_days(), which counts in 400 year eras from 0000-03-01
+        const int64 z = days + 719468;
+        const int64 era = (z >= 0 ? z : z - 146096) / 146097;
+        const int64 doe = z - era * 146097;
+        const int64 yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+        const int64 doy = doe - (365*yoe + yoe/4 - yoe/100);
+        const int64 mp = (5*doy + 2) / 153;
+        const int month = int(mp < 10 ? mp + 3 : mp - 9);
+        const int year = int(yoe + era * 400 + (month <= 2));
+        return CalendarTime{ year, month, int(doy - (153*mp + 2)/5 + 1),
+                             int(secs / 3600), int(secs % 3600 / 60), int(secs % 60), nanos };
     }
 
     // YYYY-MM-DD HH:MM:SS.mmm
