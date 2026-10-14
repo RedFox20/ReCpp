@@ -183,7 +183,7 @@ namespace rpp
             if (c1 < c2) return -1;
             if (c1 > c2) return +1;
         }
-        return 0;
+        return *s2 ? -1 : 0; // s is longer, so this view is its prefix
     }
 
     strview& strview::trim_start() noexcept
@@ -890,6 +890,21 @@ namespace rpp
 
     ////////////////////// loose utility functions
 
+    // parses e3 E+3 e-016 at s and moves s past it, but leaves s on the 'e' of a word suffix
+    static int parse_exponent(const char*& s, const char* e) noexcept
+    {
+        if (s >= e || (*s != 'e' && *s != 'E')) return 0;
+        const char* x = s + 1;
+        const int esign = (x < e && *x == '-') ? -1 : +1;
+        if (x < e && (*x == '-' || *x == '+')) ++x;
+        if (x >= e || *x < '0' || '9' < *x) return 0;
+        int exponent = 0;
+        for (; x < e && '0' <= *x && *x <= '9'; ++x) // the cap stops an int overflow, and any larger exponent is inf or 0
+            if (exponent < 100'000) exponent = exponent * 10 + (*x - '0');
+        s = x;
+        return exponent * esign;
+    }
+
     /**
      * @note Doesn't account for special cases like +- NAN. Does support scientific notation, ex: '1.0e+003' 
      *       Some optimizations applied to avoid too many multiplications
@@ -905,7 +920,6 @@ namespace rpp
         int64 power   = 1;
         int64 intPart = abs(to_int64(s, len, &s));
         char ch       = *s;
-        int exponent  = 0;
 
         // if input is -0.xxx then intPart will lose the sign info
         // intpart growth will also break if we use neg ints
@@ -915,25 +929,18 @@ namespace rpp
         if (ch == '.') { /* fraction part follows*/
             while (++s < e) {
                 ch = *s;
-                if (ch == 'e') { // parse e-016 e+3 etc.
-                    ++s;
-                    int esign = (*s++ == '+') ? +1 : -1;
-                    exponent = (*s++ - '0');
-                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
-                    exponent = (exponent << 3) + (exponent << 1) + (*s++ - '0');
-                    exponent *= esign;
-                    break;
-                }
                 if (ch < '0' || '9' < ch)
                     break;
                 intPart = (intPart << 3) + (intPart << 1) + int64(ch - '0'); // intPart = intPart*10 + digit
                 power   = (power   << 3) + (power   << 1);                     // power *= 10
             }
         }
+        const int exponent = parse_exponent(s, e);
         if (end) *end = s; // write end of parsed value
         double result = power == 1 ? double(intPart) : double(intPart) / double(power);
-        if (exponent)
-            result *= pow(10.0, (double)exponent);
+        // dividing by an exact power of ten rounds once, multiplying by an inexact 10^-n rounds twice
+        if (exponent > 0)      result *= pow(10.0, (double)exponent);
+        else if (exponent < 0) result /= pow(10.0, (double)-exponent);
         return result * sign;
     }
 
@@ -1002,12 +1009,51 @@ namespace rpp
         return int(intPart);
     }
 
+    /// Writes '.' and the decimals of g in (0, 1). @returns false when the first digit rounds up to 10
+    static bool write_fraction(char*& end, double g, int maxDecimals) noexcept
+    {
+        // moving epsilon which has to be slightly smaller than maxDecimals
+        double epsilon = 0.001;
+        for (int d = 0; d < maxDecimals; ++d) {
+            epsilon *= 0.1;
+        }
+        *end++ = '.'; // place the fraction mark
+        double x = g; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
+        for (int d = 0; d < maxDecimals; ++d) {
+            x *= 10;
+            int64 ix = (int64)x;
+            x -= ix; // NOLINT
+
+            // CUSTOM ROUNDING RULES:
+            // handle case of 0.199999 -> 1.99999 -> int(1), but should be int(2)
+            if (1.0 > x && x > 0.9999) {
+                int64 ix2 = (int64)round(x);
+                ix += ix2;
+                x -= ix2; // NOLINT
+            }
+            if (ix == 10) // only the first digit can round up to 10, because a later one rounds at the digit before it
+                return false;
+
+            *end++ = char('0' + ix);
+
+            if (x < epsilon) // break from 0.750000011 cases
+                break;
+            epsilon *= 10.0;
+        }
+        return true;
+    }
+
     int _tostring(char* buffer, double f, int maxDecimals) noexcept
     {
         //// @todo Implement scientific notation?
         if (isnan(f)) {
             buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
             return 3;
+        }
+        if (isinf(f)) {
+            const int n = f < 0 ? 4 : 3;
+            memcpy(buffer, f < 0 ? "-inf" : "inf", size_t(n) + 1);
+            return n;
         }
 
         // we need ceil and floor for handling -DBL_MAX edge case, or -2.0119 edge case
@@ -1027,33 +1073,11 @@ namespace rpp
 
         if (maxDecimals > 0) {
             double g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
-            if (g != 0.0) { // do we have a fraction ?
-                // moving epsilon which has to be slightly smaller than maxDecimals
-                double epsilon = 0.001;
-                for (int d = 0; d < maxDecimals; ++d) {
-                    epsilon *= 0.1;
-                }
-                *end++ = '.'; // place the fraction mark
-                double x = g; // floats go way imprecise when *=10, perhaps should extract mantissa instead?
-                for (int d = 0; d < maxDecimals; ++d) {
-                    x *= 10;
-                    int64 ix = (int64)x;
-                    x -= ix; // NOLINT
-
-                    // CUSTOM ROUNDING RULES:
-                    // handle case of 0.199999 -> 1.99999 -> int(1), but should be int(2)
-                    if (1.0 > x && x > 0.9999) {
-                        int64 ix2 = (int64)round(x);
-                        ix += ix2;
-                        x -= ix2; // NOLINT
-                    }
-
-                    *end++ = char('0' + (ix % 10));
-
-                    if (x < epsilon) // break from 0.750000011 cases
-                        break;
-                    epsilon *= 10.0;
-                }
+            if (g != 0.0 && !write_fraction(end, g, maxDecimals)) { // the fraction rounded up to a whole one
+                end = buffer + (f < -0.0 ? 1 : 0);
+                end += _tostring(end, absIntegral + 1);
+                *end++ = '.';
+                *end++ = '0';
             }
         }
 

@@ -19,7 +19,7 @@ namespace rpp
         if (sb.ptr == sb.buf)
         {
             ptr = buf;
-            memcpy(buf, sb.buf, len);
+            memcpy(buf, sb.buf, (size_t)len + 1);
         }
         else
         {
@@ -138,8 +138,8 @@ namespace rpp
     void string_buffer::write(ushort value) noexcept { reserve(8);  len += _tostring(&ptr[len], value); }
     void string_buffer::write(int value)    noexcept { reserve(16); len += _tostring(&ptr[len], value); }
     void string_buffer::write(uint value)   noexcept { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(long value)   noexcept { reserve(16); len += _tostring(&ptr[len], value); }
-    void string_buffer::write(ulong value)  noexcept { reserve(16); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(long value)   noexcept { reserve(32); len += _tostring(&ptr[len], value); }
+    void string_buffer::write(ulong value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(int64 value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(uint64 value) noexcept { reserve(32); len += _tostring(&ptr[len], value); }
     void string_buffer::write(float value)  noexcept { reserve(32); len += _tostring(&ptr[len], value); }
@@ -333,8 +333,8 @@ namespace rpp
     std::string to_string(ushort v) noexcept { char buf[8];  return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(int v)    noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(uint v)   noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
-    std::string to_string(long v)   noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
-    std::string to_string(ulong v)  noexcept { char buf[16]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(long v)   noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
+    std::string to_string(ulong v)  noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(int64 v)  noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(uint64 v) noexcept { char buf[40]; return std::string{buf, buf + _tostring(buf, v)}; }
     std::string to_string(float v)  noexcept { char buf[32]; return std::string{buf, buf + _tostring(buf, v)}; }

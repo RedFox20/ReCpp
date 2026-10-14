@@ -5,6 +5,7 @@
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <fstream> // use fstream as a baseline file utility to test against
+#include <cstdlib> // getenv, setenv
 #if !_MSC_VER
     #include <fcntl.h> // fcntl, FD_CLOEXEC
 #endif
@@ -296,6 +297,8 @@ TestImpl(test_file_io)
     TestCase(path_utils)
     {
         AssertThat(merge_dirups("../lib/../bin/file.txt"), "../bin/file.txt");
+        AssertThat(merge_dirups("/home/user/../x"), "/home/x");
+        AssertThat(merge_dirups("a//b/../c/"), "a/c/");
 
         AssertThat(file_name("/root/dir/file.ext"   ), "file");
         AssertThat(file_name("/root/dir/file"       ), "file");
@@ -667,6 +670,19 @@ TestImpl(test_file_io)
         AssertThat(last(temp_dir()), '/');
         AssertThat(last(home_dir()), '/');
     }
+
+#if !_WIN32
+    TestCase(home_dir_leaves_the_environment_unchanged)
+    {
+        const char* home = getenv("HOME");
+        const std::string saved = home ? home : "";
+        setenv("HOME", "/tmp/rpp_home", 1);
+        AssertThat(home_dir(), "/tmp/rpp_home/");
+        AssertThat(std::string{getenv("HOME")}, "/tmp/rpp_home");
+        if (home) setenv("HOME", saved.c_str(), 1);
+        else unsetenv("HOME");
+    }
+#endif
 
 #if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // test_obfuscated_string scans this file for plaintext, so it must name a real executable

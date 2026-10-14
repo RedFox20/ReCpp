@@ -5,6 +5,9 @@
 #include <rpp/file_io.h>
 #include <map>
 #include <cfloat> // DBL_MAX
+#include <cstring> // memset
+#include <limits>
+#include <new> // placement new
 #include "TempFILE.h"
 #include <rpp/tests.h>
 #include <string> // std::string
@@ -144,6 +147,30 @@ TestImpl(test_sprint)
         string_buffer move_assign{ std::string(4096, 'z') };
         move_assign = std::move(move_init);
         AssertThat(move_assign.view(), content);
+
+        // the moved small buffer lands on dirty memory, so c_str() must carry its own terminator
+        string_buffer small;
+        small.write("hello");
+        alignas(string_buffer) char raw[sizeof(string_buffer)];
+        memset(raw, 'Z', sizeof(raw));
+        string_buffer* small_moved = new (raw) string_buffer{ std::move(small) };
+        AssertThat(std::string{small_moved->c_str()}, "hello");
+        small_moved->~string_buffer();
+    }
+
+    TestCase(string_buffer_write_long_grows_the_buffer)
+    {
+        constexpr long big = std::numeric_limits<long>::max();
+        string_buffer sb;
+        std::string fill(string_buffer::SIZE - 17, 'x');
+        sb.write(fill);
+        sb.write(big);
+        AssertGreater(sb.cap, sb.len);
+        AssertThat(sb.view(), fill + std::to_string(big));
+        constexpr long lmin = std::numeric_limits<long>::min();
+        constexpr unsigned long umax = std::numeric_limits<unsigned long>::max();
+        AssertThat(rpp::to_string(lmin), std::to_string(lmin));
+        AssertThat(rpp::to_string(umax), std::to_string(umax));
     }
 
     TestCase(string_buf_loop)
