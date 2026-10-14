@@ -228,7 +228,8 @@ namespace rpp
         template<class T> requires is_trivial_type<T>
         binary_stream& write(const T& data) noexcept
         {
-            ensure_space((int)sizeof(T));
+            if (End + (int)sizeof(T) > Cap) // a write which fits skips the call
+                ensure_space((int)sizeof(T));
             unsafe_write(data);
             return *this;
         }
