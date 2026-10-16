@@ -4,9 +4,20 @@
 #include <rpp/file_io.h>
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
+#include <rpp/timepoint.h> // rpp::sleep_ms, rpp::TimePoint
+#include <rpp/threads.h> // rpp::yield
 #include <fstream> // use fstream as a baseline file utility to test against
-#if !_MSC_VER
-    #include <fcntl.h> // fcntl, FD_CLOEXEC
+#include <atomic> // std::atomic_bool
+#include <cerrno> // EINTR
+#include <cstdio> // clearerr
+#include <thread> // std::thread
+#include <fcntl.h> // fcntl, FD_CLOEXEC, _O_TEXT
+#if _MSC_VER
+    #include <io.h> // _pipe, dup2
+#else
+    #include <unistd.h> // pipe, dup2
+    #include <csignal> // sigaction
+    #include <pthread.h> // pthread_kill
 #endif
 using namespace rpp;
 
@@ -112,6 +123,89 @@ TestImpl(test_file_io)
         AssertThat(f.read_text(), TestFileContents);
     }
 #endif // RPP_ENABLE_UNICODE
+
+    // the state field of a /proc stat line follows the last ')', and 'S' is an interruptible sleep
+    static bool sleeps(const std::string& statPath)
+    {
+        std::ifstream f { statPath };
+        std::string stat;
+        std::getline(f, stat);
+        size_t end = stat.rfind(')');
+        return end != std::string::npos && end + 2 < stat.size() && stat[end + 2] == 'S';
+    }
+
+    // a pipe has no size to seek to, so only a read to EOF gets its bytes
+    TestCase(read_stdin_text_reads_a_pipe_to_eof)
+    {
+        std::string sent(10'000, '\0');
+        for (size_t i = 0; i < sent.size(); ++i) sent[i] = char(i);
+        int fds[2];
+    #if _MSC_VER // the read end gets the default text mode of stdin, which stops at Ctrl+Z
+        AssertThat(_pipe(fds, 65536, _O_TEXT), 0);
+        _setmode(fds[1], _O_BINARY);
+    #else
+        AssertThat(pipe(fds), 0);
+    #endif
+        const int savedStdin = dup(0);
+        dup2(fds[0], 0);
+        close(fds[0]);
+    #if !_MSC_VER // a handler without SA_RESTART stops a blocked read with EINTR
+        static std::atomic_bool handled;
+        handled = false;
+        struct sigaction onSignal {}, oldSignal {};
+        onSignal.sa_handler = [](int) { handled = true; };
+        sigaction(SIGUSR1, &onSignal, &oldSignal);
+        const pthread_t reader = pthread_self();
+    #if __linux__
+        const std::string readerStat = "/proc/self/task/" + std::to_string(gettid()) + "/stat";
+    #endif
+    #endif
+        int written = 0;
+        std::thread writer { [&] { // the pipe can hold less than sent, so the write runs beside the read
+        #if !_MSC_VER
+            const rpp::TimePoint end = rpp::TimePoint::now() + rpp::seconds(1); // hang guard for both waits
+        #if __linux__ // the signal must come while the reader sleeps in read()
+            while (!sleeps(readerStat) && rpp::TimePoint::now() < end) rpp::yield();
+        #else
+            rpp::sleep_ms(5); // the reader blocks in its first fread by now
+        #endif
+            pthread_kill(reader, SIGUSR1);
+            while (!handled && rpp::TimePoint::now() < end) rpp::yield(); // a write before the handler lets read() return data
+        #endif
+            written = int(write(fds[1], sent.data(), unsigned(sent.size())));
+            close(fds[1]);
+        }};
+        const std::string received = file::read_stdin_text();
+        char rest[4096]; // a short read must fail the case, not block the writer
+        for (int n = 1; n > 0 || (n < 0 && errno == EINTR);) n = int(read(0, rest, unsigned(sizeof(rest))));
+        writer.join();
+    #if !_MSC_VER
+        sigaction(SIGUSR1, &oldSignal, nullptr);
+    #endif
+    #if _MSC_VER // the call must give stdin back in the mode it found
+        AssertThat(_setmode(0, _O_TEXT), _O_TEXT);
+    #endif
+        dup2(savedStdin, 0);
+        close(savedStdin);
+        clearerr(stdin);
+        AssertThat(written, int(sent.size()));
+        AssertThat(received.size(), sent.size());
+        AssertTrue(received == sent);
+    }
+
+#if !(_MSC_VER && _DEBUG) // the debug CRT asserts in _setmode() before it calls the invalid parameter handler
+    // on MSVC a closed fd 0 fails _setmode(), whose default invalid parameter handler ends the process
+    TestCase(read_stdin_text_returns_empty_for_a_closed_stdin)
+    {
+        const int savedStdin = dup(0);
+        close(0);
+        const std::string received = file::read_stdin_text();
+        dup2(savedStdin, 0);
+        close(savedStdin);
+        clearerr(stdin);
+        AssertThat(received.size(), size_t(0));
+    }
+#endif
 
     TestCase(if_initializer)
     {
