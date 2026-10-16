@@ -238,6 +238,9 @@ namespace rpp /* ReCpp */
         }
     #endif
 
+        /** Returns all of stdin to EOF in binary mode, or an empty string when there is no stdin or the allocation fails */
+        static std::string read_stdin_text() noexcept;
+
         /**
          * Writes a block of bytes to the file. Regular Windows IO
          * buffering is ENABLED for WRITE.

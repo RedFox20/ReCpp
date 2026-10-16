@@ -1,6 +1,7 @@
 #include "file_io.h"
 #include "strview.h"
 #include "debugging.h"
+#include <cerrno> // EINTR
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
@@ -15,7 +16,10 @@
 #if RPP_ANDROID
     #include <jni.h>
 #endif
-#if !_MSC_VER
+#if _MSC_VER
+    #include <fcntl.h> // _O_BINARY
+    #include <io.h> // _setmode
+#else
     #include <sys/file.h> // flock
 #endif
 
@@ -287,6 +291,37 @@ namespace rpp /* ReCpp */
             return {};
         }
         return out;
+    }
+    std::string file::read_stdin_text() noexcept
+    {
+    #if _MSC_VER // a closed or missing stdin fails _setmode(), and the default invalid parameter handler ends the process
+        const _invalid_parameter_handler ignore = [](const wchar_t*, const wchar_t*, const wchar_t*, unsigned, uintptr_t) {};
+        const _invalid_parameter_handler oldHandler = _set_thread_local_invalid_parameter_handler(ignore);
+        const int fd = _fileno(stdin);
+        const int oldMode = _setmode(fd, _O_BINARY); // text mode turns \r\n into \n and stops at Ctrl+Z
+        _set_thread_local_invalid_parameter_handler(oldHandler);
+        if (oldMode == -1) return {};
+    #endif
+        std::string text;
+        char buf[4096];
+        try {
+            for (;;)
+            {
+                if (size_t n = fread(buf, 1, sizeof(buf), stdin))
+                    text.append(buf, n);
+                else if (ferror(stdin) && !feof(stdin) && errno == EINTR)
+                    clearerr(stdin); // a signal handler without SA_RESTART stops a blocked read
+                else
+                    break;
+            }
+        } catch (...) {
+            LogError("file::read_stdin_text failed after %zu bytes", text.size());
+            text = std::string{};
+        }
+    #if _MSC_VER
+        (void)_setmode(fd, oldMode);
+    #endif
+        return text;
     }
     bool file::save_as(strview filename) noexcept
     {
