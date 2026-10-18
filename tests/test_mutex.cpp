@@ -483,7 +483,7 @@ TestImpl(test_mutex)
         rpp::mutex m;
         auto try_lock_on_another_thread = [&] {
             bool taken = false;
-            std::thread([&] { if ((taken = m.try_lock())) m.unlock(); }).join();
+            std::thread([&] { taken = m.try_lock(); if (taken) m.unlock(); }).join();
             return taken;
         };
         m.lock();
@@ -574,10 +574,19 @@ TestImpl(test_mutex)
         }
     }
 
-    static void lock_and_enter(guarded_counter& s, int) noexcept
+    static void lock_and_enter(guarded_counter& s, int /*i*/) noexcept
     {
         std::lock_guard guard { s.m };
         s.enter();
+    }
+
+    // A spin_lock_for() which times out falls back to lock().
+    static void spin_lock_and_enter(guarded_counter& s, int i) noexcept
+    {
+        if (std::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
+            s.enter();
+        else
+            lock_and_enter(s, i);
     }
 
     TestCase(contended_lockers_never_overlap)
@@ -669,13 +678,9 @@ TestImpl(test_mutex)
                     s.enter();
                     s.m.unlock();
                 }
-                else if (std::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
-                {
-                    s.enter();
-                }
                 else
                 {
-                    lock_and_enter(s, i);
+                    spin_lock_and_enter(s, i);
                 }
             }
         }};
@@ -713,7 +718,8 @@ TestImpl(test_mutex)
         auto s = std::make_shared<packed>();
         thread_group lockers { 8, s, [](packed& s, int t) {
             const int next = (t + 1) % 8;
-            const int a = next < t ? next : t, b = next < t ? t : next; // one lock order, so no deadlock
+            const int a = next < t ? next : t; // Every thread locks a pair in one order, so none can deadlock.
+            const int b = next < t ? t : next;
             for (int i = 0; i < 2'000; ++i)
             {
                 std::lock_guard first { s.m[a] };

@@ -152,7 +152,8 @@ TestImpl(test_file_io)
     #if !_MSC_VER // a handler without SA_RESTART stops a blocked read with EINTR
         static std::atomic_bool handled;
         handled = false;
-        struct sigaction onSignal {}, oldSignal {};
+        struct sigaction onSignal {};
+        struct sigaction oldSignal {};
         onSignal.sa_handler = [](int) { handled = true; };
         sigaction(SIGUSR1, &onSignal, &oldSignal);
         const pthread_t reader = pthread_self();
