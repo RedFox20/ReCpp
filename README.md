@@ -144,7 +144,7 @@ directly, so the group is the unit you import:
 | `rpp.time` | timepoint, timer, atomic_timepoint |
 | `rpp.containers` | collections, memory_pool, load_balancer |
 | `rpp.io` | file_io, paths, sockets, binary_stream, binary_serializer |
-| `rpp.threading` | mutex, condition_variable, semaphore, concurrent_queue, thread_pool, threads, task, future_types, atomic_shared_ptr, close_sync, async |
+| `rpp.threading` | mutex, condition_variable, semaphore, concurrent_queue, thread_pool, threads, task, future_types, atomic_shared_ptr, close_sync, async, atomic |
 | `rpp.future` | event_loop, coroutines |
 | `rpp.testing` | tests |
 
@@ -329,6 +329,7 @@ See `BUGS.md` B8.
 | [Sockets](#rppsocketsh) | [`sockets.h`](src/rpp/sockets.h) | Cross-platform TCP/UDP sockets, IP addresses, and network interfaces |
 | [Binary Stream](#rppbinary_streamh) | [`binary_stream.h`](src/rpp/binary_stream.h) | Buffered binary read/write streams |
 | [Binary Serializer](#rppbinary_serializerh) | [`binary_serializer.h`](src/rpp/binary_serializer.h) | Reflection-based binary and string serialization |
+| [Atomic](#rppatomich) | [`atomic.h`](src/rpp/atomic.h) | `std::atomic` with lock-free readers on every target |
 | [Atomic Timepoint](#rppatomic_timepointh) | [`atomic_timepoint.h`](src/rpp/atomic_timepoint.h) | Lock-free atomic Duration and TimePoint |
 | [Atomic Shared Ptr](#rppatomic_shared_ptrh) | [`atomic_shared_ptr.h`](src/rpp/atomic_shared_ptr.h) | Portable atomic shared_ptr and weak_ptr |
 | [Timer](#rpptimer) | [`timer.h`](src/rpp/timer.h) | High-precision timers, Duration, TimePoint, and StopWatch |
@@ -2951,17 +2952,38 @@ LogInfo("time of day: %s", tod.to_string());
 
 ---
 
+## rpp/atomic.h
+
+`rpp::atomic<T>` is `std::atomic<T>` where that is always lock-free. An 8-byte `T` on a target without lock-free 64-bit atomics, such as MIPS32, gets `rpp::seqlock_atomic<T>`, with the 8 bytes and the alignment of `std::atomic<int64>`. Its readers take no lock and never wait for a writer.
+
+| Type | Description |
+|------|-------------|
+| [`atomic<T>`](src/rpp/atomic.h#L171) | `std::atomic<T>` where it is always lock-free, else `seqlock_atomic<T>` for an 8-byte `T` |
+| [`seqlock_atomic<T>`](src/rpp/atomic.h#L60) | The `std::atomic` interface for an 8-byte `T` in 8 bytes, built on 32-bit atomics. An integral `T` gets `fetch_add()`, `fetch_sub()`, `++`, `--`, `+=` and `-=`, but no bitwise operations |
+
+The objects share a pool of 64 stripes in the namespace `rpp::atomics`, and each object hashes its address into one. A stripe holds a 32-bit version. A writer takes the stripe, copies the old value of the object into it, and then writes the object. During the write, a reader of the object takes the copy. So a reader never waits for a writer, even for one which the scheduler stopped in the middle of a write. Writers to the objects of one stripe wait for each other.
+
+```cpp
+#include <rpp/atomic.h>
+
+rpp::atomic<rpp::int64> offset_ns { 0 }; // std::atomic<int64> on a 64-bit target
+offset_ns.fetch_add(1000);
+rpp::int64 offset = offset_ns.load();
+```
+
+---
+
 ## rpp/atomic_timepoint.h
 
-Lock-free atomic wrappers for `Duration` and `TimePoint`. Both types are 8 bytes (a single `int64`) and inherit from `std::atomic<Duration>` / `std::atomic<TimePoint>`, which are always lock-free on 64-bit platforms. Provides atomic `+=` / `-=` operators via CAS loops that reuse the underlying Duration/TimePoint arithmetic.
+Lock-free atomic wrappers for `Duration` and `TimePoint`. Both types are 8 bytes (a single `int64`) and inherit from `std::atomic<Duration>` / `std::atomic<TimePoint>`, which are always lock-free on 64-bit platforms. They inherit through `rpp::atomic`, so a target without lock-free 64-bit atomics, such as MIPS32, gets `rpp::seqlock_atomic` in their place, and its readers take no lock. Provides atomic `+=` / `-=` operators via CAS loops that reuse the underlying Duration/TimePoint arithmetic.
 
 ### Types
 
 | Type | Description |
 |------|-------------|
-| [`AtomicDuration`](src/rpp/atomic_timepoint.h#L24) | Lock-free atomic Duration with atomic arithmetic |
-| [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L89) | Lock-free atomic TimePoint with atomic arithmetic |
-| [`AtomicTimeSource`](src/rpp/atomic_timepoint.h#L135) | Lock-free time source with sync and warp offsets |
+| [`AtomicDuration`](src/rpp/atomic_timepoint.h#L27) | Lock-free atomic Duration with atomic arithmetic |
+| [`AtomicTimePoint`](src/rpp/atomic_timepoint.h#L87) | Lock-free atomic TimePoint with atomic arithmetic |
+| [`AtomicTimeSource`](src/rpp/atomic_timepoint.h#L128) | Lock-free time source with sync and warp offsets |
 
 ### AtomicDuration Methods
 
@@ -2969,10 +2991,10 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 
 | Method | Description |
 |--------|-------------|
-| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L41) | Atomically add a Duration, returns new value |
-| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L52) | Atomically subtract a Duration, returns new value |
-| [`fetch_add(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L63) | Atomically add, returns old value |
-| [`fetch_sub(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L72) | Atomically subtract, returns old value |
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L39) | Atomically add a Duration, returns new value |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L50) | Atomically subtract a Duration, returns new value |
+| [`fetch_add(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L61) | Atomically add, returns old value |
+| [`fetch_sub(Duration d, memory_order)`](src/rpp/atomic_timepoint.h#L70) | Atomically subtract, returns old value |
 
 ### AtomicTimePoint Methods
 
@@ -2980,8 +3002,8 @@ Inherits `load()`, `store()`, `exchange()`, `compare_exchange_weak()`, `compare_
 
 | Method | Description |
 |--------|-------------|
-| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L106) | Atomically add a Duration, returns new TimePoint |
-| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L117) | Atomically subtract a Duration, returns new TimePoint |
+| [`operator+=(Duration d)`](src/rpp/atomic_timepoint.h#L99) | Atomically add a Duration, returns new TimePoint |
+| [`operator-=(Duration d)`](src/rpp/atomic_timepoint.h#L110) | Atomically subtract a Duration, returns new TimePoint |
 
 ### AtomicTimeSource
 
@@ -2989,15 +3011,15 @@ Lock-free time source for simulation time warping and time synchronization with 
 
 | Method | Description |
 |--------|-------------|
-| [`time_now()`](src/rpp/atomic_timepoint.h#L152) | Returns the base clock time plus combined offset (sync + warp) |
-| [`total_offset()`](src/rpp/atomic_timepoint.h#L174) | Returns the combined sync + warp offset |
-| [`warp_offset()`](src/rpp/atomic_timepoint.h#L184) | Returns the current warp offset (diagnostic) |
-| [`sync_offset()`](src/rpp/atomic_timepoint.h#L194) | Returns the current sync offset (diagnostic) |
-| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L202) | Atomically advances time by delta |
-| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L211) | Atomically rewinds time by delta |
-| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L220) | Sets sync offset, adjusting combined offset by the difference |
-| [`get_base_clock()`](src/rpp/atomic_timepoint.h#L244) | Returns the clock under the offsets, Realtime by default |
-| [`set_base_clock(rpp::ClockType clock)`](src/rpp/atomic_timepoint.h#L247) | Sets the clock under the offsets. Monotonic keeps waits and timers through a wall clock step |
+| [`time_now()`](src/rpp/atomic_timepoint.h#L145) | Returns the base clock time plus combined offset (sync + warp) |
+| [`total_offset()`](src/rpp/atomic_timepoint.h#L167) | Returns the combined sync + warp offset |
+| [`warp_offset()`](src/rpp/atomic_timepoint.h#L177) | Returns the current warp offset (diagnostic) |
+| [`sync_offset()`](src/rpp/atomic_timepoint.h#L187) | Returns the current sync offset (diagnostic) |
+| [`warp_forward(Duration delta)`](src/rpp/atomic_timepoint.h#L195) | Atomically advances time by delta |
+| [`warp_backward(Duration delta)`](src/rpp/atomic_timepoint.h#L204) | Atomically rewinds time by delta |
+| [`set_sync_offset(Duration new_offset)`](src/rpp/atomic_timepoint.h#L213) | Sets sync offset, adjusting combined offset by the difference |
+| [`get_base_clock()`](src/rpp/atomic_timepoint.h#L237) | Returns the clock under the offsets, Realtime by default |
+| [`set_base_clock(rpp::ClockType clock)`](src/rpp/atomic_timepoint.h#L240) | Sets the clock under the offsets. Monotonic keeps waits and timers through a wall clock step |
 
 ### Example: AtomicTimeSource for Simulation Time
 

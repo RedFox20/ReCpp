@@ -6,7 +6,10 @@
  * Provides AtomicDuration and AtomicTimePoint as thin wrappers
  * inheriting from std::atomic<Duration> and std::atomic<TimePoint>.
  * Both types are 8 bytes (int64 nsec) and lock-free on 64-bit platforms.
+ * They build on rpp::atomic, so on a target without lock-free 64-bit atomics, such as MIPS32,
+ * their readers take no lock either.
  */
+#include "atomic.h" // rpp::atomic
 #include "config.types.h" // rpp::int64, rpp::byte
 #include "timepoint.h"
 #include <atomic>
@@ -18,19 +21,14 @@ namespace rpp
     /**
      * @brief Lock-free atomic Duration for thread-safe duration arithmetic.
      *
-     * Inherits load/store/exchange/compare_exchange from std::atomic<Duration>.
+     * Inherits load/store/exchange/compare_exchange from rpp::atomic<Duration>.
      * Adds atomic += and -= operators via CAS loops, reusing Duration's own arithmetic.
      */
-    struct RPPAPI AtomicDuration : std::atomic<Duration>
+    struct RPPAPI AtomicDuration : rpp::atomic<Duration>
     {
-        using base = std::atomic<Duration>;
+        using base = rpp::atomic<Duration>;
         using base::base;      // inherit constructors: atomic(), atomic(Duration)
         using base::operator=; // inherit: Duration operator=(Duration)
-
-    #if !MIPS // mips is 32-bit, so this will not be atomic
-        static_assert(base::is_always_lock_free,
-            "std::atomic<Duration> must be lock-free (requires 64-bit platform)");
-    #endif // !MIPS
 
         // default initialize to zero, because it's not the default for atomics
         AtomicDuration() noexcept : base{Duration::zero()}
@@ -83,19 +81,14 @@ namespace rpp
     /**
      * @brief Lock-free atomic TimePoint for thread-safe timepoint arithmetic.
      *
-     * Inherits load/store/exchange/compare_exchange from std::atomic<TimePoint>.
+     * Inherits load/store/exchange/compare_exchange from rpp::atomic<TimePoint>.
      * Adds atomic += and -= operators (with Duration operand) via CAS loops.
      */
-    struct RPPAPI AtomicTimePoint : std::atomic<TimePoint>
+    struct RPPAPI AtomicTimePoint : rpp::atomic<TimePoint>
     {
-        using base = std::atomic<TimePoint>;
+        using base = rpp::atomic<TimePoint>;
         using base::base;      // inherit constructors: atomic(), atomic(TimePoint)
         using base::operator=; // inherit: TimePoint operator=(TimePoint)
-
-    #if !MIPS // mips is 32-bit, so this will not be atomic
-        static_assert(base::is_always_lock_free,
-            "std::atomic<TimePoint> must be lock-free (requires 64-bit platform)");
-    #endif // !MIPS
 
         // default initialize to zero, because it's not the default for atomics
         AtomicTimePoint() noexcept : base{TimePoint::zero()}
@@ -135,13 +128,13 @@ namespace rpp
     class RPPAPI AtomicTimeSource
     {
         // combines sync and warp offsets atomically
-        std::atomic<rpp::int64> combined_offset_ns {};
+        rpp::atomic<rpp::int64> combined_offset_ns {};
 
         // sync offset to apply to current time
-        std::atomic<rpp::int64> sync_offset_ns {};
+        rpp::atomic<rpp::int64> sync_offset_ns {};
 
         // time warp offset to apply to current time, can be used for time warping in simulations
-        std::atomic<rpp::int64> warp_offset_ns {};
+        rpp::atomic<rpp::int64> warp_offset_ns {};
         std::atomic<rpp::ClockType> base_clock { rpp::ClockType::Realtime }; // Monotonic ignores a wall clock step
 
     public:
