@@ -286,6 +286,8 @@ TestImpl(test_async)
         AssertThat(co_awaits<std::future<int>>, false);
     }
 
+    // Each caller drains the task before its referenced locals leave scope.
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-reference-coroutine-parameters)
     static rpp::event_task await_on_loop(rpp::event_loop& loop, future<int> result, int& value, rpp::uint64& thread)
     {
         value = co_await loop.run_async(std::move(result));
