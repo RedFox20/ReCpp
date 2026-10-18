@@ -2,6 +2,17 @@
 #include <rpp/proc_utils.h>
 #include <rpp/tests.h>
 #include <thread>
+#if __linux__ // Android also defines __linux__.
+    #include <rpp/file_io.h> // rpp::file
+    #include <rpp/threads.h> // rpp::yield
+    #include <atomic> // std::atomic_bool
+    #include <csignal> // sigaction
+    #include <cstdio> // sscanf
+    #include <ctime> // CLOCK_MONOTONIC, TIMER_ABSTIME
+    #include <string> // std::to_string
+    #include <pthread.h> // pthread_kill
+    #include <unistd.h> // gettid
+#endif
 
 namespace rpp {
     string_buffer& operator<<(string_buffer& sb, const Duration& d) noexcept
@@ -115,6 +126,57 @@ TestImpl(test_timer)
             AssertInRange(elapsed_ns, 99'999, 7'100'200); // OS sleep can never be accurate enough, so the range must be very loose
         }
     }
+
+#if __linux__
+    // A thread which blocks in a system call shows its number and arguments in this file, else the word "running".
+    static bool read_blocked_syscall(const std::string& path, unsigned long long& clock, unsigned long long& flags)
+    {
+        char text[256];
+        rpp::file f { path, rpp::file::READONLY };
+        const int len = f ? f.read(text, sizeof(text) - 1) : 0;
+        text[len > 0 ? len : 0] = '\0';
+        long long nr = -1;
+        return sscanf(text, "%lld %llx %llx", &nr, &clock, &flags) == 3 && nr >= 0;
+    }
+
+    // A wall clock step moves no CLOCK_MONOTONIC deadline, and a signal must not end the sleep early.
+    TestCase(sleep_waits_for_a_monotonic_deadline_through_a_signal)
+    {
+        static std::atomic_bool handled;
+        handled = false;
+        struct sigaction on_signal {};
+        struct sigaction old_signal {};
+        on_signal.sa_handler = [](int) { handled = true; };
+        sigaction(SIGUSR1, &on_signal, &old_signal);
+
+        const rpp::Duration sleep = rpp::millis(10);
+        std::atomic<pid_t> sleeper_tid { 0 };
+        std::atomic_bool done { false };
+        rpp::Duration slept;
+        std::thread sleeper { [&] {
+            sleeper_tid = gettid();
+            const rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+            rpp::sleep_ns(sleep.nsec);
+            slept = rpp::TimePoint::monotonic_now() - start;
+            done = true;
+        }};
+        while (sleeper_tid == 0) rpp::yield();
+        const std::string path = "/proc/self/task/" + std::to_string(sleeper_tid) + "/syscall";
+        unsigned long long clock = ~0ull;
+        unsigned long long flags = ~0ull;
+        bool blocked = false;
+        while (!blocked && !done) blocked = read_blocked_syscall(path, clock, flags); // The end of the sleep ends this wait.
+        pthread_kill(sleeper.native_handle(), SIGUSR1);
+        sleeper.join();
+        sigaction(SIGUSR1, &old_signal, nullptr);
+
+        AssertTrue(blocked);
+        AssertEqual(clock, static_cast<unsigned long long>(CLOCK_MONOTONIC));
+        AssertEqual(flags, static_cast<unsigned long long>(TIMER_ABSTIME));
+        AssertTrue(handled);
+        AssertGreaterOrEqual(slept.nsec, sleep.nsec);
+    }
+#endif
 
     TestCase(duration_conversion)
     {
