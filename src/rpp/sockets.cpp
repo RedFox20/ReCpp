@@ -1508,6 +1508,43 @@ namespace rpp
         return result == 1; // TCP_NODELAY: 1 nodelay, 0 nagle enabled
     }
 
+    bool socket::set_dscp(int dscp) noexcept
+    {
+        if (dscp < 0 || dscp > 63)
+        {
+            set_errno(ESOCK(EINVAL));
+            return false;
+        }
+    #if _WIN32
+        set_errno(ESOCK(EOPNOTSUPP)); // only the qWAVE QoS API sets the DSCP on Windows
+        return false;
+    #else
+        std::unique_lock lock = rpp::spin_lock(Mtx); // the same handle for the family and the options
+        auto set_tos = [this, dscp](int level, int option)
+        {
+            const int tos = get_opt(level, option); // the DSCP takes the top 6 bits, the 2 ECN bits stay
+            return set_opt(level, option, (dscp << 2) | (tos < 0 ? 0 : tos & 3)) == 0;
+        };
+        if (ipaddress{os_handle_unsafe()}.Address.Family != AF_IPv6) // also before bind(), unlike family()
+            return set_tos(IPPROTO_IP, IP_TOS);
+        set_tos(IPPROTO_IP, IP_TOS); // the IPv4 packets of a dual-stack socket. Darwin refuses it
+        return set_tos(IPPROTO_IPV6, IPV6_TCLASS);
+    #endif
+    }
+
+    int socket::get_dscp() const noexcept
+    {
+    #if _WIN32
+        set_errno(ESOCK(EOPNOTSUPP));
+        return -1;
+    #else
+        std::unique_lock lock = rpp::spin_lock(Mtx);
+        const bool ipv6 = ipaddress{os_handle_unsafe()}.Address.Family == AF_IPv6;
+        const int tos = get_opt(ipv6 ? IPPROTO_IPV6 : IPPROTO_IP, ipv6 ? IPV6_TCLASS : IP_TOS);
+        return tos < 0 ? -1 : tos >> 2;
+    #endif
+    }
+
     bool socket::set_buf_size(buffer_option opt, size_t size, [[maybe_unused]] bool force) noexcept
     {
         int which = (opt == BO_Recv ? SO_RCVBUF : SO_SNDBUF);
