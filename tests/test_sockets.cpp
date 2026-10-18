@@ -328,6 +328,58 @@ TestImpl(test_sockets)
         AssertTrue(sock.is_nodelay());
     }
 
+    TestCase(udp_socket_sets_the_dscp)
+    {
+        socket v4 = create_udp_listener();
+        socket v6 = socket::make_udp(ipaddress6{"::1", 0});
+        AssertTrue(v6.good());
+        AssertFalse(v4.set_dscp(64)); // a DSCP has 6 bits
+    #if _WIN32
+        AssertFalse(v4.set_dscp(46));
+        AssertEqual(v4.get_dscp(), -1);
+    #else
+        AssertTrue(v4.set_dscp(46));
+        AssertEqual(v4.get_dscp(), 46);
+        AssertTrue(v4.set_dscp(0));
+        AssertEqual(v4.get_dscp(), 0);
+        AssertTrue(v6.set_dscp(46));
+        AssertEqual(v6.get_dscp(), 46);
+    #if __linux__ // the Linux values, because <netinet/in.h> makes rpp::socket ambiguous here
+        AssertEqual(v6.get_opt(/*IPPROTO_IPV6*/ 41, /*IPV6_TCLASS*/ 67), 46 << 2);
+        AssertTrue(v4.set_dscp(46));
+        AssertEqual(v4.get_opt(/*IPPROTO_IP*/ 0, /*IP_TOS*/ 1), 46 << 2);
+        AssertEqual(v4.set_opt(/*IPPROTO_IP*/ 0, /*IP_TOS*/ 1, 1), 0); // ECN ECT(1)
+        AssertTrue(v4.set_dscp(10));
+        AssertEqual(v4.get_opt(/*IPPROTO_IP*/ 0, /*IP_TOS*/ 1), (10 << 2) | 1); // set_dscp() keeps the ECN bits
+        socket unbound; // family() stays empty until bind() or connect(). Linux makes a socket on ::1 IPv6-only
+        AssertTrue(unbound.create(AF_IPv6, IPP_UDP));
+        AssertTrue(unbound.set_dscp(46));
+        AssertEqual(unbound.get_opt(/*IPPROTO_IPV6*/ 41, /*IPV6_TCLASS*/ 67), 46 << 2);
+        AssertEqual(unbound.get_opt(/*IPPROTO_IP*/ 0, /*IP_TOS*/ 1), 46 << 2); // its IPv4 packets, it is dual-stack
+    #endif
+    #endif
+    }
+
+#if !_WIN32
+    // set_dscp() and get_dscp() must not read the family of one socket and the options of the next
+    TestCase(dscp_calls_use_one_socket_while_another_thread_recreates_it)
+    {
+        socket s;
+        AssertTrue(s.create(AF_IPv6, IPP_UDP));
+        std::atomic_bool done = false;
+        std::thread swapper { [&] { for (int i = 0; !done; ++i) s.create(i % 2 ? AF_IPv6 : AF_IPv4, IPP_UDP); } };
+        int failed = 0;
+        for (int i = 0; i < 500; ++i)
+        {
+            if (!s.set_dscp(46) || s.get_dscp() < 0)
+                ++failed;
+        }
+        done = true;
+        swapper.join();
+        AssertEqual(failed, 0);
+    }
+#endif
+
     TestCase(tcp_socket_options)
     {
         socket sock = rpp::make_tcp_randomport();

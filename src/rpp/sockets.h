@@ -1025,6 +1025,18 @@ namespace rpp
          */
         bool is_nodelay() const noexcept;
 
+        /**
+         * Sets the DSCP of every packet this socket sends, such as 46 for EF: IP_TOS on IPv4, IPV6_TCLASS on IPv6.
+         * The 2 ECN bits below the DSCP keep their value.
+         * A dual-stack IPv6 socket also gets IP_TOS for its IPv4 packets. Darwin refuses that, and the result ignores it.
+         * @param dscp Differentiated Services Code Point, 0 to 63
+         * @return TRUE on success. Windows ignores IP_TOS, so it returns false there. Check socket::last_err()
+         */
+        bool set_dscp(int dscp) noexcept;
+
+        /** @return The DSCP of the packets this socket sends, or -1 on error. Windows always gives -1 */
+        int get_dscp() const noexcept;
+
         enum buffer_option
         {
             BO_Recv, // SO_RCVBUF
