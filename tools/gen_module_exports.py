@@ -416,7 +416,7 @@ GROUP_HEADERS = {
     'core': ('config.types.h', 'debugging.h', 'source_loc.h', 'traits.h', 'type_traits.h',
              'predicates.h', 'scope_guard.h', 'delegate.h', 'proc_utils.h', 'stack_trace.h',
              'endian.h', 'bitutils.h'),
-    'text': ('strview.h', 'sprint.h', 'obfuscated_string.h'),
+    'text': ('strview.h', 'sprint.h', 'obfuscated_string.h', 'unicode.h'),
     'numeric': ('math.h', 'minmax.h', 'vec.h', 'sort.h'),
     'time': ('timepoint.h', 'timer.h', 'atomic_timepoint.h'),
     'containers': ('collections.h', 'memory_pool.h', 'load_balancer.h'),

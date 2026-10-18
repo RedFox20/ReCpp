@@ -3,6 +3,7 @@
 #endif
 
 #include <rpp/tests.h>
+#include <rpp/unicode.h>
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
 #include <limits>
 #include <unordered_map>
@@ -475,6 +476,21 @@ TestImpl(test_strview)
         AssertEqual(rpp::strview{buf}, "a");
         AssertEqual(rpp::to_string(buf, 6, u"a𝕳"), 5);
         AssertEqual(rpp::strview{buf}, rpp::strview{u8"a𝕳"});
+    }
+
+    TestCase(utf16_to_wtf8_resumes_at_the_sequence_which_did_not_fit)
+    {
+        // The input is 'a', U+00E9, U+1D573 as a surrogate pair and a lone high surrogate, which takes 3 bytes.
+        const char16_t in[] = { u'a', 0xE9, 0xD835, 0xDD73, 0xD835 };
+        char out[10];
+        int i = 0;
+        AssertEqual(rpp::utf16_to_wtf8(out, 6, in, 5, i), 3);
+        AssertEqual(i, 2);
+        AssertEqual(rpp::utf16_to_wtf8(out + 3, 6, in, 5, i), 4);
+        AssertEqual(i, 4);
+        AssertEqual(rpp::utf16_to_wtf8(out + 7, 3, in, 5, i), 3);
+        AssertEqual(i, 5);
+        AssertEqual(rpp::strview(out, 10), "a\xC3\xA9\xF0\x9D\x95\xB3\xED\xA0\xB5");
     }
 
     // Without a wchar_t overload, a wide string converts to bool and to_string(bool) wins,

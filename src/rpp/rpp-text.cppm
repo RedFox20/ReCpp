@@ -5,6 +5,7 @@ module;
 #include "strview.h"
 #include "sprint.h"
 #include "obfuscated_string.h"
+#include "unicode.h"
 
 export module rpp.text;
 
@@ -63,6 +64,13 @@ export namespace rpp {
     using rpp::format;
     using rpp::obfuscated_string;
     using rpp::make_obfuscated;
+    using rpp::utf8_decode;
+    using rpp::utf16_decode;
+    using rpp::utf8_size;
+    using rpp::utf16_size;
+    using rpp::utf8_encode;
+    using rpp::utf16_encode;
+    using rpp::utf16_to_wtf8;
 #if RPP_ENABLE_UNICODE
     using rpp::ustrview;
     using rpp::to_ustring;

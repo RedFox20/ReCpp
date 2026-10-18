@@ -8,6 +8,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `config.types.h` | Base integer type aliases and size macros, exported by module rpp.core |
 | `strview.h` | Non-owning string view with tokenization and search |
 | `sprint.h` | String builder, type-safe formatting, to_string |
+| `unicode.h` | UTF-8 and UTF-16 code point decoders and encoders |
 | `file_io.h` | Cross-platform file read and write, RAII file handles |
 | `paths.h` | Path manipulation, directory listing, filesystem helpers |
 | `delegate.h` | Fast function delegates and multicast events |
