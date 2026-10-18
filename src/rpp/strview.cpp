@@ -3,36 +3,15 @@
  */
 // ReSharper disable IdentifierTypo
 // ReSharper disable CommentTypo
-#if defined(__clang__) || defined(__GNUC__)
-#  define _LIBCPP_DISABLE_DEPRECATION_WARNINGS 1 // NOLINT(bugprone-reserved-identifier)
-#endif
 #include "strview.h"
 #include <math.h> // use math.h for GCC compatibility  // NOLINT
 #include <cstdlib>
 #include <cstring> // memcpy
-#include <locale> // toupper
+#include <cctype> // toupper
 #include <cfloat> // DBL_MAX
 #include <cstdint> // UINT64_MAX
 #include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
-
-// NOLINTBEGIN(clang-diagnostic-deprecated-declarations)
-#if _WIN32
-    #define WIN32_LEAN_AND_MEAN
-    #include <Windows.h>
-    #define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING 1
-    #include <codecvt> // codecvt_utf8
-#else
-    // TODO: codecvt is deprected, but the other API-s don't even work
-    #if defined(__clang__) || defined(__GNUC__)
-    #  pragma GCC diagnostic push
-    #  pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    #endif
-    #include <codecvt> // codecvt_utf8
-    #if defined(__clang__) || defined(__GNUC__)
-    #  pragma GCC diagnostic pop
-    #endif
-#endif
 
 namespace rpp
 {
@@ -1132,141 +1111,111 @@ namespace rpp
     }
 
 #if RPP_ENABLE_UNICODE
-    // TODO: codecvt is deprected, but the other API-s don't even work
-    #if defined(__clang__) || defined(__GNUC__)
-    #pragma GCC diagnostic push
-    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-    #endif
+    // Decodes the code point at utf16[i] and moves i past it. Returns -1 for a lone surrogate.
+    static int utf16_decode(const char16_t* utf16, int len, int& i) noexcept
+    {
+        const int unit = utf16[i++];
+        if (unit < 0xD800 || unit > 0xDFFF) return unit;
+        const int low = i < len ? utf16[i] : 0;
+        if (unit > 0xDBFF || low < 0xDC00 || low > 0xDFFF) return -1;
+        ++i;
+        return 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00);
+    }
+
+    // Decodes the code point at utf8[i] and moves i past it. Returns -1 for an invalid or truncated sequence.
+    static int utf8_decode(const char* utf8, int len, int& i) noexcept
+    {
+        static constexpr int MIN_CODE_POINT[] = { 0, 0x80, 0x800, 0x10000 };
+        int cp = static_cast<unsigned char>(utf8[i++]);
+        if (cp < 0x80) return cp;
+        if (cp < 0xC2 || cp > 0xF4) return -1; // A continuation byte, an overlong lead or a lead over U+10FFFF is invalid.
+        const int tail = 1 + (cp >= 0xE0) + (cp >= 0xF0);
+        if (len - i < tail) return -1;
+        cp &= 0x3F >> tail;
+        for (const int end = i + tail; i < end; ++i)
+        {
+            const int byte = static_cast<unsigned char>(utf8[i]);
+            if ((byte & 0xC0) != 0x80) return -1;
+            cp = (cp << 6) | (byte & 0x3F);
+        }
+        if (cp < MIN_CODE_POINT[tail] || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) return -1;
+        return cp;
+    }
+
+    // Writes only whole sequences, at most out_max bytes. Returns the byte count, or -1 for invalid input.
+    static int utf16_to_utf8(char* out, int out_max, const char16_t* utf16, int utf16len) noexcept
+    {
+        static constexpr int LEAD_BITS[] = { 0x00, 0xC0, 0xE0, 0xF0 };
+        int n = 0;
+        for (int i = 0; i < utf16len;)
+        {
+            const int cp = utf16_decode(utf16, utf16len, i);
+            if (cp < 0) return -1;
+            const int tail = (cp >= 0x80) + (cp >= 0x800) + (cp >= 0x10000);
+            if (n + 1 + tail > out_max) break;
+            out[n++] = static_cast<char>(LEAD_BITS[tail] | (cp >> (6 * tail)));
+            for (int shift = 6 * (tail - 1); shift >= 0; shift -= 6)
+                out[n++] = static_cast<char>(0x80 | ((cp >> shift) & 0x3F));
+        }
+        return n;
+    }
+
+    // Writes only whole code points, at most out_max units. Returns the unit count, or -1 for invalid input.
+    static int utf8_to_utf16(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
+    {
+        int n = 0;
+        for (int i = 0; i < utf8len;)
+        {
+            const int cp = utf8_decode(utf8, utf8len, i);
+            if (cp < 0) return -1;
+            const bool pair = cp >= 0x10000;
+            if (n + 1 + pair > out_max) break;
+            if (pair)
+            {
+                out[n++] = static_cast<char16_t>(0xD800 + ((cp - 0x10000) >> 10));
+                out[n++] = static_cast<char16_t>(0xDC00 + (cp & 0x3FF));
+            }
+            else
+            {
+                out[n++] = static_cast<char16_t>(cp);
+            }
+        }
+        return n;
+    }
 
     string to_string(const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
-        if (utf16len == 0) return string{}; // empty string
-
-    #if false && _WIN32
-        int utf8len = WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)utf16, utf16len,
-                                          nullptr, 0, nullptr, nullptr);
-        string ret;
-        if (utf8len > 0) {
-            ret.resize(utf8len);
-            WideCharToMultiByte(CP_UTF8, 0, (const wchar_t*)utf16, utf16len,
-                                (char*)ret.data(), utf8len, nullptr, nullptr);
-        }
+        string ret(static_cast<size_t>(utf16len) * 3, '\0'); // a UTF-16 unit never takes more UTF-8 bytes than this
+        const int len = utf16_to_utf8(ret.data(), static_cast<int>(ret.size()), utf16, utf16len);
+        ret.resize(len < 0 ? 0 : static_cast<size_t>(len));
         return ret;
-    #elif RPP_HAS_CXX26 && __clang__
-        return string{}; // wstring_convert completely deprecated on Clang
-    #else
-        // TODO: codecvt is deprected, but the other API-s don't even work
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
-        try {
-            return cvt.to_bytes(utf16, utf16 + utf16len);
-        } catch (...) {
-            return string{}; // conversion failed, return empty string
-        }
-    #endif
     }
 
     int to_string(char* out, int out_max, const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
-        if (utf16len == 0) {
-            *out = '\0'; // always null terminate
-            return 0;
-        }
-
-    #if false && _WIN32
-    #elif RPP_HAS_CXX26 && __clang__
-        (void)out_max;
-        // codecvt_utf8_utf16 completely deprecated on Clang, no alternative API available
-    #else
-        // TODO: codecvt is deprected, but the other API-s don't even work
-        std::codecvt_utf8_utf16<char16_t> cvt;
-        std::mbstate_t state = std::mbstate_t();
-        char* to_next;
-        const char16_t* from_next;
-        const char16_t* from_end = utf16 + utf16len;
-        auto res = cvt.out(state, utf16, from_end, from_next, out, out + out_max - 1, to_next);
-        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
-            *to_next = u'\0'; // always null terminate
-            return (int)(to_next - out);
-        }
-    #endif
-
-        *out = u'\0'; // always null terminate
-        return -1;
+        const int len = utf16_to_utf8(out, out_max - 1, utf16, utf16len);
+        out[len < 0 ? 0 : len] = '\0'; // always null terminate
+        return len;
     }
 
     ustring to_ustring(const char* utf8, int utf8len) noexcept
     {
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        if (utf8len == 0) return ustring{};
-
-    #if false && _WIN32
-        int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, nullptr, 0);
-        ustring ret;
-        if (wlen > 0) {
-            ret.resize(wlen);
-            MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)ret.data(), wlen);
-        }
+        ustring ret(static_cast<size_t>(utf8len), u'\0'); // a UTF-8 sequence never gives more UTF-16 units than it has bytes
+        const int len = utf8_to_utf16(ret.data(), static_cast<int>(ret.size()), utf8, utf8len);
+        ret.resize(len < 0 ? 0 : static_cast<size_t>(len));
         return ret;
-    #elif RPP_HAS_CXX26 && __clang__
-        return ustring{}; // wstring_convert completely deprecated on Clang, no alternative API available
-    #else
-        // TODO: codecvt is deprected, but the other API-s don't even work
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> cvt;
-        try {
-            return cvt.from_bytes(utf8, utf8 + utf8len);
-        } catch (...) {
-            return ustring{}; // conversion failed, return empty string
-        }
-    #endif
     }
-    
+
     int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
     {
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        if (utf8len == 0) {
-            *out = u'\0'; // always null terminate
-            return 0;
-        }
-
-    #if false && _WIN32
-        int utf16len = MultiByteToWideChar(CP_UTF8, 0, utf8, utf8len, (wchar_t*)out, out_max - 1);
-        if (utf16len <= 0/*failed*/) {
-            int lasterr = GetLastError();
-            if (lasterr == ERROR_INSUFFICIENT_BUFFER) {
-                utf16len = out_max - 1;
-            } else {
-                *out = u'\0'; // always null terminate
-                return -1; // failed -- invalid unicode characters or invalid inputs
-            }
-        }
-        out[utf16len] = u'\0'; // always null terminate
-        return utf16len; // success
-    #elif RPP_HAS_CXX26 && __clang__
-        (void)out_max;
-        *out = u'\0'; // always null terminate
-        return -1; // wstring_convert completely deprecated on Clang, no alternative API available
-    #else
-        // TODO: codecvt is deprected, but the other API-s have even more issues
-        std::codecvt_utf8_utf16<char16_t> cvt;
-        std::mbstate_t state = std::mbstate_t();
-        char16_t* to_next;
-        const char* from_next;
-        const char* from_end = utf8 + utf8len;
-        auto res = cvt.in(state, utf8, from_end, from_next, out, out + out_max - 1, to_next);
-        if (res == std::codecvt_base::ok || res == std::codecvt_base::partial) {
-            *to_next = u'\0'; // always null terminate
-            return (int)(to_next - out);
-        }
-        *out = u'\0'; // always null terminate
-        return -1;
-    #endif
+        const int len = utf8_to_utf16(out, out_max - 1, utf8, utf8len);
+        out[len < 0 ? 0 : len] = u'\0'; // always null terminate
+        return len;
     }
-
-    #if defined(__clang__) || defined(__GNUC__)
-    #pragma GCC diagnostic pop
-    #endif
 #endif // RPP_ENABLE_UNICODE
 
     ///////////// line_parser
@@ -1398,7 +1347,5 @@ namespace rpp
     }
 
     ////////////////////////////////////////////////////////////////////////////////
-    
-} // namespace rpp
 
-// NOLINTEND(clang-diagnostic-deprecated-declarations)
+} // namespace rpp
