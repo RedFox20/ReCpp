@@ -418,6 +418,65 @@ TestImpl(test_strview)
         AssertEqual(path.length(), 23);
     }
 
+    TestCase(can_convert_every_utf8_length_and_surrogate_edge)
+    {
+        // The samples are the first and last code point of each UTF-8 length and the code points around the surrogates.
+        const char8_t* utf8 = u8"\u007F\u0080\u07FF\u0800\uD7FF\uE000\uFFFF\U00010000\U0010FFFF";
+        const char16_t* utf16 = u"\u007F\u0080\u07FF\u0800\uD7FF\uE000\uFFFF\U00010000\U0010FFFF";
+        AssertEqual(rpp::to_ustring(utf8), utf16);
+        AssertEqual(rpp::to_string(utf16), utf8);
+
+        char buf[64];
+        char16_t ubuf[64];
+        for (rpp::strview s : { rpp::strview{utf8}, rpp::strview{u8"hello: 𝕳𝖊𝖑𝖑𝖔"}, rpp::strview{u8"hello: Привет"},
+                                rpp::strview{u8"hello: 你好"}, rpp::strview{u8"valid utf8: 😀 𝄞 ℵ €"} })
+        {
+            const int ulen = rpp::to_ustring(ubuf, 64, s.str, s.len);
+            AssertEqual(rpp::to_string(buf, 64, ubuf, ulen), s.len);
+            AssertEqual(rpp::strview{buf}, s);
+        }
+    }
+
+    TestCase(utf8_to_utf16_refuses_invalid_input)
+    {
+        char16_t ubuf[16];
+        // The inputs are an overlong '/', an encoded surrogate, a code point over U+10FFFF and a truncated tail.
+        for (const char* bad : { "\xC0\xAF", "\xED\xA0\x80", "\xF4\x90\x80\x80", "ok\xF0\x9D\x95" })
+        {
+            AssertEqual(rpp::to_ustring(bad), u"");
+            AssertEqual(rpp::to_ustring(ubuf, 16, bad), -1);
+            AssertEqual(ubuf[0], u'\0');
+        }
+    }
+
+    TestCase(utf16_to_utf8_refuses_lone_surrogates)
+    {
+        char buf[16];
+        // The inputs are a high surrogate at the end, a high surrogate before a BMP unit and a low surrogate alone.
+        for (const char16_t* bad : { u"a\xD835", u"\xD835" u"b", u"a\xDD73" u"b" })
+        {
+            AssertEqual(rpp::to_string(bad), "");
+            AssertEqual(rpp::to_string(buf, 16, bad), -1);
+            AssertEqual(buf[0], '\0');
+        }
+    }
+
+    TestCase(utf_conversion_never_splits_a_sequence_in_a_short_buffer)
+    {
+        // U+1D573 takes two UTF-16 units and four UTF-8 bytes. The buffer also holds the terminator.
+        char16_t ubuf[4];
+        AssertEqual(rpp::to_ustring(ubuf, 3, u8"a𝕳"), 1);
+        AssertEqual(ubuf, u"a");
+        AssertEqual(rpp::to_ustring(ubuf, 4, u8"a𝕳"), 3);
+        AssertEqual(ubuf, u"a𝕳");
+
+        char buf[6];
+        AssertEqual(rpp::to_string(buf, 5, u"a𝕳"), 1);
+        AssertEqual(rpp::strview{buf}, "a");
+        AssertEqual(rpp::to_string(buf, 6, u"a𝕳"), 5);
+        AssertEqual(rpp::strview{buf}, rpp::strview{u8"a𝕳"});
+    }
+
     // Without a wchar_t overload, a wide string converts to bool and to_string(bool) wins,
     // so every wide string becomes "true". That shipped, and get_thread_name() returned it.
     TestCase(can_convert_wide_string_to_utf8)
