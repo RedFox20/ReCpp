@@ -139,7 +139,7 @@ directly, so the group is the unit you import:
 | Module | Carries |
 |---|---|
 | `rpp.core` | config.types, debugging, source_loc, traits, type_traits, predicates, scope_guard, delegate, proc_utils, stack_trace, endian, bitutils |
-| `rpp.text` | strview, sprint, obfuscated_string |
+| `rpp.text` | strview, sprint, obfuscated_string, unicode |
 | `rpp.numeric` | math, minmax, vec, sort |
 | `rpp.time` | timepoint, timer, atomic_timepoint |
 | `rpp.containers` | collections, memory_pool, load_balancer |
@@ -311,6 +311,7 @@ See `BUGS.md` B8.
 |--------|--------|-------------|
 | [Config](#rppconfigh) | [`config.h`](src/rpp/config.h) | Platform detection and compiler macros, with the base type aliases in [`config.types.h`](src/rpp/config.types.h) |
 | [String View](#rppstrviewh) | [`strview.h`](src/rpp/strview.h) | Lightweight non-owning string view with fast tokenization, parsing, and search |
+| [Unicode](#rppunicodeh) | [`unicode.h`](src/rpp/unicode.h) | UTF-8 and UTF-16 code point decoders and encoders |
 | [String Formatting](#rppsprinth) | [`sprint.h`](src/rpp/sprint.h) | String builder, type-safe formatting, and `to_string` conversions |
 | [File I/O](#rppfile_ioh) | [`file_io.h`](src/rpp/file_io.h) | Cross-platform file read/write with RAII file handles |
 | [Paths](#rpppathsh) | [`paths.h`](src/rpp/paths.h) | Path manipulation, directory listing, and filesystem utilities |
@@ -821,6 +822,33 @@ if (padded.starts_with(u"hel"))
 // convert to UTF-8 std::string and back to UTF-16
 std::string utf8 = rpp::to_string(name);
 rpp::ustring utf16 = rpp::to_ustring(utf8); // rpp::ustring is alias for std::u16string
+```
+
+---
+
+## rpp/unicode.h
+
+UTF-8 and UTF-16 code point primitives, defined in `unicode.cpp` with the `to_string()` and `to_ustring()` conversions of `strview.h`. `string_buffer` writes UTF-16 through `utf16_to_wtf8()`. The decoders refuse overlong forms, surrogates in UTF-8, lone surrogates in UTF-16, code points over U+10FFFF and truncated sequences.
+
+| Function | Description |
+|----------|-------------|
+| [`utf8_decode(const char* utf8, int len, int& i)`](src/rpp/unicode.h#L16) | Decodes the UTF-8 code point at `utf8[i]` and moves `i` past it, or returns -1 |
+| [`utf16_decode(const char16_t* utf16, int len, int& i)`](src/rpp/unicode.h#L22) | Decodes the UTF-16 code point at `utf16[i]` and moves `i` past it, or returns -1 |
+| [`utf8_size(char32_t cp)`](src/rpp/unicode.h#L25) | Returns the UTF-8 byte count of a code point, from 1 to 4 |
+| [`utf16_size(char32_t cp)`](src/rpp/unicode.h#L28) | Returns the UTF-16 unit count of a code point, 1 or 2 |
+| [`utf8_encode(char* out, char32_t cp)`](src/rpp/unicode.h#L34) | Writes the UTF-8 form of a code point and returns its byte count |
+| [`utf16_encode(char16_t* out, char32_t cp)`](src/rpp/unicode.h#L40) | Writes the UTF-16 form of a code point and returns its unit count |
+| [`utf16_to_wtf8(char* out, int out_max, const char16_t* utf16, int len, int& i)`](src/rpp/unicode.h#L47) | Writes UTF-16 as UTF-8 while whole sequences fit, a lone surrogate as its 3-byte form, and moves `i` past them |
+
+```cpp
+#include <rpp/unicode.h>
+
+const char* utf8 = "a€"; // the euro sign takes 3 bytes
+int i = 0;
+int a = rpp::utf8_decode(utf8, 4, i);    // 'a', and i is 1
+int euro = rpp::utf8_decode(utf8, 4, i); // 0x20AC, and i is 4
+char16_t utf16[2];
+int units = rpp::utf16_encode(utf16, euro); // 1
 ```
 
 ---

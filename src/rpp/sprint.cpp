@@ -1,4 +1,5 @@
 #include "sprint.h"
+#include "unicode.h" // rpp::utf8_encode, rpp::utf16_to_wtf8
 #include <cstdarg> // va_start
 #include <cstdlib> // malloc/free/realloc
 #include <cstring> // memcpy
@@ -159,54 +160,18 @@ namespace rpp
 #if RPP_ENABLE_UNICODE
     void string_buffer::write_codepoint(char32_t codepoint) noexcept
     {
-        int char_size;
-        if      (codepoint <= 0x7F)   char_size = 1;
-        else if (codepoint <= 0x7FF)  char_size = 2;
-        else if (codepoint <= 0xFFFF) char_size = 3;
-        else                          char_size = 4;
-        reserve(char_size);
-
-        if (char_size == 1)
-        {
-            ptr[len++] = (static_cast<char>(codepoint));
-        }
-        else if (char_size == 2)
-        {
-            ptr[len++] = (static_cast<char>(0xC0 | (codepoint >> 6)));
-            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-        }
-        else if (char_size == 3)
-        {
-            ptr[len++] = (static_cast<char>(0xE0 | (codepoint >> 12)));
-            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-        }
-        else
-        {
-            ptr[len++] = (static_cast<char>(0xF0 | (codepoint >> 18)));
-            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
-            ptr[len++] = (static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
-            ptr[len++] = (static_cast<char>(0x80 | (codepoint & 0x3F)));
-        }
+        reserve(utf8_size(codepoint));
+        len += utf8_encode(&ptr[len], codepoint);
     }
 
     void string_buffer::write_utf16_as_utf8(const char16_t* utf16, int utflength) noexcept
     {
-        // if UTF-16 contains only ASCII, then UTF-8 will be the same length
-        // so best case scenario we can reserve the same length, however we will dynamically append
-        reserve(utflength);
-
-        for (int i = 0; i < utflength; ++i)
+        for (int i = 0; i < utflength;)
         {
-            char32_t codepoint = utf16[i];
-            if (codepoint >= 0xD800 && codepoint <= 0xDBFF && (i+1) < utflength)
-            {
-                // Handle surrogate pairs
-                char32_t high = codepoint - 0xD800;
-                char32_t low = utf16[++i] - 0xDC00; // consume i+1 pair
-                codepoint = (high << 10) + low + 0x10000;
-            }
-            write_codepoint(codepoint);
+            reserve(utflength - i + 3); // ASCII takes a byte a unit, and 3 more bytes hold any code point.
+            const int written = utf16_to_wtf8(&ptr[len], cap - 1 - len, utf16, utflength, i);
+            if (written == 0) break; // reserve() got no memory, so the text ends with what fits.
+            len += written;
         }
         ptr[len] = '\0';
     }

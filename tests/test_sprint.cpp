@@ -9,6 +9,13 @@
 #include <rpp/tests.h>
 #include <string> // std::string
 #include <vector> // std::vector
+#if __linux__
+#include <cstdio> // fopen, fscanf
+#include <cstdlib> // malloc, free
+#include <sys/resource.h> // setrlimit
+#include <sys/wait.h> // waitpid
+#include <unistd.h> // fork, alarm, _exit, sysconf
+#endif
 
 using namespace rpp;
 
@@ -406,6 +413,63 @@ TestImpl(test_sprint)
         sb.write(L""); // an empty wide string appends nothing
         AssertThat(sb.size(), 0);
     }
+
+    // A high surrogate before a unit which is no low surrogate stays alone, and the unit after it stays too.
+    TestCase(string_buffer_write_utf16_keeps_each_lone_surrogate)
+    {
+        string_buffer sb;
+        sb.write_utf16_as_utf8(u"a\xD835" u"b", 3);
+        AssertThat(sb.view(), "a\xED\xA0\xB5" "b");
+        sb.clear();
+
+        sb.write_utf16_as_utf8(u"\xDD73" u"c\xD835", 3); // The inputs are a lone low surrogate and a high one at the end.
+        AssertThat(sb.view(), "\xED\xB5\xB3" "c\xED\xA0\xB5");
+        sb.clear();
+
+        sb.write_utf16_as_utf8(u"x𝕳", 3);
+        AssertThat(sb.view(), rpp::strview{u8"x𝕳"});
+    }
+
+    TestCase(string_buffer_write_utf16_grows_past_its_first_reserve)
+    {
+        // U+4F60 takes 3 bytes for its one unit, so the first reserve of a byte a unit holds only part of the text.
+        rpp::ustring text;
+        for (int i = 0; i < 1000; ++i) text += u"你a\U0001D573";
+        const std::string expected = rpp::to_string(text);
+        string_buffer sb;
+        sb.write(text);
+        AssertThat(sb.view(), rpp::strview{expected});
+    }
+
+#if __linux__ && !RPP_SANITIZERS
+    // A child process limits its address space, so reserve() fails. The writer keeps what fits and ends.
+    TestCase(string_buffer_write_utf16_ends_when_reserve_fails)
+    {
+        const rpp::ustring text(8 * 1024 * 1024, u'a');
+        const pid_t child = fork();
+        if (child == 0)
+        {
+            alarm(1); // A writer which does not end dies of SIGALRM.
+            long pages = 0;
+            FILE* statm = fopen("/proc/self/statm", "r");
+            if (!statm || fscanf(statm, "%ld", &pages) != 1) _exit(2);
+            fclose(statm);
+            rlimit limit {};
+            getrlimit(RLIMIT_AS, &limit);
+            limit.rlim_cur = rlim_t(pages) * rlim_t(sysconf(_SC_PAGESIZE)) + (1 << 20);
+            if (setrlimit(RLIMIT_AS, &limit) != 0) _exit(2);
+            if (void* probe = malloc(4 << 20)) { free(probe); _exit(3); } // qemu-user does not apply RLIMIT_AS.
+            string_buffer sb;
+            sb.write(text);
+            _exit(sb.size() == string_buffer::SIZE - 1 ? 0 : 1);
+        }
+        int status = 0;
+        AssertThat(waitpid(child, &status, 0), child);
+        AssertTrue(WIFEXITED(status));
+        if (WEXITSTATUS(status) == 3) return; // The limit cannot fail reserve() here, so the case checks nothing.
+        AssertThat(WEXITSTATUS(status), 0);
+    }
+#endif // __linux__ && !RPP_SANITIZERS
 #endif // RPP_ENABLE_UNICODE
 
     TestCase(string_buffer_shift_op)
