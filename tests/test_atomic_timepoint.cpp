@@ -1,8 +1,14 @@
 #include <rpp/atomic_timepoint.h>
 #include <rpp/tests.h>
+#include "torn_reads.h"
 #include <thread>
+#include <type_traits> // std::is_base_of_v
 #include <vector>
 using namespace rpp;
+
+// A target with lock-free 64-bit atomics keeps std::atomic as the base, so its code stays the same.
+static_assert(!std::atomic<int64>::is_always_lock_free || std::is_base_of_v<std::atomic<Duration>, AtomicDuration>);
+static_assert(!std::atomic<int64>::is_always_lock_free || std::is_base_of_v<std::atomic<TimePoint>, AtomicTimePoint>);
 
 TestImpl(test_atomic_timepoint)
 {
@@ -500,5 +506,19 @@ TestImpl(test_atomic_timepoint)
 
         Duration expected_warp = Duration::from_micros(num_writers * ops_per_thread);
         AssertThat(ts.warp_offset(), expected_warp);
+    }
+
+    TestCase(timesource_reader_never_sees_a_torn_offset)
+    {
+        AtomicTimeSource ts;
+        const Duration step { 0x1'0000'0001LL }; // Each multiple of the step has equal words, until the low word carries.
+        const int torn = count_torn_reads([&](int) { ts.warp_forward(step); }, [&]
+        {
+            const uint64 total = uint64(ts.total_offset().nsec);
+            const uint64 warp = uint64(ts.warp_offset().nsec);
+            return (total >> 32) != (total & 0xFFFF'FFFF) || (warp >> 32) != (warp & 0xFFFF'FFFF);
+        });
+        AssertThat(torn, 0);
+        AssertThat(ts.warp_offset(), Duration{ step.nsec * TORN_WRITERS * TORN_WRITES });
     }
 };

@@ -13,6 +13,7 @@ module;
 #include "atomic_shared_ptr.h"
 #include "close_sync.h"
 #include "async.h"
+#include "atomic.h"
 
 export module rpp.threading;
 
@@ -75,6 +76,8 @@ export namespace rpp {
     using rpp::wait_all;
     using rpp::get_all;
     using rpp::run_tasks;
+    using rpp::seqlock_atomic;
+    using rpp::atomic;
 #if !RPP_BARE_METAL
     using rpp::set_this_thread_name;
     using rpp::get_this_thread_name;
@@ -87,6 +90,16 @@ export namespace rpp {
     using rpp::critical_section;
     using rpp::synchronized_critical;
 #endif
+}
+
+export namespace rpp::atomics {
+    using rpp::atomics::seqlock_stripe;
+    using rpp::atomics::SEQLOCK_STRIPES;
+    using rpp::atomics::seqlock_stripes;
+    using rpp::atomics::seqlock_stripe_of;
+    using rpp::atomics::seqlock_lock;
+    using rpp::atomics::seqlock_write;
+    using rpp::atomics::seqlock_unlock;
 }
 
 export namespace rpp::cvar {

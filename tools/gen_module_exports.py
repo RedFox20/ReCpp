@@ -423,7 +423,7 @@ GROUP_HEADERS = {
     'io': ('file_io.h', 'paths.h', 'sockets.h', 'binary_stream.h', 'binary_serializer.h'),
     'threading': ('mutex.h', 'condition_variable.h', 'semaphore.h', 'concurrent_queue.h',
                   'thread_pool.h', 'threads.h', 'task.h', 'future_types.h',
-                  'atomic_shared_ptr.h', 'close_sync.h', 'async.h'),
+                  'atomic_shared_ptr.h', 'close_sync.h', 'async.h', 'atomic.h'),
     # the event loop and the awaiters. This group kept <future> out of rpp.threading before 2.2, see BUGS.md B16
     'future': ('event_loop.h', 'coroutines.h'),
     'testing': ('tests.h',),

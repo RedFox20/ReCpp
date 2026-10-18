@@ -28,8 +28,9 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `binary_stream.h` | Buffered binary read and write streams |
 | `binary_serializer.h` | Reflection-based binary and string serialization |
 | `timepoint.h` | Duration, TimePoint, time constants, sleep utilities, duration literals |
+| `atomic.h` | rpp::atomic: std::atomic, or an 8-byte seqlock_atomic whose readers take no lock, where a 64-bit std::atomic takes one |
 | `atomic_shared_ptr.h` | Portable atomic shared_ptr and weak_ptr, with a mutex fallback |
-| `atomic_timepoint.h` | Lock-free AtomicDuration, AtomicTimePoint (inherits std::atomic), AtomicTimeSource (time sync and fastforward) |
+| `atomic_timepoint.h` | AtomicDuration, AtomicTimePoint (inherits rpp::atomic), AtomicTimeSource (time sync and fastforward), readers take no lock |
 | `timer.h` | Timer, StopWatch, ScopedPerfTimer (includes timepoint.h) |
 | `vec.h` | 2D/3D/4D vector math, matrices, rectangles |
 | `math.h` | Clamp, lerp, deg/rad, epsilon compare |
