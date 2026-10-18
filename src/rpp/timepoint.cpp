@@ -10,6 +10,7 @@
     #include <sysinfoapi.h> // GetSystemTimePreciseAsFileTime
     #pragma comment(lib, "Winmm.lib") // MM time library
 #elif __APPLE__ || __linux__ || RPP_ANDROID || __EMSCRIPTEN__
+    #include <cerrno> // EINTR
     #include <cstdio>  // fprintf
     #include <unistd.h> // usleep()
     #if __linux__ || RPP_ANDROID
@@ -191,11 +192,19 @@ namespace rpp
             timeEndPeriod(1);
         }
     }
-#elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-    inline void unix_sleep_ns_abstime(int64 nanos)
+#elif __APPLE__
+    // Darwin has no clock_nanosleep, and its nanosleep counts the interval on a clock which no wall clock step moves.
+    static void unix_sleep_ns(int64 nanos) noexcept
+    {
+        struct timespec left { static_cast<time_t>(nanos / NANOS_PER_SEC), static_cast<long>(nanos % NANOS_PER_SEC) };
+        while (nanosleep(&left, &left) == -1 && errno == EINTR) {}
+    }
+#elif __linux__ || __EMSCRIPTEN__
+    // A wall clock step moves no CLOCK_MONOTONIC deadline, and after a signal the sleep resumes to the same deadline.
+    static void unix_sleep_ns(int64 nanos) noexcept
     {
         struct timespec deadline;
-        clock_gettime(CLOCK_REALTIME, &deadline);
+        clock_gettime(CLOCK_MONOTONIC, &deadline);
         deadline.tv_sec  += (nanos / NANOS_PER_SEC);
         deadline.tv_nsec += (nanos % NANOS_PER_SEC);
         // normalize tv_nsec by overflowing into tv_sec
@@ -203,7 +212,7 @@ namespace rpp
             deadline.tv_nsec -= NANOS_PER_SEC;
             deadline.tv_sec++;
         }
-        clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &deadline, nullptr);
+        while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, nullptr) == EINTR) {}
     }
 #elif RPP_BARE_METAL
     #if RPP_CORTEX_M_ARCH
@@ -334,7 +343,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(int64(millis) * 1'000'000ll);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(int64(millis) * 1'000'000ll);
+            unix_sleep_ns(int64(millis) * 1'000'000ll);
         #elif RPP_FREERTOS
             freertos_sleep_ns(millis * 1'000'000ull);
         #elif RPP_STM32_HAL
@@ -349,7 +358,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(int64(micros) * 1'000ll);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(int64(micros) * 1'000ll);
+            unix_sleep_ns(int64(micros) * 1'000ll);
         #elif RPP_FREERTOS
             freertos_sleep_ns(micros * 1'000ull);
         #elif RPP_STM32_HAL
@@ -364,7 +373,7 @@ namespace rpp
         #if _WIN32
             win32_sleep_ns(nanos);
         #elif __APPLE__ || __linux__ || __EMSCRIPTEN__
-            unix_sleep_ns_abstime(nanos);
+            unix_sleep_ns(nanos);
         #elif RPP_FREERTOS
             freertos_sleep_ns(nanos);
         #elif RPP_STM32_HAL
