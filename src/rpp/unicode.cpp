@@ -4,6 +4,8 @@
  */
 #include "unicode.h"
 #include "strview.h" // rpp::to_string, rpp::to_ustring
+#include <cstddef> // ptrdiff_t
+#include <cstdint> // SIZE_MAX
 #include <cstring> // strlen
 #include <string> // std::char_traits
 
@@ -90,54 +92,71 @@ namespace rpp
     }
 
 #if RPP_ENABLE_UNICODE
+    // Writes whole UTF-8 sequences while they fit in room bytes, and returns their size, or -1 for invalid input.
+    // The room is a size_t, because the result of a string form can be longer than the int out_max of a buffer form.
+    static ptrdiff_t utf16_to_utf8(char* out, size_t room, const char16_t* utf16, int utf16len) noexcept
+    {
+        size_t n = 0;
+        for (int i = 0; i < utf16len;)
+        {
+            const int cp = decode_utf16(utf16, utf16len, i);
+            if (cp < 0) return -1;
+            if (room - n < static_cast<size_t>(utf8_size(cp))) break;
+            n += static_cast<size_t>(encode_utf8(out + n, cp));
+        }
+        return static_cast<ptrdiff_t>(n);
+    }
+
+    // Writes whole code points while they fit in room units, and returns the unit count, or -1 for invalid input.
+    static ptrdiff_t utf8_to_utf16(char16_t* out, size_t room, const char* utf8, int utf8len) noexcept
+    {
+        size_t n = 0;
+        for (int i = 0; i < utf8len;)
+        {
+            const int cp = decode_utf8(utf8, utf8len, i);
+            if (cp < 0) return -1;
+            if (room - n < static_cast<size_t>(utf16_size(cp))) break;
+            n += static_cast<size_t>(encode_utf16(out + n, cp));
+        }
+        return static_cast<ptrdiff_t>(n);
+    }
+
     string to_string(const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
-        // A UTF-16 unit never takes more than 3 UTF-8 bytes, and the terminator takes 1 more.
-        string ret(static_cast<size_t>(utf16len) * 3 + 1, '\0');
-        const int len = to_string(ret.data(), static_cast<int>(ret.size()), utf16, utf16len);
-        ret.resize(len < 0 ? 0 : static_cast<size_t>(len));
+        // Over SIZE_MAX / 3 units, the input and its UTF-8 cannot both fit in the address space of a 32-bit target.
+        if (static_cast<size_t>(utf16len) > SIZE_MAX / 3) return {};
+        string ret(static_cast<size_t>(utf16len) * 3, '\0'); // A UTF-16 unit never takes more than 3 UTF-8 bytes.
+        const ptrdiff_t n = utf16_to_utf8(ret.data(), ret.size(), utf16, utf16len);
+        ret.resize(n < 0 ? 0 : static_cast<size_t>(n)); // Invalid input gives an empty string.
         return ret;
     }
 
     int to_string(char* out, int out_max, const char16_t* utf16, int utf16len) noexcept
     {
+        if (out_max <= 0) return -1; // The buffer has no room for the terminator.
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
-        int n = 0;
-        for (int i = 0; i < utf16len && n >= 0;)
-        {
-            const int cp = decode_utf16(utf16, utf16len, i);
-            if (cp < 0) n = -1; // Invalid input gives an empty string.
-            else if (n + utf8_size(cp) < out_max) n += encode_utf8(out + n, cp);
-            else break; // A short buffer gets only whole sequences and the terminator.
-        }
-        out[n < 0 ? 0 : n] = '\0';
-        return n;
+        const ptrdiff_t n = utf16_to_utf8(out, static_cast<size_t>(out_max) - 1, utf16, utf16len);
+        out[n < 0 ? 0 : n] = '\0'; // Invalid input gives an empty string.
+        return static_cast<int>(n);
     }
 
     ustring to_ustring(const char* utf8, int utf8len) noexcept
     {
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        // A UTF-8 sequence never gives more UTF-16 units than it has bytes, and the terminator takes 1 more.
-        ustring ret(static_cast<size_t>(utf8len) + 1, u'\0');
-        const int len = to_ustring(ret.data(), static_cast<int>(ret.size()), utf8, utf8len);
-        ret.resize(len < 0 ? 0 : static_cast<size_t>(len));
+        ustring ret(static_cast<size_t>(utf8len), u'\0'); // A UTF-8 sequence never gives more UTF-16 units than it has bytes.
+        const ptrdiff_t n = utf8_to_utf16(ret.data(), ret.size(), utf8, utf8len);
+        ret.resize(n < 0 ? 0 : static_cast<size_t>(n)); // Invalid input gives an empty string.
         return ret;
     }
 
     int to_ustring(char16_t* out, int out_max, const char* utf8, int utf8len) noexcept
     {
+        if (out_max <= 0) return -1; // The buffer has no room for the terminator.
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        int n = 0;
-        for (int i = 0; i < utf8len && n >= 0;)
-        {
-            const int cp = decode_utf8(utf8, utf8len, i);
-            if (cp < 0) n = -1; // Invalid input gives an empty string.
-            else if (n + utf16_size(cp) < out_max) n += encode_utf16(out + n, cp);
-            else break; // A short buffer gets only whole code points and the terminator.
-        }
-        out[n < 0 ? 0 : n] = u'\0';
-        return n;
+        const ptrdiff_t n = utf8_to_utf16(out, static_cast<size_t>(out_max) - 1, utf8, utf8len);
+        out[n < 0 ? 0 : n] = u'\0'; // Invalid input gives an empty string.
+        return static_cast<int>(n);
     }
 #endif // RPP_ENABLE_UNICODE
 } // namespace rpp

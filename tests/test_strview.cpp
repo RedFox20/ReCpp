@@ -4,9 +4,14 @@
 
 #include <rpp/tests.h>
 #include <rpp/unicode.h>
+#include <climits> // INT_MAX
+#include <cstdint> // INTPTR_MAX, SIZE_MAX
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
 #include <limits>
 #include <unordered_map>
+#if SIZE_MAX / 3 < INT_MAX && __linux__
+    #include <sys/mman.h> // mmap
+#endif
 
 // When building with modules, the test code below stays identical. This checks
 // that the export list is complete. GCC 14 redefines every std entity when an
@@ -492,6 +497,43 @@ TestImpl(test_strview)
         AssertEqual(i, 5);
         AssertEqual(rpp::strview(out, 10), "a\xC3\xA9\xF0\x9D\x95\xB3\xED\xA0\xB5");
     }
+
+    TestCase(utf_conversion_writes_nothing_into_a_buffer_without_room)
+    {
+        // A buffer without room for the terminator holds no result, so the conversion fails and leaves it alone.
+        for (int out_max : { 0, -1 })
+        {
+            char buf[1] = { 'x' };
+            AssertEqual(rpp::to_string(buf, out_max, u"a"), -1);
+            AssertEqual(buf[0], 'x');
+            char16_t ubuf[1] = { u'x' };
+            AssertEqual(rpp::to_ustring(ubuf, out_max, "a"), -1);
+            AssertEqual(ubuf[0], u'x');
+        }
+    }
+
+#if INTPTR_MAX > INT32_MAX
+    // This case needs gigabytes of memory, so it runs only when a filter names it.
+    TestCaseNoAutorun(to_string_converts_an_input_whose_utf8_capacity_exceeds_int)
+    {
+        const int len = INT_MAX / 3 + 1;
+        const rpp::ustring utf16(static_cast<size_t>(len), u'a');
+        AssertEqual(rpp::to_string(utf16.data(), len).size(), static_cast<size_t>(len));
+    }
+#endif
+
+#if SIZE_MAX / 3 < INT_MAX && __linux__
+    // Only a 32-bit target reaches this length. The case maps 2.9 GB of zero pages, so it runs only when a filter names it.
+    TestCaseNoAutorun(to_string_refuses_an_input_whose_utf8_capacity_exceeds_size_t)
+    {
+        const size_t len = SIZE_MAX / 3 + 1;
+        const size_t bytes = len * sizeof(char16_t);
+        void* zeros = mmap(nullptr, bytes, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+        AssertMsg(zeros != MAP_FAILED, "mmap of %zu bytes failed", bytes);
+        AssertEqual(rpp::to_string(static_cast<const char16_t*>(zeros), static_cast<int>(len)).size(), size_t{ 0 });
+        munmap(zeros, bytes);
+    }
+#endif
 
     // Without a wchar_t overload, a wide string converts to bool and to_string(bool) wins,
     // so every wide string becomes "true". That shipped, and get_thread_name() returned it.
