@@ -12,6 +12,9 @@
 #if SIZE_MAX / 3 < INT_MAX && __linux__
     #include <sys/mman.h> // mmap
 #endif
+#if __linux__
+    #include "low_memory.h"
+#endif
 
 // When building with modules, the test code below stays identical. This checks
 // that the export list is complete. GCC 14 redefines every std entity when an
@@ -532,6 +535,19 @@ TestImpl(test_strview)
         AssertMsg(zeros != MAP_FAILED, "mmap of %zu bytes failed", bytes);
         AssertEqual(rpp::to_string(static_cast<const char16_t*>(zeros), static_cast<int>(len)).size(), size_t{ 0 });
         munmap(zeros, bytes);
+    }
+#endif
+
+#if __linux__ && !RPP_SANITIZERS && RPP_HAS_EXCEPTIONS
+    // A child process limits its address space, so the result gets no memory. The noexcept conversion gives an empty string.
+    TestCase(utf_conversion_gives_an_empty_string_when_it_gets_no_memory)
+    {
+        const rpp::ustring utf16(8 * 1024 * 1024, u'a');
+        const std::string utf8(8 * 1024 * 1024, 'a');
+        const int utf8_result = run_with_little_memory([&] { return rpp::to_string(utf16.data(), int(utf16.size())).empty(); });
+        if (utf8_result == NO_MEMORY_LIMIT) return; // The limit cannot fail an allocation here, so the case checks nothing.
+        AssertThat(utf8_result, 0);
+        AssertThat(run_with_little_memory([&] { return rpp::to_ustring(utf8.data(), int(utf8.size())).empty(); }), 0);
     }
 #endif
 

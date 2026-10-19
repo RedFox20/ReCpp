@@ -121,12 +121,27 @@ namespace rpp
         return static_cast<ptrdiff_t>(n);
     }
 
+    // Gives a string of size units. A failed allocation gives an empty string, which converts nothing.
+    template<class String>
+    static String allocate_or_empty(size_t size) noexcept
+    {
+    #if RPP_HAS_EXCEPTIONS
+        try {
+            return String(size, typename String::value_type{});
+        } catch (...) {
+            return String{};
+        }
+    #else
+        return String(size, typename String::value_type{});
+    #endif
+    }
+
     string to_string(const char16_t* utf16, int utf16len) noexcept
     {
         if (utf16len < 0) utf16len = static_cast<int>(std::char_traits<char16_t>::length(utf16));
         // Over SIZE_MAX / 3 units, the input and its UTF-8 cannot both fit in the address space of a 32-bit target.
         if (static_cast<size_t>(utf16len) > SIZE_MAX / 3) return {};
-        string ret(static_cast<size_t>(utf16len) * 3, '\0'); // A UTF-16 unit never takes more than 3 UTF-8 bytes.
+        string ret = allocate_or_empty<string>(static_cast<size_t>(utf16len) * 3); // A UTF-16 unit takes 3 UTF-8 bytes at most.
         const ptrdiff_t n = utf16_to_utf8(ret.data(), ret.size(), utf16, utf16len);
         ret.resize(n < 0 ? 0 : static_cast<size_t>(n)); // Invalid input gives an empty string.
         return ret;
@@ -144,7 +159,7 @@ namespace rpp
     ustring to_ustring(const char* utf8, int utf8len) noexcept
     {
         if (utf8len < 0) utf8len = int(strlen(utf8));
-        ustring ret(static_cast<size_t>(utf8len), u'\0'); // A UTF-8 sequence never gives more UTF-16 units than it has bytes.
+        ustring ret = allocate_or_empty<ustring>(static_cast<size_t>(utf8len)); // A UTF-8 byte gives 1 UTF-16 unit at most.
         const ptrdiff_t n = utf8_to_utf16(ret.data(), ret.size(), utf8, utf8len);
         ret.resize(n < 0 ? 0 : static_cast<size_t>(n)); // Invalid input gives an empty string.
         return ret;
