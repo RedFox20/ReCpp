@@ -10,11 +10,7 @@
 #include <string> // std::string
 #include <vector> // std::vector
 #if __linux__
-#include <cstdio> // fopen, fscanf
-#include <cstdlib> // malloc, free
-#include <sys/resource.h> // setrlimit
-#include <sys/wait.h> // waitpid
-#include <unistd.h> // fork, alarm, _exit, sysconf
+#include "low_memory.h"
 #endif
 
 using namespace rpp;
@@ -446,28 +442,14 @@ TestImpl(test_sprint)
     TestCase(string_buffer_write_utf16_ends_when_reserve_fails)
     {
         const rpp::ustring text(8 * 1024 * 1024, u'a');
-        const pid_t child = fork();
-        if (child == 0)
+        const int result = run_with_little_memory([&]
         {
-            alarm(1); // A writer which does not end dies of SIGALRM.
-            long pages = 0;
-            FILE* statm = fopen("/proc/self/statm", "r");
-            if (!statm || fscanf(statm, "%ld", &pages) != 1) _exit(2);
-            fclose(statm);
-            rlimit limit {};
-            getrlimit(RLIMIT_AS, &limit);
-            limit.rlim_cur = rlim_t(pages) * rlim_t(sysconf(_SC_PAGESIZE)) + (1 << 20);
-            if (setrlimit(RLIMIT_AS, &limit) != 0) _exit(2);
-            if (void* probe = malloc(4 << 20)) { free(probe); _exit(3); } // qemu-user does not apply RLIMIT_AS.
             string_buffer sb;
             sb.write(text);
-            _exit(sb.size() == string_buffer::SIZE - 1 ? 0 : 1);
-        }
-        int status = 0;
-        AssertThat(waitpid(child, &status, 0), child);
-        AssertTrue(WIFEXITED(status));
-        if (WEXITSTATUS(status) == 3) return; // The limit cannot fail reserve() here, so the case checks nothing.
-        AssertThat(WEXITSTATUS(status), 0);
+            return sb.size() == string_buffer::SIZE - 1;
+        });
+        if (result == NO_MEMORY_LIMIT) return; // The limit cannot fail reserve() here, so the case checks nothing.
+        AssertThat(result, 0);
     }
 #endif // __linux__ && !RPP_SANITIZERS
 #endif // RPP_ENABLE_UNICODE
