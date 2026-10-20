@@ -551,10 +551,26 @@ TestImpl(test_timer)
 
     TestCase(timepoint_to_calendar_past_a_narrow_time_t)
     {
-        // a narrow time_t cannot hold this year, and the calendar still splits it
+        // a narrow time_t cannot hold this year, and the calendar still splits it and builds it back
         constexpr rpp::int64 YEAR_2200_SECONDS = 7'272'378'123LL;
         rpp::TimePoint far { rpp::seconds(YEAR_2200_SECONDS) };
         AssertThat(far.to_calendar(), (rpp::CalendarTime{ 2200, 6, 15, 1, 2, 3, 0 }));
+        AssertThat(rpp::TimePoint(2200, 6, 15, 1, 2, 3, 0).duration, far.duration);
+    }
+
+    // the calendar constructor inverts to_calendar(), and a month outside [1, 12] carries into the year, as in timegm()
+    TestCase(timepoint_from_calendar_round_trips)
+    {
+        for (rpp::int64 secs = -9'000'000'000LL; secs < 9'000'000'000LL; secs += 9'876'541LL)
+        {
+            const rpp::CalendarTime c = rpp::TimePoint{ rpp::seconds(secs) }.to_calendar();
+            const rpp::TimePoint back { c.year, c.month, c.day, c.hour, c.minute, c.second, 0 };
+            if (back.duration.seconds() != secs)
+                AssertFailed("%lld s splits into %d-%d-%d %d:%d:%d, which builds %lld s", secs,
+                             c.year, c.month, c.day, c.hour, c.minute, c.second, back.duration.seconds());
+        }
+        AssertThat(rpp::TimePoint(2023, 13, 1, 0, 0, 0, 0).duration, rpp::TimePoint(2024, 1, 1, 0, 0, 0, 0).duration);
+        AssertThat(rpp::TimePoint(2024, 0, 1, 0, 0, 0, 0).duration, rpp::TimePoint(2023, 12, 1, 0, 0, 0, 0).duration);
     }
 
 #if !_MSC_VER
