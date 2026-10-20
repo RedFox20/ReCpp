@@ -25,10 +25,14 @@ namespace rpp
         return false;
     }
     const char* strfindi(const char* str, int len, char ch) noexcept {
-        // two compares against the hoisted case pair skip the libc call per byte
-        const char up = char(::toupper(ch));
-        const char lo = char(::tolower(ch));
-        for (int i = 0; i < len; ++i) if (str[i] == up || str[i] == lo) return &str[i]; // found it.
+        // the hoisted case pair skips the libc call per ASCII byte. A byte over 0x7F can be one of
+        // several lower cases of one upper case, as the Greek sigmas are, so it still folds through toupper()
+        const char up = char(::toupper(uint8_t(ch)));
+        const char lo = char(::tolower(uint8_t(ch)));
+        for (int i = 0; i < len; ++i) {
+            const char c = str[i];
+            if (c == up || c == lo || (uint8_t(c) > 0x7F && char(::toupper(uint8_t(c))) == up)) return &str[i];
+        }
         return nullptr;
     }
     /**
