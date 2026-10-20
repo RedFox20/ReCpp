@@ -180,6 +180,7 @@ TestImpl(test_strview)
         AssertThat(rpp::strview{"1e5"}.to_double(), 1e5);
         AssertThat(rpp::strview{"2.5east"}.to_double(), 2.5);
         AssertThat(std::isinf(rpp::strview{"1e3000000000"}.to_double()), true);
+        AssertThat(rpp::strview{"0e309"}.to_double(), 0.0); // 0 * inf would be NaN
     }
 
 
