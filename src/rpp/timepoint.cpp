@@ -712,16 +712,16 @@ namespace rpp
             }
         #endif
 
-        std::tm tm {};
-        tm.tm_year = year - 1900; // [0, 60] since 1900
-        tm.tm_mon  = month - 1;   // [0, 11] since Jan
-        tm.tm_mday = day;         // [1, 31]
-        tm.tm_hour = hour;        // [0, 23] since midnight
-        tm.tm_min  = minute;      // [0, 59] after the hour
-        tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
-        tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
-
-        int64 seconds = int64(timegm(&tm)); // input time as-is
+        // Howard Hinnant's days_from_civil(), the inverse of to_calendar(), with no time_t limit.
+        // A month outside [1, 12] carries into the year, and the other parts add up, as in timegm().
+        const int64 months = int64(year) * 12 + month - 1;
+        const int64 m = months - (months >= 0 ? months : months - 11) / 12 * 12 + 1;
+        const int64 y = (months - m + 1) / 12 - (m <= 2);
+        const int64 era = (y >= 0 ? y : y - 399) / 400;
+        const int64 yoe = y - era * 400;
+        const int64 doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + day - 1;
+        const int64 days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+        const int64 seconds = days * 86400 + hour * 3600LL + minute * 60LL + second;
         duration = Duration{seconds * NANOS_PER_SEC + nanos};
     }
 
