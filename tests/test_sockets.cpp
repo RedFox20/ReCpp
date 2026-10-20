@@ -1303,21 +1303,17 @@ TestImpl(test_sockets)
         socket remote_client = accept(server);
         remote_client.set_nagle(false); // disable nagle
 
-        int received_chunks = 0;
+        // TCP can split or join the sends, so the case checks the byte stream and not each receive
+        std::string received;
         for (int i = 0; i < 10; ++i)
         {
             // the remote sends right after it connects, so the first receive waits for it, as a hang guard
-            std::string data = i == 0 ? remote_client.wait_recv_str(1000) : remote_client.recv_str();
-            if (!data.empty())
-            {
-                ++received_chunks;
-                print_info("server: received %d bytes of data from remote_client\n", (int)data.length());
-                AssertThat(data.size(), TransmitSize);
-                AssertThat(data.find_first_not_of('$'), std::string::npos); // no corrupted byte
-            }
+            received += i == 0 ? remote_client.wait_recv_str(1000) : remote_client.recv_str();
             rpp::sleep_ms(2);
         }
-        AssertGreater(received_chunks, 0);
+        print_info("server: received %d bytes of data from remote_client\n", (int)received.size());
+        AssertGreaterOrEqual((int)received.size(), TransmitSize); // the first send arrived whole
+        AssertThat(received.find_first_not_of('$'), std::string::npos); // no corrupted byte
 
         print_info("server: closing down\n");
         remote_client.close();
