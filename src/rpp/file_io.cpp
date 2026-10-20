@@ -579,9 +579,9 @@ namespace rpp /* ReCpp */
             return 0LL;
     #if _MSC_VER
         LARGE_INTEGER newpos, nseek;
-        newpos.QuadPart = -1; // a failed seek leaves newpos unchanged, so seek() reports -1
         nseek.QuadPart = filepos;
-        SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode);
+        if (!SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode))
+            return uint64(-1); // seek() then reports -1
         return newpos.QuadPart;
     #else
         fseeki64((FILE*)Handle, filepos, seekmode);
@@ -596,7 +596,8 @@ namespace rpp /* ReCpp */
             return 0LL;
     #if _MSC_VER
         LARGE_INTEGER current;
-        SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), { {0, 0} }, &current, FILE_CURRENT);
+        if (!SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), { {0, 0} }, &current, FILE_CURRENT))
+            return -1; // a failed call leaves current unset
         return current.QuadPart;
     #else
         return (int64)ftelli64((FILE*)Handle);
