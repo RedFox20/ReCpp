@@ -216,7 +216,9 @@ TestImpl(test_timer)
     }
 
     // moving t2 by one second must move each elapsed reading by exactly one second
-    template<class Elapsed> static void check_one_sec_shift(rpp::Duration one_sec, Elapsed elapsed, RPP_SOURCE_LOC)
+    // `one` is one second in the unit elapsed() returns, so a scale error in elapsed() shows
+    template<class T, class Elapsed>
+    static void check_one_sec_shift(rpp::Duration one_sec, T one, Elapsed elapsed, RPP_SOURCE_LOC)
     {
         rpp::TimePoint t1 = rpp::TimePoint::monotonic_now();
         spin_sleep_for_us(15);
@@ -224,7 +226,6 @@ TestImpl(test_timer)
         AssertThatLoc(loc, (t2 + one_sec) - t2, one_sec);
         AssertThatLoc(loc, t2 - (t2 - one_sec), one_sec);
         auto e = elapsed(t1, t2);
-        auto one = elapsed(t2, t2 + one_sec);
         AssertThatLoc(loc, elapsed(t1, t2 + one_sec), one + e);
         AssertThatLoc(loc, elapsed(t1, t2 - one_sec), e - one);
     }
@@ -232,22 +233,24 @@ TestImpl(test_timer)
     TestCase(duration_sec_arithmetic)
     {
         AssertEqual(rpp::Duration::from_seconds(1.0).sec(), 1.0);
-        check_one_sec_shift(rpp::Duration::from_seconds(1.0), [](auto t1, auto t2) { return t1.elapsed_sec(t2); });
+        check_one_sec_shift(rpp::Duration::from_seconds(1.0), 1.0, [](auto t1, auto t2) { return t1.elapsed_sec(t2); });
     }
 
     TestCase(duration_millis_arithmetic)
     {
-        check_one_sec_shift(rpp::Duration::from_millis(1000), [](auto t1, auto t2) { return t1.elapsed(t2); });
+        check_one_sec_shift(rpp::Duration::from_millis(1000), rpp::seconds(1), [](auto t1, auto t2) { return t1.elapsed(t2); });
     }
 
     TestCase(duration_micros_arithmetic)
     {
-        check_one_sec_shift(rpp::Duration::from_micros(1'000'000), [](auto t1, auto t2) { return t1.elapsed(t2); });
+        check_one_sec_shift(rpp::Duration::from_micros(1'000'000), rpp::seconds(1),
+                            [](auto t1, auto t2) { return t1.elapsed(t2); });
     }
 
     TestCase(duration_nanos_arithmetic)
     {
-        check_one_sec_shift(rpp::Duration::from_nanos(1'000'000'000), [](auto t1, auto t2) { return t1.elapsed_ns(t2); });
+        check_one_sec_shift(rpp::Duration::from_nanos(1'000'000'000), 1'000'000'000LL,
+                            [](auto t1, auto t2) { return t1.elapsed_ns(t2); });
     }
 
     TestCase(duration_overflow)
