@@ -3814,12 +3814,12 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 | [`erase_back_swap(vector, i)`](src/rpp/collections.h#L258) | O(1) erase by swapping with last element |
 | [`contains(container, item)`](src/rpp/collections.h#L330) | Check membership |
 | [`find(vector, item)`](src/rpp/collections.h#L345) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](src/rpp/collections.h#L426) | Find minimum by selector |
-| [`find_largest(range, selector)`](src/rpp/collections.h#L448) | Find maximum by selector |
-| [`any_of(vector, predicate)`](src/rpp/collections.h#L466) | True if any element matches predicate |
-| [`all_of(vector, predicate)`](src/rpp/collections.h#L475) | True if all elements match predicate |
-| [`none_of(vector, predicate)`](src/rpp/collections.h#L484) | True if no elements match predicate |
-| [`sum_all(vector)`](src/rpp/collections.h#L494) | Sum all elements |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L422) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L444) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L462) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L471) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L480) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L490) | Sum all elements |
 | [`append(vector, other)`](src/rpp/collections.h#L335) | Append one vector to another |
 
 ### Example: element_range & index_range

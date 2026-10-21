@@ -6,6 +6,7 @@
 #include <rpp/semaphore.h>
 #include <rpp/tests.h>
 #include <string> // std::string
+#include <vector>
 using namespace rpp;
 using namespace std::string_literals;
 
@@ -268,17 +269,13 @@ TestImpl(test_concurrent_queue)
             queue.push("item3");
         });
 
-        rpp::future<> consumer = rpp::async([&queue] {
-            std::string item1 = *queue.wait_pop();
-            AssertThat(item1, "item1");
-            std::string item2 = *queue.wait_pop();
-            AssertThat(item2, "item2");
-            std::string item3 = *queue.wait_pop();
-            AssertThat(item3, "item3");
+        // an assertion on the consumer thread cannot fail the case, so the consumer returns the items
+        rpp::future<std::vector<std::string>> consumer = rpp::async([&queue] {
+            return std::vector<std::string>{ *queue.wait_pop(), *queue.wait_pop(), *queue.wait_pop() };
         });
 
         producer.get();
-        consumer.get();
+        AssertThat(consumer.get(), (std::vector<std::string>{ "item1", "item2", "item3" }));
     }
 
     // wait_pop() is best used for producer/consumer scenarios
@@ -300,24 +297,16 @@ TestImpl(test_concurrent_queue)
             queue.notify_one(); // notify consumer
         });
 
-        rpp::future<> consumer = rpp::async([&queue,&popped_all] {
-            std::string item1, item2, item3; // NOLINT(readability-isolate-declaration)
-            AssertTrue(queue.wait_pop(item1));
-            AssertThat(item1, "item1");
-            AssertTrue(queue.wait_pop(item2));
-            AssertThat(item2, "item2");
-            AssertTrue(queue.wait_pop(item3));
-            AssertThat(item3, "item3");
-
-            // enter infinite wait, but we should be notified by the producer
-            std::string item4;
+        rpp::future<std::vector<std::string>> consumer = rpp::async([&queue,&popped_all] {
+            auto pop = [&queue] { std::string item; return queue.wait_pop(item) ? item : "<none>"s; };
+            std::vector<std::string> items { pop(), pop(), pop() };
             popped_all.notify();
-            AssertFalse(queue.wait_pop(item4));
-            AssertThat(item4, "");
+            items.push_back(pop()); // an infinite wait, which the notify_one() of the producer releases with no item
+            return items;
         });
 
         producer.get();
-        consumer.get();
+        AssertThat(consumer.get(), (std::vector<std::string>{ "item1", "item2", "item3", "<none>" }));
     }
 
     struct PopResult
@@ -728,119 +717,24 @@ TestImpl(test_concurrent_queue)
         }
     }
 
-    TestCase(wait_pop_cross_thread_perf)
-    {
-        constexpr int num_iterations = 10;
-        constexpr int num_items = 10'000;
-        constexpr int total_items = num_iterations * num_items;
-        double total_time = 0.0;
-        for (int i = 0; i < num_iterations; ++i)
-        {
-            concurrent_queue<std::string> queue;
-            rpp::Timer t;
-
-            rpp::future<> producer = rpp::async([&] {
-                for (int i = 0; i < num_items; ++i) {
-                    queue.push("item");
-                    if (i % 1000 == 0) // yield every 1000 items
-                        std::this_thread::yield();
-                }
-            });
-            rpp::future<> consumer = rpp::async([&] {
-                int num_received = 0;
-                std::string item;
-                // std::deque<std::string> items;
-                while (num_received < num_items) {
-                    // if (queue.try_pop_all(items)) {
-                    //     num_received += items.size();
-                    //     rpp::sleep_us(100);
-                    // }
-
-                    // if (queue.try_pop(item))
-                    //     ++num_received;
-                    // item = *queue.wait_pop();
-                    // ++num_received;
-                    if (queue.wait_pop(item, Millis(5))) {
-                        ++num_received;
-                    }
-                }
-            });
-
-            producer.get();
-            consumer.get();
-            double elapsed = t.elapsed();
-            total_time += elapsed;
-            print_info("wait_pop consumer elapsed: %.2f ms  queue capacity: %zu\n", elapsed*1000, queue.capacity());
-        }
-
-        double avg_time = total_time / num_iterations;
-        double items_per_sec = double(total_items) / total_time;
-        double Mitems_per_sec = items_per_sec / 1'000'000.0;
-        print_info("AVERAGE wait_pop consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
-    }
-
-    TestCase(wait_pop_interval_cross_thread_perf)
-    {
-        constexpr int num_iterations = 10;
-        constexpr int num_items = 10'000;
-        constexpr int total_items = num_iterations * num_items;
-        double total_time = 0.0;
-        for (int i = 0; i < num_iterations; ++i)
-        {
-            concurrent_queue<std::string> queue;
-            rpp::Timer t;
-
-            rpp::future<> producer = rpp::async([&] {
-                for (int i = 0; i < num_items; ++i) {
-                    queue.push("item");
-                    if (i % 1000 == 0) // yield every 1000 items
-                        std::this_thread::yield();
-                }
-            });
-            rpp::future<> consumer = rpp::async([&] {
-                int num_received = 0;
-                std::string item;
-                while (num_received < num_items) {
-                    if (queue.wait_pop_interval(item, Millis(15), Millis(5),
-                                                []{ return false; })) {
-                        ++num_received;
-                    }
-                }
-            });
-
-            producer.get();
-            consumer.get();
-            double elapsed = t.elapsed();
-            total_time += elapsed;
-            print_info("wait_pop_interval consumer elapsed: %.2f ms  queue capacity: %zu\n", elapsed*1000, queue.capacity());
-        }
-
-        double avg_time = total_time / num_iterations;
-        double items_per_sec = double(total_items) / total_time;
-        double Mitems_per_sec = items_per_sec / 1'000'000.0;
-        print_info("AVERAGE wait_pop_interval consumer elapsed: %.2f ms  %.1f Mitems/s\n", avg_time, Mitems_per_sec);
-    }
-
     // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-    // NOTE: TestCaseCoro cannot be used here because the standalone awaiters
-    // resume on a background thread, which conflicts with the default test
-    // runner's synchronous pump loop.
+    // the standalone awaiters resume on a pool worker, which the synchronous TestCaseCoro pump cannot drive.
+    // An assertion on a worker cannot fail the case, so each coroutine returns its result.
 
     // ─── co_await queue pop: item arrives ───────────────────────
     TestCase(co_await_queue_pop)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<std::string>
         {
             std::string item;
-            bool got = co_await queue.await_pop(item, Duration::from_millis(200));
-            AssertThat(got, true);
-            AssertThat(item, "hello"s);
+            bool got = co_await queue.await_pop(item, rpp::millis(200));
+            co_return got ? item : "<timeout>"s;
         };
 
         std::thread producer([&]() { rpp::sleep_ms(5); queue.push("hello"); });
         auto future = coro();
-        future.get();
+        AssertThat(future.get(), "hello"s);
         producer.join();
     }
 
@@ -848,13 +742,12 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_timeout)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<bool>
         {
             std::string item;
-            bool got = co_await queue.await_pop(item, Duration::from_millis(10));
-            AssertThat(got, false);
+            co_return co_await queue.await_pop(item, rpp::millis(10));
         };
-        coro().get();
+        AssertThat(coro().get(), false);
     }
 
     // ─── co_await queue pop: already has item (fast path) ───────
@@ -878,15 +771,14 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_available_after_delay)
     {
         concurrent_queue<int> queue;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<bool>
         {
-            bool available = co_await queue.await(Duration::from_millis(200));
-            AssertThat(available, true);
+            co_return co_await queue.await(rpp::millis(200));
         };
 
         std::thread producer([&]() { rpp::sleep_ms(5); queue.push(42); });
         auto future = coro();
-        future.get();
+        AssertThat(future.get(), true);
         producer.join();
         AssertThat(queue.empty(), false); // await() doesn't pop
     }
@@ -895,16 +787,15 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_optional)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<std::string>
         {
-            auto item = co_await queue.await_pop(Duration::from_millis(200));
-            AssertThat(item.has_value(), true);
-            AssertThat(item.value_or("none"), "hello"s);
+            auto item = co_await queue.await_pop(rpp::millis(200));
+            co_return item.value_or("<none>");
         };
 
         std::thread producer([&]() { rpp::sleep_ms(5); queue.push("hello"); });
         auto future = coro();
-        future.get();
+        AssertThat(future.get(), "hello"s);
         producer.join();
     }
 
@@ -912,12 +803,12 @@ TestImpl(test_concurrent_queue)
     TestCase(co_await_queue_pop_optional_timeout)
     {
         concurrent_queue<std::string> queue;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<bool>
         {
-            auto item = co_await queue.await_pop(Duration::from_millis(10));
-            AssertThat(item.has_value(), false);
+            auto item = co_await queue.await_pop(rpp::millis(10));
+            co_return item.has_value();
         };
-        coro().get();
+        AssertThat(coro().get(), false);
     }
 
     // ─── co_await queue await_pop optional: fast path ───────────

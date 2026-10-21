@@ -334,11 +334,12 @@ TestImpl(test_collections)
 
     TestCase(vector_find_last_if)
     {
-        std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+        std::vector<std::string> v { "0"s, "1"s, "2"s, "1"s, "2"s };
 
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  ); // NOLINT(readability-*)
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  ); // NOLINT(readability-*)
+        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
+        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "0"s; }), &v[0]);
+        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[3]);
+        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[4]);
     }
 
     TestCase(vector_find_smallest)
@@ -398,15 +399,5 @@ TestImpl(test_collections)
         });
         AssertThat(transformed2, expected);
     }
-
-    //TestCase(reduce)
-    //{
-    //    vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
-    //    int reduced = rpp::reduce(v, [](const string& a, const string& b)
-    //    {
-    //       return std::stoi(a) + std::stoi(b); 
-    //    });
-    //    AssertThat(reduced, 15);
-    //}
 
 };
