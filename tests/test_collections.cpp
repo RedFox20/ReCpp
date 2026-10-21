@@ -283,12 +283,7 @@ TestImpl(test_collections)
         std::vector<std::string> b { "3"s, "4"s, "5"s };
 
         append(a, b);
-        AssertThat(a.size(), 5ul);
-        AssertThat(a[0], "1");
-        AssertThat(a[1], "2");
-        AssertThat(a[2], "3");
-        AssertThat(a[3], "4");
-        AssertThat(a[4], "5");
+        AssertThat(a, (std::vector<std::string>{ "1"s, "2"s, "3"s, "4"s, "5"s }));
     }
 
     TestCase(vector_find)
