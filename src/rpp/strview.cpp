@@ -25,7 +25,14 @@ namespace rpp
         return false;
     }
     const char* strfindi(const char* str, int len, char ch) noexcept {
-        for (int i = 0; i < len; ++i) if (::toupper(str[i]) == ::toupper(ch)) return &str[i]; // found it.
+        // the hoisted case pair skips the libc call per ASCII byte. A byte over 0x7F can be one of
+        // several lower cases of one upper case, as the Greek sigmas are, so it still folds through toupper()
+        const char up = char(::toupper(uint8_t(ch)));
+        const char lo = char(::tolower(uint8_t(ch)));
+        for (int i = 0; i < len; ++i) {
+            const char c = str[i];
+            if (c == up || c == lo || (uint8_t(c) > 0x7F && char(::toupper(uint8_t(c))) == up)) return &str[i];
+        }
         return nullptr;
     }
     /**
@@ -301,21 +308,19 @@ namespace rpp
         return count;
     }
 
+    // memchr scans whole words, where a byte loop with an early exit does not vectorize
     int strview::indexof(char ch) const noexcept
     {
-        for (int i = 0; i < len; ++i)
-            if (str[i] == ch) return i;
-        return -1;
+        const char* p = len > 0 ? (const char*)memchr(str, ch, size_t(len)) : nullptr;
+        return p ? int(p - str) : -1;
     }
 
     int strview::indexof(char ch, int start) const noexcept
     {
         if (start < 0) start = 0;
         if (start >= len) return -1;
-
-        for (int i = start; i < len; ++i)
-            if (str[i] == ch) return i;
-        return -1;
+        const char* p = (const char*)memchr(str + start, ch, size_t(len - start));
+        return p ? int(p - str) : -1;
     }
 
     int strview::indexof(char ch, int start, int end) const noexcept
@@ -323,10 +328,8 @@ namespace rpp
         if (start < 0) start = 0;
         if (end > len) end = len;
         if (start >= end) return -1;
-
-        for (int i = start; i < end; ++i)
-            if (str[i] == ch) return i;
-        return -1;
+        const char* p = (const char*)memchr(str + start, ch, size_t(end - start));
+        return p ? int(p - str) : -1;
     }
 
     int strview::rindexof(char ch) const noexcept

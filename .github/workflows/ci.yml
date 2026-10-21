@@ -79,7 +79,9 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build
+          sudo apt-get -y --allow-unauthenticated install libdw-dev libunwind-dev gdb gcovr ninja-build locales
+          # test_strview needs a single byte locale with non-ASCII case mappings
+          sudo localedef -i el_GR -f ISO-8859-7 el_GR.ISO-8859-7
 
       - name: Register apt.llvm.org for ${{ matrix.cc }}
         if: matrix.llvm_apt == 'true'

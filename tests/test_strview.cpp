@@ -5,6 +5,7 @@
 #include <rpp/tests.h>
 #include <rpp/unicode.h>
 #include <climits> // INT_MAX
+#include <clocale> // setlocale
 #include <cstdint> // INTPTR_MAX, SIZE_MAX
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
 #include <limits>
@@ -322,6 +323,18 @@ TestImpl(test_strview)
         AssertFalse(home != &equal[0]);
     }
 #endif
+
+    // ISO-8859-7 maps the sigma 0xF3 and the final sigma 0xF2 to one upper case 0xD3, so either one matches the other
+    TestCase(containsi_folds_every_lower_case_of_a_single_byte_locale)
+    {
+        if (!setlocale(LC_CTYPE, "el_GR.ISO-8859-7"))
+            return; // the locale is not installed on this machine
+        const bool upper_finds_final = rpp::strview{"x\xF2x"}.containsi("\xD3");
+        const bool final_finds_sigma = rpp::strview{"x\xF3x"}.containsi("\xF2");
+        setlocale(LC_CTYPE, "C");
+        AssertTrue(upper_finds_final);
+        AssertTrue(final_finds_sigma);
+    }
 
     TestCase(string_compare_less)
     {
