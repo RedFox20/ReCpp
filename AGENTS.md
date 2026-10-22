@@ -98,6 +98,8 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   `std::this_thread` timing helper to source or tests.
 - **Build a duration with `rpp::millis()`, `rpp::micros()`, `rpp::nanos()` or `rpp::seconds()`.**
   Never call `rpp::Duration::from_millis()` or another `from_*()` factory in new code.
+- **Never include a heavy std header, and never call `std::sort`.** `<algorithm>` and `<functional>` are
+  the usual ones. `recpp-review` R16 lists the headers and the ReCpp replacements.
 - **Includes come before imports. Always.** A misplaced import gives about 960
   compile errors, never a link error.
 - **A header never contains an `import`.** Only a `.cpp`, a test, or a `.cppm` does.

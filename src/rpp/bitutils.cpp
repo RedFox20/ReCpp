@@ -57,11 +57,8 @@ namespace rpp
         memcpy(data, buf, bytesToCopy);
 
         // zero the bits at the end
-        uint32_t trailingBits = 8 - (bitsToCopy % 8);
-        if (trailingBits)
-        {
-            data[bytesToCopy - 1] &= ~uint8_t(0xFF << trailingBits);
-        }
+        if (uint32_t usedBits = bitsToCopy % 8)
+            data[bytesToCopy - 1] &= uint8_t(0xFF >> (8 - usedBits));
     }
 
     bit_array::~bit_array() noexcept
@@ -147,7 +144,7 @@ namespace rpp
         const uint32_t index = bit / 8;
         const uint32_t shift = bit % 8;
         const uint8_t mask = uint8_t(1 << shift);
-        data[index] |= mask;
+        data[index] &= uint8_t(~mask);
     }
 
     bool bit_array::isSet(uint32_t bit) const noexcept

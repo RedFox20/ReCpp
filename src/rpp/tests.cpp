@@ -5,7 +5,7 @@
 #include "timepoint.h"
 #include <memory>
 #include <unordered_set>
-#include <chrono> // high_resolution_clock
+#include <chrono> // high_resolution_clock, a second clock beside the rpp::TimePoint under test
 #include <cstdarg>
 #include <cstdlib> // getenv
 #include <cassert>

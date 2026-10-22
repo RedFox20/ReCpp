@@ -6,9 +6,9 @@
 #include <rpp/tests.h>
 #include <rpp/timepoint.h> // rpp::sleep_ms, rpp::TimePoint
 #include <rpp/threads.h> // rpp::yield
-#include <fstream> // use fstream as a baseline file utility to test against
 #include <atomic> // std::atomic_bool
 #include <cerrno> // EINTR
+#include <cstdlib> // getenv, setenv
 #include <cstdio> // clearerr
 #include <thread> // std::thread
 #include <fcntl.h> // fcntl, FD_CLOEXEC, _O_TEXT
@@ -70,16 +70,11 @@ TestImpl(test_file_io)
 
     void create_test_file(rpp::strview filename)
     {
-        std::string filePath = filename.to_string();
-        std::ofstream fstr { filePath };
-        AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", filePath.c_str());
-
         TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
-        fstr << TestFileContents;
-        TestFileSize = (int)fstr.tellp();
-        fstr.close();
+        TestFileSize = rpp::file::write_new(filename, TestFileContents);
+        AssertMsg(TestFileSize == (int)TestFileContents.size(), "rpp::file create failed: '%s'", filename.to_cstr());
     }
 #if RPP_ENABLE_UNICODE
     void create_test_file(ustrview filename)
@@ -127,9 +122,9 @@ TestImpl(test_file_io)
     // the state field of a /proc stat line follows the last ')', and 'S' is an interruptible sleep
     static bool sleeps(const std::string& statPath)
     {
-        std::ifstream f { statPath };
-        std::string stat;
-        std::getline(f, stat);
+        char buf[512]; // a /proc file reports size 0, so read_all_text() would return nothing
+        const int n = rpp::file{ statPath, rpp::file::READONLY }.read(buf, sizeof(buf));
+        const std::string stat(buf, size_t(n > 0 ? n : 0));
         size_t end = stat.rfind(')');
         return end != std::string::npos && end + 2 < stat.size() && stat[end + 2] == 'S';
     }
@@ -391,6 +386,8 @@ TestImpl(test_file_io)
     TestCase(path_utils)
     {
         AssertThat(merge_dirups("../lib/../bin/file.txt"), "../bin/file.txt");
+        AssertThat(merge_dirups("/home/user/../x"), "/home/x");
+        AssertThat(merge_dirups("a//b/../c/"), "a/c/");
 
         AssertThat(file_name("/root/dir/file.ext"   ), "file");
         AssertThat(file_name("/root/dir/file"       ), "file");
@@ -762,6 +759,19 @@ TestImpl(test_file_io)
         AssertThat(last(temp_dir()), '/');
         AssertThat(last(home_dir()), '/');
     }
+
+#if !_WIN32
+    TestCase(home_dir_leaves_the_environment_unchanged)
+    {
+        const char* home = getenv("HOME");
+        const std::string saved = home ? home : "";
+        setenv("HOME", "/tmp/rpp_home", 1);
+        AssertThat(home_dir(), "/tmp/rpp_home/");
+        AssertThat(std::string{getenv("HOME")}, "/tmp/rpp_home");
+        if (home) setenv("HOME", saved.c_str(), 1);
+        else unsetenv("HOME");
+    }
+#endif
 
 #if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // test_obfuscated_string scans this file for plaintext, so it must name a real executable

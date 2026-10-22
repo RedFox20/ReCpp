@@ -33,6 +33,14 @@ TestImpl(test_stack_trace)
 
         AssertLessOrEqual(second_elapsed, first_elapsed);
     }
+    TestCase(get_callstack_with_skip_writes_only_the_entries_it_returns)
+    {
+        uint64_t callstack[64];
+        for (uint64_t& addr : callstack) addr = 0xDEADull;
+        const int n = get_callstack(callstack, 32, 2);
+        AssertThat(callstack[n], 0xDEADull);
+        AssertThat(callstack[n + 1], 0xDEADull);
+    }
     TestCaseExpectedEx(trace_ex, traced_exception)
     {
         struct inner_struct {

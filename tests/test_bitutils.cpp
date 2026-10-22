@@ -275,4 +275,23 @@ TestImpl(test_bitutils)
             AssertMsg(bitarray.isSet(bit) == (bit % 9 == 0), "Bit %d was copied wrong", bit);
         }
     }
+
+    TestCase(bitarray_UnsetClearsTheBit)
+    {
+        rpp::bit_array bits{16};
+        bits.set(3);
+        bits.set(4);
+        bits.unset(3);
+        bits.unset(5);
+        AssertFalse(bits.isSet(3));
+        AssertFalse(bits.isSet(5));
+        AssertThat(bits.getBuffer()[0], uint8_t(1 << 4));
+    }
+
+    TestCase(bitarray_InitFromBufferBitsClearsTheBitsPastNumBits)
+    {
+        const uint8_t buf[1] = { 0xFF };
+        rpp::bit_array bits{buf, 1, 3};
+        AssertThat(bits.getByte(0), uint8_t(0x07));
+    }
 };

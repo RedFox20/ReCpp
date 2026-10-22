@@ -96,6 +96,18 @@ TestImpl(test_collections)
         int k = 0;
         for (int i : range(5, 0, -1)) k += i;
         AssertThat(k, 15); // 5 + 4 + 3 + 2 + 1
+
+        // a step which does not divide the range must still stop, so the loops break out on a runaway
+        int up = 0, up_steps = 0;
+        for (int i : range(0, 10, 3)) { up += i; if (++up_steps > 4) break; }
+        AssertThat(up, 18); // 0 + 3 + 6 + 9
+        int down = 0, down_steps = 0;
+        for (int i : range(10, 0, -3)) { down += i; if (++down_steps > 4) break; }
+        AssertThat(down, 22); // 10 + 7 + 4 + 1
+        int empty_steps = 0;
+        for (int i : range(10, 0, 1)) { (void)i; if (++empty_steps > 4) break; }
+        for (int i : range(0, 10, 0)) { (void)i; if (++empty_steps > 4) break; }
+        AssertThat(empty_steps, 0);
     }
 
     TestCase(pop_back)

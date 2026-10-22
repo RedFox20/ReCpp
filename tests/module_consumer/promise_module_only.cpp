@@ -1,7 +1,7 @@
 // Instantiates std::promise beside an import, the shape which crashes gcc-14 at -O1 and
 // above whenever the module fragment carries <future>, see BUGS.md B16.
 #ifdef MAMA_HAS_MODULES
-#include <future> // includes come first, the import goes last
+#include <future> // BUGS.md B16, and includes come first, the import goes last
 
 import rpp.threading;
 

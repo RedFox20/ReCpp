@@ -2,7 +2,6 @@
 #include <rpp/delegate.h>
 #include <rpp/stack_trace.h>
 #include <cstring> // strlen, strcmp
-#include <functional>
 #include <memory> // std::make_shared
 #include <stdexcept> // std::invalid_argument
 #include <string>
@@ -993,17 +992,6 @@ namespace rpp
             AssertThat(evt3.size(), 2);
             evt3(data);
             AssertThat(count, 2);
-        }
-
-        TestCase(std_function_args)
-        {
-            std::function<void(Data, Data&, const Data&, Data&&)> fun =
-                [&](Data a, Data& b, const Data& c, Data&& d) // NOLINT(cppcoreguidelines-rvalue-reference-param-not-moved)
-            {
-                (void)validate("stdfun", a, b, c, d); 
-            };
-            Data copy = data;
-            fun.operator()(data, data, data, std::move(copy));
         }
 
         TestCase(multicast_delegate_mixed_reference_args)
