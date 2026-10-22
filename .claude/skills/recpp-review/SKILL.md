@@ -377,7 +377,36 @@ A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built li
 bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
 Report a missing bump, or a bump below that level, as blocking. An API break needs MINOR, not MAJOR.
 
-### R15. No heavy std header, and no `std::sort`
+### R15. A view never outlives its string
+
+A non-owning view that outlives the string or buffer it points into reads freed
+memory. Report each one as CRITICAL, also on an unchanged line that the change
+calls or moves.
+
+- A view is an `rpp::strview`, `rpp::ustrview`, any `std::basic_string_view`
+  (`std::string_view`, `std::u16string_view`, `std::wstring_view`), a `std::span`,
+  or a pointer from `.c_str()` or `.data()`.
+- A temporary is any `std::basic_string` from `a + b`, `"x"_sv + s`,
+  `rpp::format`, `to_string`, `to_ustring`, a by-value return or
+  `std::string{...}`. A temporary object (`Bar{}`, `f()`) and a local buffer
+  whose scope ends are also temporaries. The `substr` of a view returns a view, so
+  it makes no temporary owner.
+- It dangles when the view lives past the full expression. A static, member or
+  local view from a temporary dangles, and so does a returned view of a local.
+  The same applies to a lambda capture, a stored view, and a view that the callee
+  keeps. Real case in krattcam:
+  `static rpp::strview DIR = rpp::temp_dir() + "krattcam/conf/"_sv;`.
+- A temporary passed straight to a view parameter is safe only when the callee
+  keeps no copy. Read the callee.
+- A reference or view of a temporary or of its member is CRITICAL also where C++
+  extends the lifetime: `const Foo& foo = Bar{}.member;`. No lint follows it, and
+  a later accessor dangles in silence. Safe: a member of a named object
+  (`Bar bar{}; const Foo& foo = bar.member;`) or of `this`.
+- The fix is a named owner of the original type that lives as long as every use
+  of the view. The owner is the matching `std::basic_string`, a `std::vector`, an
+  array or the object.
+
+### R16. No heavy std header, and no `std::sort`
 
 A heavy std header slows the build of every file which includes it. Each `std::sort` call
 instantiates a large template, and the binary grows with every call site.
@@ -399,16 +428,18 @@ instantiates a large template, and the binary grows with every call site.
 Order the findings by severity. Keep one line per finding where possible.
 
 ```
+CRITICAL R15 src/rpp/x.cpp:12  static strview of temporary_dir() + "x" dangles
 BLOCK  R1  tests/            no test covers thread_pool::steal_task()
 BLOCK  R3  src/rpp/paths.cpp:88   readlink() has no guard, Windows and CV25 fail
 WARN   R7  tests/test_future.cpp:120  6 blank lines, 3 one-argument-per-line calls
 NOTE   R10 test_future        TSAN reports 1 race, deferred to BUGS.md B12
 
 Gates: gcc PASS 512/512 5.5s | clang PASS | clang-tidy PASS | android NOT RUN | windows SKIP (mirror dirty)
-Verdict: BLOCK, 2 findings
+Verdict: BLOCK, 3 findings
 ```
 
-- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, R14, or R15.
+- `CRITICAL` breaks R15. It comes first, and the verdict is BLOCK.
+- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, R14, or R16.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
