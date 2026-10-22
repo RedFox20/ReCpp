@@ -7,7 +7,6 @@
 #include <vector>
 #include <deque>
 #include <unordered_map>
-#include <numeric>
 #include "sort.h"
 #include <stdexcept>
 

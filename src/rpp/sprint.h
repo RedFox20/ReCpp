@@ -16,7 +16,7 @@
 // NOTE: had to remove, because clang-18 includes <algorithm> here, which crashes clang-tidy
 //#include <unordered_map> // std::unordered_map for to_string extensions
 #include <atomic>        // std::atomic<T> support
-#include <sstream>       // std::stringstream
+#include <sstream>       // std::ostringstream, the to_string() fallback for a type with operator<<
 
 #ifndef RPP_SPRINT_H
 #define RPP_SPRINT_H 1

@@ -5,7 +5,6 @@
 #include <rpp/tests.h>
 #include <rpp/delegate.h>
 #include <rpp/async.h>
-#include <algorithm> // std::fill
 using namespace rpp;
 
 static std::string stack_tracer() { return stack_trace(); }
@@ -37,7 +36,7 @@ TestImpl(test_stack_trace)
     TestCase(get_callstack_with_skip_writes_only_the_entries_it_returns)
     {
         uint64_t callstack[64];
-        std::fill(std::begin(callstack), std::end(callstack), 0xDEADull);
+        for (uint64_t& addr : callstack) addr = 0xDEADull;
         const int n = get_callstack(callstack, 32, 2);
         AssertThat(callstack[n], 0xDEADull);
         AssertThat(callstack[n + 1], 0xDEADull);
