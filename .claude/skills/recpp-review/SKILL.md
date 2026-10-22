@@ -377,6 +377,23 @@ A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built li
 bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
 Report a missing bump, or a bump below that level, as blocking. An API break needs MINOR, not MAJOR.
 
+### R15. No heavy std header, and no `std::sort`
+
+A heavy std header slows the build of every file which includes it. Each `std::sort` call
+instantiates a large template, and the binary grows with every call site.
+
+- Never include `<algorithm>`, `<functional>`, `<chrono>`, `<regex>`, `<future>`, `<filesystem>`,
+  `<random>`, `<format>`, `<iomanip>`, `<fstream>`, `<locale>`, `<sstream>`, `<ranges>` or `<iostream>`.
+  On g++ 13 each one adds 28k to 83k preprocessed lines. `<cstring>` adds 600.
+- Never call `std::sort`, `std::stable_sort` or `std::ranges::sort`. Use `rpp::sort` or
+  `rpp::insertion_sort` from `sort.h`.
+- Use the ReCpp form: `rpp::min` and `rpp::max` from `minmax.h`, and `rpp::any_of`, `rpp::find_if`
+  and `rpp::contains` from `collections.h`. Use `rpp::delegate` for a callable and `rpp::TimePoint` for a clock.
+- A test which needs one more helper writes it in the test file. A loop replaces `std::fill`.
+- A file may keep a listed header for three reasons. It works with that std type, it measures a std
+  baseline, or it times `rpp::TimePoint` against a second clock. A trailing comment on the include says which.
+- An include which nothing in the file uses is a defect, whatever its size.
+
 ## Report format
 
 Order the findings by severity. Keep one line per finding where possible.
@@ -391,7 +408,7 @@ Gates: gcc PASS 512/512 5.5s | clang PASS | clang-tidy PASS | android NOT RUN | 
 Verdict: BLOCK, 2 findings
 ```
 
-- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, or R14.
+- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, R14, or R15.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
