@@ -48,12 +48,6 @@ struct string_buffer_member_operator
     }
 };
 
-struct ostream_operator { };
-std::ostream& operator<<(std::ostream& os, [[maybe_unused]] const ostream_operator& ostrm_op)
-{
-    return os << "ostream_operator";
-}
-
 enum stringable_enum : uint8_t
 {
     strenum_first,
@@ -123,7 +117,6 @@ TestImpl(test_sprint)
         // sprint dispatches the generic write() on these two
         struct writes_itself { void operator<<(rpp::string_buffer&) const; };
         static_assert(rpp::has_member_sbuf_op<writes_itself> && !rpp::has_member_sbuf_op<int>);
-        static_assert(rpp::has_ostream_op<int> && !rpp::has_ostream_op<writes_itself>);
     }
 
     TestCase(string_buf)
@@ -401,10 +394,6 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "string_buffer_member_operator");
         sb.clear();
 
-        sb.write(ostream_operator{});
-        AssertThat(sb.view(), "ostream_operator");
-        sb.clear();
-
         external_to_string ext;
         sb.write(&ext);
         AssertThat(sb.view(), "*{external_to_string}");
@@ -514,10 +503,6 @@ TestImpl(test_sprint)
         AssertThat(sb.view(), "string_buffer_member_operator");
         sb.clear();
 
-        sb << ostream_operator{};
-        AssertThat(sb.view(), "ostream_operator");
-        sb.clear();
-
         external_to_string ext;
         sb << &ext;
         AssertThat(sb.view(), "*{external_to_string}");
@@ -537,7 +522,6 @@ TestImpl(test_sprint)
         AssertThat(rpp::sprint(string_buffer_operator{}), "string_buffer_operator");
         AssertThat(rpp::sprint(1,2,string_buffer_operator{}), "1 2 string_buffer_operator");
         AssertThat(rpp::sprint(string_buffer_member_operator{}), "string_buffer_member_operator");
-        AssertThat(rpp::sprint(ostream_operator{}, 1), "ostream_operator 1");
 
         external_to_string ext;
         AssertThat(rpp::sprint(&ext), "*{external_to_string}");
