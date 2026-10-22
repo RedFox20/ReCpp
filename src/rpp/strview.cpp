@@ -918,6 +918,7 @@ namespace rpp
         double result = power == 1 ? double(intPart) : double(intPart) / double(power);
         // dividing by an exact power of ten rounds once, multiplying by an inexact 10^-n rounds twice
         if (exponent > 0 && result != 0.0) result *= pow(10.0, (double)exponent); // 0 * inf would give NaN
+        else if (exponent < -308)           result = result / 1e308 / pow(10.0, -308.0 - exponent); // pow() would give inf
         else if (exponent < 0)              result /= pow(10.0, (double)-exponent);
         return result * sign;
     }

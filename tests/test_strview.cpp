@@ -181,6 +181,8 @@ TestImpl(test_strview)
         AssertThat(rpp::strview{"2.5east"}.to_double(), 2.5);
         AssertThat(std::isinf(rpp::strview{"1e3000000000"}.to_double()), true);
         AssertThat(rpp::strview{"0e309"}.to_double(), 0.0); // 0 * inf would be NaN
+        AssertInRange(rpp::strview{"1.0e-309"}.to_double() / 1e-309, 0.999999, 1.000001);
+        AssertInRange(rpp::strview{"12345.0e-310"}.to_double() / 1.2345e-306, 0.999999, 1.000001);
     }
 
 
