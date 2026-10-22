@@ -869,10 +869,9 @@ namespace rpp
 
     ////////////////////// loose utility functions
 
-    // parses e3 E+3 e-016 at s and moves s past it, but leaves s on the 'e' of a word suffix
+    // parses e3 E+3 e-016 with s on the 'e' and moves s past it, but leaves s on the 'e' of a word suffix
     static int parse_exponent(const char*& s, const char* e) noexcept
     {
-        if (s >= e || (*s != 'e' && *s != 'E')) return 0;
         const char* x = s + 1;
         const int esign = (x < e && *x == '-') ? -1 : +1;
         if (x < e && (*x == '-' || *x == '+')) ++x;
@@ -914,7 +913,7 @@ namespace rpp
                 power   = (power   << 3) + (power   << 1);                     // power *= 10
             }
         }
-        const int exponent = parse_exponent(s, e);
+        const int exponent = (s < e && (*s == 'e' || *s == 'E')) ? parse_exponent(s, e) : 0;
         if (end) *end = s; // write end of parsed value
         double result = power == 1 ? double(intPart) : double(intPart) / double(power);
         // dividing by an exact power of ten rounds once, multiplying by an inexact 10^-n rounds twice
