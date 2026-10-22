@@ -353,6 +353,13 @@ TestImpl(test_strview)
         AssertLess(rpp::strview{"abc"}.compare("abcdef"), 0);
     }
 
+    TestCase(string_compare_stops_at_the_c_string_end)
+    {
+        const char rhs[] = "abc";
+        const rpp::strview with_null { rhs, 4 };
+        AssertGreater(with_null.compare(rhs), 0);
+    }
+
     TestCase(string_compare_greater)
     {
         AssertGreater(rpp::strview{"bbbb"}, "aaaaaaaa");
