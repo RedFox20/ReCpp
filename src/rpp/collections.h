@@ -139,7 +139,7 @@ namespace rpp
         {
             const long long span = (long long)sentinel - first;
             if (step == 0 || (span > 0) != (step > 0)) this->sentinel = first; // a step away from the sentinel is empty
-            else if (long long rem = span % step) this->sentinel = int(sentinel - rem + step); // in 64 bits, with no overflow
+            else if (long long rem = span % step) this->sentinel = int(sentinel - rem + step); // rounds in 64 bits
         }
 
         struct iter
