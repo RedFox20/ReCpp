@@ -280,10 +280,12 @@ TestImpl(test_bitutils)
     {
         rpp::bit_array bits{16};
         bits.set(3);
+        bits.set(4);
         bits.unset(3);
         bits.unset(5);
         AssertFalse(bits.isSet(3));
         AssertFalse(bits.isSet(5));
+        AssertThat(bits.getBuffer()[0], uint8_t(1 << 4));
     }
 
     TestCase(bitarray_InitFromBufferBitsClearsTheBitsPastNumBits)
