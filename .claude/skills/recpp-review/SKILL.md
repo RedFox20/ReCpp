@@ -419,8 +419,8 @@ instantiates a large template, and the binary grows with every call site.
 - Use the ReCpp form: `rpp::min` and `rpp::max` from `minmax.h`, and `rpp::any_of`, `rpp::find_if`
   and `rpp::contains` from `collections.h`. Use `rpp::delegate` for a callable and `rpp::TimePoint` for a clock.
 - A test which needs one more helper writes it in the test file. A loop replaces `std::fill`.
-- A file may keep a listed header for three reasons. It works with that std type, it measures a std
-  baseline, or it times `rpp::TimePoint` against a second clock. A trailing comment on the include says which.
+- A file may keep a listed header only to time `rpp::TimePoint` against a second clock, or to test a
+  named compiler bug. A trailing comment on the include says which.
 - An include which nothing in the file uses is a defect, whatever its size.
 
 ## Report format
