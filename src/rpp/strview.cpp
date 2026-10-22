@@ -1029,9 +1029,10 @@ namespace rpp
             return 3;
         }
         if (isinf(f)) {
-            const int n = f < 0 ? 4 : 3;
-            memcpy(buffer, f < 0 ? "-inf" : "inf", size_t(n) + 1);
-            return n;
+            char* p = buffer;
+            if (f < 0) *p++ = '-';
+            p[0] = 'i'; p[1] = 'n'; p[2] = 'f'; p[3] = '\0';
+            return int(p - buffer) + 3;
         }
 
         // we need ceil and floor for handling -DBL_MAX edge case, or -2.0119 edge case
