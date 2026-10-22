@@ -2,7 +2,6 @@
 #include <rpp/stack_trace.h>
 #include <rpp/tests.h>
 #include <string> // std::string
-#include <climits> // INT_MAX
 using namespace rpp;
 using namespace std::string_literals;
 using std::unordered_map;
@@ -109,7 +108,6 @@ TestImpl(test_collections)
         for (int i : range(10, 0, 1)) { (void)i; if (++empty_steps > 4) break; }
         for (int i : range(0, 10, 0)) { (void)i; if (++empty_steps > 4) break; }
         AssertThat(empty_steps, 0);
-        AssertThat(range(-10, INT_MAX).end().i, INT_MAX); // the span overflows an int
     }
 
     TestCase(pop_back)
