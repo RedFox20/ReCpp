@@ -159,8 +159,8 @@ namespace rpp
         {
             char c1 = *s1;
             char c2 = *s2;
-            if (c1 < c2) return -1;
-            if (c1 > c2) return +1;
+            if (c1 != c2 || c2 == '\0') // two 0 bytes mean s ended inside this view
+                return c1 < c2 ? -1 : +1;
         }
         return *s2 ? -1 : 0; // s is longer, so this view is its prefix
     }
