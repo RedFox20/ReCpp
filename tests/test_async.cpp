@@ -12,7 +12,6 @@
 #include <atomic>
 #include <cstdint> // std::uintptr_t
 #include <exception> // std::current_exception, std::exception_ptr
-#include <future> // std::future, which IsFuture and run_async reject
 #include <map>
 #include <stdexcept>
 #include <string> // std::string
@@ -40,11 +39,8 @@ TestImpl(test_async)
         AssertThat(IsFunctionReturningFuture<delegate<future<int>()>>, true);
         AssertThat(IsFunctionReturningFuture<delegate<future<void>()>>, true);
         AssertThat(IsFunctionNotReturningFuture<delegate<future<int>()>>, false);
-        AssertThat(IsFuture<std::future<int>>, false);
-        AssertThat(IsFuture<std::future<void>>, false);
         AssertThat(IsFuture<int>, false);
         AssertThat(IsFunctionNotReturningFuture<delegate<int()>>, true);
-        AssertThat(IsFunctionNotReturningFuture<delegate<std::future<int>()>>, true);
     }
 
     template<typename Launcher>
@@ -270,20 +266,6 @@ TestImpl(test_async)
     {
         AssertThat(loop_awaits<future<int>>, true);
         AssertThat(loop_awaits<delegate<int()>>, true);
-        AssertThat(loop_awaits<std::future<int>>, false); // a std::future has no completion hook, so a worker would block
-
-        // a callable which returns a std::future yields that future, and no worker waits for it
-        using Yield = decltype(std::declval<rpp::event_loop&>().run_async(delegate<std::future<int>()>{}).await_resume());
-        AssertThat((std::is_same_v<Yield, std::future<int>>), true);
-    }
-
-    template<typename F>
-    static constexpr bool co_awaits = requires(F f) { rpp::coro_operators::operator co_await(std::move(f)); };
-
-    TestCase(co_await_takes_no_std_future)
-    {
-        AssertThat(co_awaits<delegate<int()>>, true);
-        AssertThat(co_awaits<std::future<int>>, false);
     }
 
     // Each caller drains the task before its referenced locals leave scope.

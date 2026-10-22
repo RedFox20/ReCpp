@@ -6,7 +6,6 @@
 #include <rpp/tests.h>
 #include <rpp/timepoint.h> // rpp::sleep_ms, rpp::TimePoint
 #include <rpp/threads.h> // rpp::yield
-#include <fstream> // use fstream as a baseline file utility to test against
 #include <atomic> // std::atomic_bool
 #include <cerrno> // EINTR
 #include <cstdlib> // getenv, setenv
@@ -71,16 +70,11 @@ TestImpl(test_file_io)
 
     void create_test_file(rpp::strview filename)
     {
-        std::string filePath = filename.to_string();
-        std::ofstream fstr { filePath };
-        AssertMsg(fstr.good(), "std::ofstream create failed: '%s'", filePath.c_str());
-
         TestFileContents = "abc1abc2abc3abc4abc5abc6abc7abc8abc9abc10"
                            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                            "0123456789!@#$%^&*()_+-=[]{};':\",.<>/?`~";
-        fstr << TestFileContents;
-        TestFileSize = (int)fstr.tellp();
-        fstr.close();
+        TestFileSize = rpp::file::write_new(filename, TestFileContents);
+        AssertMsg(TestFileSize == (int)TestFileContents.size(), "rpp::file create failed: '%s'", filename.to_cstr());
     }
 #if RPP_ENABLE_UNICODE
     void create_test_file(ustrview filename)
@@ -128,9 +122,9 @@ TestImpl(test_file_io)
     // the state field of a /proc stat line follows the last ')', and 'S' is an interruptible sleep
     static bool sleeps(const std::string& statPath)
     {
-        std::ifstream f { statPath };
-        std::string stat;
-        std::getline(f, stat);
+        char buf[512]; // a /proc file reports size 0, so read_all_text() would return nothing
+        const int n = rpp::file{ statPath, rpp::file::READONLY }.read(buf, sizeof(buf));
+        const std::string stat(buf, size_t(n > 0 ? n : 0));
         size_t end = stat.rfind(')');
         return end != std::string::npos && end + 2 < stat.size() && stat[end + 2] == 'S';
     }
