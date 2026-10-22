@@ -3792,35 +3792,35 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 
 | Type | Description |
 |------|-------------|
-| [`element_range<T>`](src/rpp/collections.h#L18) | Non-owning view over contiguous elements |
-| [`index_range`](src/rpp/collections.h#L129) | Integer range with optional step |
+| [`element_range<T>`](src/rpp/collections.h#L17) | Non-owning view over contiguous elements |
+| [`index_range`](src/rpp/collections.h#L128) | Integer range with optional step |
 
 ### Range Construction
 
 | Function | Description |
 |----------|-------------|
 | [`range(data, size)`](src/rpp/collections.h#L71) | Create element range from pointer + size |
-| [`range(vector)`](src/rpp/collections.h#L74) | Create element range from vector |
-| [`range(count)`](src/rpp/collections.h#L179) | Create integer range `[0, count)` |
-| [`slice(container, start, count)`](src/rpp/collections.h#L116) | Sub-range of a container |
+| [`range(vector)`](src/rpp/collections.h#L73) | Create element range from vector |
+| [`range(count)`](src/rpp/collections.h#L178) | Create integer range `[0, count)` |
+| [`slice(container, start, count)`](src/rpp/collections.h#L115) | Sub-range of a container |
 
 ### Container Algorithms
 
 | Function | Description |
 |----------|-------------|
-| [`pop_back(vector)`](src/rpp/collections.h#L187) | Pop last element with return value |
-| [`push_unique(vector, item)`](src/rpp/collections.h#L204) | Push only if not already present |
-| [`erase_item(vector, item)`](src/rpp/collections.h#L212) | Erase first matching item |
-| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L263) | O(1) erase by swapping with last element |
-| [`contains(container, item)`](src/rpp/collections.h#L335) | Check membership |
-| [`find(vector, item)`](src/rpp/collections.h#L350) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](src/rpp/collections.h#L431) | Find minimum by selector |
-| [`find_largest(range, selector)`](src/rpp/collections.h#L453) | Find maximum by selector |
-| [`any_of(vector, predicate)`](src/rpp/collections.h#L471) | True if any element matches predicate |
-| [`all_of(vector, predicate)`](src/rpp/collections.h#L480) | True if all elements match predicate |
-| [`none_of(vector, predicate)`](src/rpp/collections.h#L489) | True if no elements match predicate |
-| [`sum_all(vector)`](src/rpp/collections.h#L499) | Sum all elements |
-| [`append(vector, other)`](src/rpp/collections.h#L340) | Append one vector to another |
+| [`pop_back(vector)`](src/rpp/collections.h#L186) | Pop last element with return value |
+| [`push_unique(vector, item)`](src/rpp/collections.h#L203) | Push only if not already present |
+| [`erase_item(vector, item)`](src/rpp/collections.h#L211) | Erase first matching item |
+| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L262) | O(1) erase by swapping with last element |
+| [`contains(container, item)`](src/rpp/collections.h#L334) | Check membership |
+| [`find(vector, item)`](src/rpp/collections.h#L349) | Find element (returns iterator) |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L430) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L452) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L470) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L479) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L488) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L498) | Sum all elements |
+| [`append(vector, other)`](src/rpp/collections.h#L339) | Append one vector to another |
 
 ### Example: element_range & index_range
 

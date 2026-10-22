@@ -5,7 +5,6 @@
 #include <cassert>
 #include <csignal>
 #include <cmath> // round
-#include <unordered_map>
 #if __APPLE__ || __linux__
 # include <pthread.h>
 #endif
