@@ -163,13 +163,17 @@ TestImpl(test_sprint)
 
     TestCase(string_buffer_write_long_grows_the_buffer)
     {
-        constexpr long big = std::numeric_limits<long>::max();
-        string_buffer sb;
         std::string fill(string_buffer::SIZE - 17, 'x');
-        sb.write(fill);
-        sb.write(big);
-        AssertGreater(sb.cap, sb.len);
-        AssertThat(sb.view(), fill + std::to_string(big));
+        auto write_near_capacity = [&](auto value)
+        {
+            string_buffer sb;
+            sb.write(fill);
+            sb.write(value);
+            AssertGreater(sb.cap, sb.len);
+            AssertThat(sb.view(), fill + std::to_string(value));
+        };
+        write_near_capacity(std::numeric_limits<long>::max());
+        write_near_capacity(std::numeric_limits<unsigned long>::max());
         constexpr long lmin = std::numeric_limits<long>::min();
         constexpr unsigned long umax = std::numeric_limits<unsigned long>::max();
         AssertThat(rpp::to_string(lmin), std::to_string(lmin));
