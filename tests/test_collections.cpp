@@ -334,11 +334,15 @@ TestImpl(test_collections)
 
     TestCase(vector_find_last_if)
     {
-        std::vector<std::string> v { "1"s, "2"s, "1"s, "3"s, "2"s };
+        std::vector<int> v { 1, 2, 3, 2, 4, 5 };
+        element_range<int> r = range(v, 5); // the last vector element lies past the range, so a read of end() finds it
+        auto eq = [](int want) { return [want](int x) { return x == want; }; };
 
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  ); // NOLINT(readability-*)
-        AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  ); // NOLINT(readability-*)
+        AssertThat(find_last_if(r, eq(1)), v.data());
+        AssertThat(find_last_if(r, eq(4)), &v[4]);
+        AssertThat(find_last_if(r, eq(2)), &v[3]);
+        AssertThat(find_last_if(r, eq(5)), nullptr);
+        AssertThat(find_last_if(element_range<int>{}, eq(1)), nullptr);
     }
 
     TestCase(vector_find_smallest)
