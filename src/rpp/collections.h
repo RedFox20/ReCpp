@@ -396,8 +396,8 @@ namespace rpp
         T* first = v.begin();
         T* last  = v.end();
         while (last != first) {
-            if (predicate(*last)) return last;
             --last;
+            if (predicate(*last)) return last;
         }
         return nullptr;
     }
