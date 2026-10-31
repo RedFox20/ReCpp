@@ -444,13 +444,51 @@ TestImpl(test_threadpool)
     }
 
     // kill() from the task of the same worker must not wait for that task
-    TestCase(a_task_can_kill_its_own_worker)
+    TestCase(kill_from_a_task_of_the_same_worker_returns_at_once)
     {
-        rpp::semaphore_once_flag done;
         rpp::pool_worker worker;
-        rpp::task_delegate<void()> task = [&] { (void)worker.kill(0); done.notify(); };
-        AssertTrue(worker.run_generic(task, nullptr));
-        AssertThat(done.wait(rpp::millis(1000)), rpp::semaphore::notified);
+        for (int i = 0; i < 20; ++i) // each submit follows the last finish at once, so it races the runner
+        {
+            rpp::pool_task_handle handle { nullptr };
+            rpp::task_delegate<void()> task = [&] { (void)worker.kill(0); };
+            AssertTrue(worker.run_generic(task, &handle));
+            AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+        }
+    }
+
+    // a task may still query its pool while the destructor waits for that task
+    TestCase(a_task_can_query_its_pool_during_the_destructor)
+    {
+        rpp::semaphore_once_flag started, release;
+        std::thread releaser;
+        int active = -1;
+        {
+            rpp::thread_pool pool { 1 };
+            (void)pool.parallel_task([&] { started.notify(); release.wait(); active = pool.active_tasks(); });
+            started.wait();
+            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+        } // the destructor starts before the releaser wakes
+        releaser.join();
+        AssertNotEqual(active, -1);
+    }
+
+    // a range which a kill cancelled must not run when the next task brings the worker back
+    TestCase(a_cancelled_range_never_runs_after_a_resurrection)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_worker worker;
+            auto body = [](int, int) {};
+            auto range = rpp::action<int, int>::from_function<decltype(body), &decltype(body)::operator()>(&body);
+            AssertTrue(worker.run_range(0, 1, range, nullptr));
+            (void)worker.kill(0);
+            bool ran = false;
+            rpp::pool_task_handle handle { nullptr };
+            rpp::task_delegate<void()> task = [&] { ran = true; };
+            AssertTrue(worker.run_generic(task, &handle));
+            AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+            AssertTrue(ran);
+        }
     }
 
     TestCase(parallel_task_resurrection)

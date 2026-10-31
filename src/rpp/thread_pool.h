@@ -363,7 +363,7 @@ namespace rpp
         // @return TRUE if run started successfully (task was not already running)
         [[nodiscard]] bool run_generic(task_delegate<void()>& newTask, pool_task_handle* out) noexcept;
 
-        // kill the task and wait for it to finish
+        // kill the task and wait for it to finish. A task of this worker gets timeout, and its runner keeps serving
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
