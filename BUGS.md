@@ -574,6 +574,8 @@ All 748 cases passed, and TSAN alone set exit code 66.
 Another sighting on e0021f4 in #161, on `ubuntu-cpp20-tsan-gcc13`.
 The free is at `thread_pool.cpp:354` and the read at `tests.cpp:733`, with the same creation stack.
 All 753 cases passed, and TSAN alone set exit code 66.
+`ubuntu-cpp20-tsan-clang18` failed on the same commit, with the libc++ pair `__cxa_end_catch` and `tests.cpp:744`.
+That makes three sightings in one hour on branches based on 57a1b01, so the rate rose after #165.
 
 The libc++ stack names the freed object. The worker frees the exception of
 `parallel_task_exception` in `__cxa_end_catch`, at the end of its catch block in
