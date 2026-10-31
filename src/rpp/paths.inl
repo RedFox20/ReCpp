@@ -188,6 +188,13 @@ namespace rpp
         return false;
     }
     template<StringViewType T>
+    static bool sys_lstat64(T filename, os_stat64* out) noexcept
+    {
+        multibyte_conv conv { filename };
+        if (conv.cstr) return lstat(conv.cstr, out) == 0;
+        return false;
+    }
+    template<StringViewType T>
     static bool set_st_mode(T filename, mode_t mode) noexcept
     {
         multibyte_conv conv{ filename };
@@ -225,14 +232,15 @@ namespace rpp
     template<StringViewType T>
     static file_flags read_file_flags(T filename) noexcept
     {
-        int flags = FF_INVALID;
         os_stat64 s;
-        if (sys_stat64<T>(filename, &s))
+        if (!sys_lstat64<T>(filename, &s)) return FF_INVALID;
+        int flags = FF_INVALID;
+        if (S_ISLNK(s.st_mode)) // stat() follows a link, so only lstat() sees it
         {
-            if (S_ISDIR(s.st_mode)) flags |= FF_FOLDER;
-            else                    flags |= FF_FILE;
-            if (S_ISLNK(s.st_mode)) flags |= FF_SYMLINK;
+            flags |= FF_SYMLINK;
+            if (!sys_stat64<T>(filename, &s)) return file_flags(flags); // a dangling link
         }
+        flags |= S_ISDIR(s.st_mode) ? FF_FOLDER : FF_FILE;
         return file_flags(flags);
     }
 #endif

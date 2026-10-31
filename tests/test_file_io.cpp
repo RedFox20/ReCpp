@@ -104,6 +104,20 @@ TestImpl(test_file_io)
         AssertThat(f.read_text(), TestFileContents);
     }
 
+#if !_MSC_VER && !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__
+    TestCase(is_symlink_sees_the_link_and_file_exists_its_target)
+    {
+        create_test_file(TestFile);
+        Assert(create_folder(TestDir));
+        const std::string link = path_combine(TestDir, "link");
+        AssertThat(symlink(TestFile.c_str(), link.c_str()), 0);
+        AssertTrue(is_symlink(link));
+        AssertTrue(file_exists(link));
+        AssertFalse(is_symlink(TestFile));
+        AssertFalse(file_exists(TestDir));
+    }
+#endif
+
 #if RPP_ENABLE_UNICODE
     TestCase(basic_file_utf16)
     {
