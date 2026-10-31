@@ -258,7 +258,8 @@ namespace rpp /* ReCpp */
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
     #endif
     }
-    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF. grow(n) returns n bytes which keep the bytes read
+    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF or to 512 MiB.
+    /// grow(n) returns n bytes which keep the bytes read, or null to stop
     template<class GrowFunc> static int read_until_eof(file& f, GrowFunc&& grow)
     {
         int len = 0;

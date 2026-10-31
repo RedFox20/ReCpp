@@ -447,12 +447,15 @@ TestImpl(test_threadpool)
     TestCase(kill_from_a_task_of_the_same_worker_returns_at_once)
     {
         rpp::pool_worker worker;
+        std::string first;
         for (int i = 0; i < 20; ++i) // each submit follows the last finish at once, so it races the runner
         {
             rpp::pool_task_handle handle { nullptr };
             rpp::task_delegate<void()> task = [&] { (void)worker.kill(0); };
             AssertTrue(worker.run_generic(task, &handle));
             AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+            if (i == 0) first = handle.worker_name();
+            AssertThat(std::string{handle.worker_name()}, first); // a resurrected runner takes a new name
         }
     }
 

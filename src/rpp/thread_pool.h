@@ -415,6 +415,7 @@ namespace rpp
          * @see set_max_parallelism
          */
         explicit thread_pool(int max_parallelism);
+        /// Waits for every running task. A task must not submit to this pool while it is destroyed
         ~thread_pool() noexcept;
         NOCOPY_NOMOVE(thread_pool)
         
