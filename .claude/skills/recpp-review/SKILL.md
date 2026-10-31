@@ -382,6 +382,7 @@ proves it runs under ASAN and reports the rate, per R1.
 A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built library
 bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
 Report a missing bump, or a bump below that level, as blocking. An API break needs MINOR, not MAJOR.
+Report an ABI break as blocking when another open PR also breaks the ABI. Move both into one changeset.
 
 ### R15. A view never outlives its string
 

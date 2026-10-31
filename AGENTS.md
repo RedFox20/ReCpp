@@ -134,6 +134,8 @@ Only a PATCH bump keeps the ABI.
 2. Bump MINOR when the ABI or the API changes: a class layout, an inline signature, a template, an ABI flag, or a removed symbol.
 3. Bump MAJOR only for a new major release, such as the C++20 modules refactor in 2.0.0.
 
+Put all pending ABI breaks into one changeset, so that one MINOR bump covers them. Each PR which breaks the ABI alone adds a MINOR bump and a rebuild of each dependent package.
+
 ## Reference
 
 - Header index: [`docs/HEADERS.md`](docs/HEADERS.md)
