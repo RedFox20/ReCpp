@@ -48,4 +48,14 @@ TestImpl(test_vec)
         AssertThat(f.bottom(), 100.0f);
     }
 
+    TestCase(vector_to_string_keeps_one_buffer_per_type)
+    {
+        const char* v2 = Vector2{1, 2}.toString();
+        const char* v3 = Vector3{1, 2, 3}.toString();
+        const char* v4 = Vector4{1, 2, 3, 4}.toString();
+        AssertThat(std::string{v2}, "{1;2}");
+        AssertThat(std::string{v3}, "{1;2;3}");
+        AssertThat(std::string{v4}, "{1;2;3;4}");
+    }
+
 };

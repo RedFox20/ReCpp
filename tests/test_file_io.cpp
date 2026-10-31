@@ -18,6 +18,8 @@
     #include <unistd.h> // pipe, dup2
     #include <csignal> // sigaction
     #include <pthread.h> // pthread_kill
+    #include <sys/stat.h> // mkfifo
+    #include <utime.h> // utime
 #endif
 using namespace rpp;
 
@@ -273,6 +275,46 @@ TestImpl(test_file_io)
         Assert(folder_exists(dir));
         Assert(folder_exists(dir + u"/"));
         Assert(!folder_exists(u"/complete/rubbish/path"_sv));
+    }
+#endif
+
+    TestCase(file_times_select_created_accessed_and_modified)
+    {
+        create_test_file(TestFile);
+    #if !_MSC_VER // distinct atime and mtime catch a swapped selector
+        const utimbuf times { 1'000'000, 2'000'000 };
+        AssertThat(utime(TestFile.c_str(), &times), 0);
+    #endif
+        time_t created, accessed, modified;
+        Assert(file_info(TestFile, nullptr, &created, &accessed, &modified));
+        AssertThat(file_created(TestFile), created);
+        AssertThat(file_accessed(TestFile), accessed);
+        AssertThat(file_modified(TestFile), modified);
+    #if !_MSC_VER
+        AssertThat(accessed, time_t(1'000'000));
+        AssertThat(modified, time_t(2'000'000));
+    #endif
+        AssertThat(file_modified(path_combine(TestDir, "missing")), time_t(0));
+    }
+
+#if __linux__ && !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__
+    TestCase(dir_iterator_classifies_each_entry_type)
+    {
+        Assert(create_folder(TestDir));
+        create_test_file(path_combine(TestDir, "file"));
+        Assert(create_folder(path_combine(TestDir, "dir")));
+        AssertThat(symlink("file", path_combine(TestDir, "link").c_str()), 0);
+        AssertThat(mkfifo(path_combine(TestDir, "fifo").c_str(), 0600), 0);
+        int entries = 0;
+        for (auto e : dir_iterator{TestDir})
+        {
+            AssertThat(e.is_file(), e.name == "file");
+            AssertThat(e.is_dir(), e.name == "dir");
+            AssertThat(e.is_symlink(), e.name == "link");
+            AssertThat(e.is_device(), e.name == "fifo");
+            ++entries;
+        }
+        AssertThat(entries, 4);
     }
 #endif
 
