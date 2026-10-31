@@ -589,7 +589,8 @@ namespace rpp /* ReCpp */
             return uint64(-1); // seek() then reports -1
         return newpos.QuadPart;
     #else
-        fseeki64((FILE*)Handle, filepos, seekmode);
+        if (fseeki64((FILE*)Handle, filepos, seekmode) != 0)
+            return uint64(-1);
         return (uint64)ftelli64((FILE*)Handle);
     #endif
     }

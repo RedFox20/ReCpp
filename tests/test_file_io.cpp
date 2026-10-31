@@ -118,6 +118,14 @@ TestImpl(test_file_io)
     }
 #endif
 
+    TestCase(seek_before_the_start_fails)
+    {
+        create_test_file(TestFile);
+        file f = { TestFile };
+        AssertThat(f.seek(-10, SEEK_SET), -1);
+        AssertThat(f.tell(), 0);
+    }
+
 #if RPP_ENABLE_UNICODE
     TestCase(basic_file_utf16)
     {
