@@ -115,6 +115,34 @@ TestImpl(test_strview)
         AssertThat(c, "after_empty");
         AssertThat(d, "");
     }
+    TestCase(next_notrim_stops_on_the_delimiter)
+    {
+        rpp::strview input = "key=value;x";
+        AssertTrue(input.next_notrim('=') == "key");
+        AssertTrue(input == "=value;x");
+        rpp::strview value = "value;x";
+        rpp::strview out;
+        AssertTrue(value.next_notrim(out, ";=", 2) && out == "value");
+        AssertTrue(value == ";x");
+        rpp::strview empty;
+        AssertFalse(empty.next_notrim(out, ';'));
+    }
+#if RPP_ENABLE_UNICODE
+    TestCase(utf16_next_token_keeps_empty_tokens_and_stops_at_the_end)
+    {
+        rpp::ustrview input = u"first,,after,";
+        AssertTrue(input.next(u',') == u"first");
+        AssertTrue(input.next(u',') == u"");
+        AssertTrue(input.next(u',') == u"after");
+        rpp::ustrview out;
+        AssertFalse(input.next(out, u','));
+        rpp::ustrview multi = u"a;b,c";
+        AssertTrue(multi.next(u",;") == u"a");
+        AssertTrue(multi.next(u",;") == u"b");
+        AssertTrue(multi.next(u",;") == u"c");
+        AssertFalse(multi.next(out, u",;"));
+    }
+#endif
 
 
     TestCase(parse_int_empty)
