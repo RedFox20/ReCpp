@@ -246,6 +246,8 @@ CXX23=1 mama clang build clang-tidy test="nogdb -vv"
 # 3. Android NDK, aarch64 under QEMU
 CXX23=1 mama android verbose build with_tests && ./run_android_tests -vv
 # 4. Windows MSVC, see the mirror steps below
+# 5. the branch carries no merge commit, so this prints nothing
+git log --merges --oneline origin/master..HEAD
 ```
 
 mama builds each compiler and sanitizer into its own directory, such as
