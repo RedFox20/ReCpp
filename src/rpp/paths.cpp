@@ -1121,6 +1121,7 @@ namespace rpp /* ReCpp */
     {
         if (!e) return 0;
         if (e->d_type) return mode_t(e->d_type) << 12; // every POSIX libc defines DT_x as S_IFx >> 12
+        // the CV25 Yocto filesystem gives DT_UNKNOWN, and no filesystem in CI or the tests does
         struct stat st;
         return ::stat(path_combine(dirname, e->d_name).c_str(), &st) == 0 ? st.st_mode : 0;
     }
