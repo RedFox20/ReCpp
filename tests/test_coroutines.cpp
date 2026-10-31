@@ -218,7 +218,8 @@ TestImpl(test_coroutines)
     }
 
 
-    static rpp::future<void> functor_nonfuture_void_coro()
+    // the coroutine resumes on a pool worker, where an assertion cannot fail the case, so it returns the result
+    static rpp::future<std::string> functor_nonfuture_void_coro()
     {
         std::string result = "default";
         // tests functor_awaiter<void>, lambda is converted to rpp::delegate<void()>
@@ -226,15 +227,14 @@ TestImpl(test_coroutines)
             rpp::sleep_ms(1);
             result = "string from lambda coro with dynamic alloc";
         };
-        AssertThat(result, "string from lambda coro with dynamic alloc"s);
+        co_return result;
     }
     TestCase(functor_nonfuture_void_coro)
     {
-        functor_nonfuture_void_coro().get();
+        AssertThat(functor_nonfuture_void_coro().get(), "string from lambda coro with dynamic alloc"s);
     }
 
-
-    static rpp::future<void> functor_nonfuture_string_coro()
+    static rpp::future<std::string> functor_nonfuture_string_coro()
     {
         // tests functor_awaiter<T> with a return value, lambda is converted to rpp::delegate<std::string()>
         std::string result = co_await [&]() -> std::string {
@@ -242,20 +242,10 @@ TestImpl(test_coroutines)
             std::string r = "string from lambda coro with dynamic alloc";
             return r;
         };
-        AssertThat(result, "string from lambda coro with dynamic alloc"s);
+        co_return result;
     }
     TestCase(functor_nonfuture_string_coro)
     {
-        functor_nonfuture_string_coro().get();
-    }
-
-    static rpp::future<void> future_void_coro()
-    {
-        co_await rpp::millis(10);
-        co_return;
-    }
-    TestCase(future_void_coro)
-    {
-        future_void_coro().get();
+        AssertThat(functor_nonfuture_string_coro().get(), "string from lambda coro with dynamic alloc"s);
     }
 };

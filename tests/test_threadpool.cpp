@@ -220,32 +220,24 @@ TestImpl(test_threadpool)
 
     TestCase(parallel_for_max_range_size)
     {
-        auto numbers = std::vector<int>(32);
-        int* ptr = numbers.data();
-        int  len = (int)numbers.size();
-        for (int i = 0; i < len; ++i)
-            ptr[i] = i;
-
-        rpp::Timer t;
-
+        constexpr int len = 32;
         thread_pool pool{/*max_parallelism*/4};
-        pool.parallel_for(0, len, 8, [&](int start, int end) {
-            AssertThat(end-start, 8);
-            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
-        });
-        
-        pool.parallel_for(0, len, 2, [&](int start, int end) {
-            AssertThat(end-start, 2);
-            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
-        });
-
-        pool.parallel_for(0, len, 1, [&](int start, int end) {
-            AssertThat(end-start, 1);
-            for (int i = start; i < end; ++i) AssertThat(ptr[i], i);
-        });
-
-        double elapsed = t.elapsed();
-        AssertLessOrEqual(elapsed, 0.2);
+        rpp::Timer t;
+        for (int range_size : { 8, 2, 1 })
+        {
+            // a worker assertion cannot fail the case, so the callbacks count and the case thread asserts
+            std::atomic_int chunks { 0 }, wrong_sizes { 0 };
+            std::atomic<uint64_t> visited { 0 };
+            pool.parallel_for(0, len, range_size, [&](int start, int end) {
+                ++chunks;
+                if (end - start != range_size) ++wrong_sizes;
+                for (int i = start; i < end; ++i) visited |= 1ull << i;
+            });
+            AssertThat(chunks.load(), len / range_size);
+            AssertThat(wrong_sizes.load(), 0);
+            AssertThat(visited.load(), (1ull << len) - 1);
+        }
+        AssertLessOrEqual(t.elapsed(), 0.2);
     }
 
     TestCase(parallel_for_max_range_size_unaligned)

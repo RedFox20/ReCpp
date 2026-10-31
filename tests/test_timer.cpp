@@ -1,7 +1,10 @@
 #include <rpp/timer.h>
+#include <rpp/debugging.h>
 #include <rpp/proc_utils.h>
 #include <rpp/tests.h>
 #include <thread>
+#include <string>
+#include <vector>
 #if __linux__ // Android also defines __linux__.
     #include <rpp/file_io.h> // rpp::file
     #include <rpp/threads.h> // rpp::yield
@@ -42,14 +45,14 @@ TestImpl(test_timer)
 
     TestCase(basic_timer_sec)
     {
-        double elapsed_ms = best_of_3([]
+        double elapsed_s = best_of_3([]
         {
             rpp::Timer t;
             spin_sleep_for_ms(10);
-            return t.elapsed_millis();
+            return t.elapsed();
         });
-        print_info("timer 10ms spin_sleep best of 3: %fms\n", elapsed_ms);
-        AssertInRange(elapsed_ms, 10.0, 10.0 + sigma_ms);
+        print_info("timer 10ms spin_sleep best of 3: %fs\n", elapsed_s);
+        AssertInRange(elapsed_s, 0.010, 0.010 + sigma_s);
     }
 
     TestCase(basic_timer_ms)
@@ -255,25 +258,23 @@ TestImpl(test_timer)
 
     TestCase(duration_overflow)
     {
-        // take 2147483647 (int max) seconds and convert to nanos
-        rpp::Duration d0 = rpp::Duration::from_seconds(2147483647);
-        print_info("d0: %lldns\n", d0.nanos());
-        print_info("d0.seconds: %lld\n", d0.seconds());
-        print_info("d0.millis: %lld\n", d0.millis());
-        print_info("d0.micros: %lld\n", d0.micros());
-        print_info("d0.nanos: %lld\n", d0.nanos());
-        print_info("d0.days: %lld\n", d0.days());
-        print_info("d0.hours: %lld\n", d0.hours());
-        print_info("d0.minutes: %lld\n", d0.minutes());
+        // int max seconds still fits in int64 nanos
+        rpp::Duration d0 = rpp::seconds(2147483647);
+        AssertThat(d0.seconds(), 2147483647LL);
+        AssertThat(d0.millis(), 2147483647'000LL);
+        AssertThat(d0.micros(), 2147483647'000'000LL);
+        AssertThat(d0.nanos(), 2147483647'000'000'000LL);
+        AssertThat(d0.days(), 24855LL);
+        AssertThat(d0.hours(), 596523LL);
+        AssertThat(d0.minutes(), 35791394LL);
 
         rpp::Duration d1 = rpp::Duration{1708732302913202308LL};
-        print_info("d1.seconds: %lld\n", d1.seconds());
-        print_info("d1.millis: %lld\n", d1.millis());
-        print_info("d1.micros: %lld\n", d1.micros());
-        print_info("d1.nanos: %lld\n", d1.nanos());
-        print_info("d1.days: %lld\n", d1.days());
-        print_info("d1.hours: %lld\n", d1.hours());
-        print_info("d1.minutes: %lld\n", d1.minutes());
+        AssertThat(d1.seconds(), 1708732302LL);
+        AssertThat(d1.millis(), 1708732302913LL);
+        AssertThat(d1.micros(), 1708732302913202LL);
+        AssertThat(d1.days(), 19776LL);
+        AssertThat(d1.hours(), 474647LL);
+        AssertThat(d1.minutes(), 28478871LL);
     }
 
     TestCase(basic_stopwatch)
@@ -316,25 +317,28 @@ TestImpl(test_timer)
         AssertNotEqual(sw.begin, prev_begin);
     }
 
+#if !RPP_ANDROID // Android sends the perf line to logcat, not to the log handlers
+    static void capture_log_line(void* context, LogSeverity, const char* message, int len) noexcept
+    {
+        static_cast<std::vector<std::string>*>(context)->emplace_back(message, len);
+    }
+
     TestCase(scoped_perf_timer)
     {
-        {
-            auto spt = rpp::ScopedPerfTimer{};
-            spin_sleep_for_ms(10);
-        }
-        {
-            auto spt = rpp::ScopedPerfTimer { __FUNCTION__ }; // backwards compatibility
-            spin_sleep_for_ms(10);
-        }
-        {
-            auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__ };
-            spin_sleep_for_ms(10);
-        }
-        {
-            auto spt = rpp::ScopedPerfTimer { "[perf]", __FUNCTION__, "detail-item" };
-            spin_sleep_for_ms(10);
-        }
+        std::vector<std::string> lines;
+        rpp::add_log_handler(&lines, &capture_log_line);
+        { rpp::ScopedPerfTimer spt{}; }
+        { rpp::ScopedPerfTimer spt{ "[perf]", __FUNCTION__, "detail-item" }; }
+        { rpp::ScopedPerfTimer spt{ "[perf]", __FUNCTION__, 1'000'000ul }; } // under the threshold, so no line
+        rpp::remove_log_handler(&lines, &capture_log_line);
+
+        AssertThat(lines.size(), 2u);
+        // MSVC names the function with its class, so the match starts at the function name
+        AssertThat(rpp::strview{lines[0]}.contains("test_scoped_perf_timer elapsed: "), true);
+        AssertThat(rpp::strview{lines[1]}.contains("test_scoped_perf_timer detail-item elapsed: "), true);
+        AssertThat(rpp::strview{lines[1]}.contains("[perf] "), true);
     }
+#endif
 
     TestCase(duration_to_string)
     {

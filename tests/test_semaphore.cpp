@@ -534,15 +534,14 @@ TestImpl(test_semaphore)
     TestCase(co_await_semaphore_notified)
     {
         rpp::semaphore sem;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<rpp::semaphore::wait_result>
         {
-            auto result = co_await sem.await(millis(500));
-            AssertEqual(result, rpp::semaphore::notified);
+            co_return co_await sem.await(millis(500));
         };
 
         std::thread producer([&]() { rpp::sleep_ms(20); sem.notify(); });
         auto future = coro();
-        future.get();
+        AssertEqual(future.get(), rpp::semaphore::notified);
         producer.join();
     }
 
@@ -550,12 +549,11 @@ TestImpl(test_semaphore)
     TestCase(co_await_semaphore_timeout)
     {
         rpp::semaphore sem;
-        auto coro = [&]() -> rpp::future<void>
+        auto coro = [&]() -> rpp::future<rpp::semaphore::wait_result>
         {
-            auto result = co_await sem.await(millis(20));
-            AssertEqual(result, rpp::semaphore::timeout);
+            co_return co_await sem.await(millis(20));
         };
-        coro().get();
+        AssertEqual(coro().get(), rpp::semaphore::timeout);
     }
 
     // ─── co_await semaphore: already signaled (fast path) ───────

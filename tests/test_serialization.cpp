@@ -47,6 +47,17 @@ struct Struct3 : serializable<Struct3>
     }
 };
 
+struct Struct4 : serializable<Struct4>
+{
+    Struct1 s1;
+    Struct2 s2;
+
+    void introspect()
+    {
+        bind(s1, s2);
+    }
+};
+
 TestImpl(test_serialization)
 {
     TestInit(test_serialization)
@@ -71,17 +82,17 @@ TestImpl(test_serialization)
 
     TestCase(binary_serialize_nested)
     {
-
-    }
-
-    TestCase(binary_deserialize_nested)
-    {
-
-    }
-
-    TestCase(binary_deserialize_version_check)
-    {
-
+        binary_buffer buf;
+        Struct4 out;
+        out.s1 = Struct1{ 34.0f };
+        out.s2 = Struct2{ 42.0f, 42, "42"s };
+        buf << out;
+        Struct4 in;
+        buf >> in;
+        AssertThat(in.s1.a, 34.0f);
+        AssertThat(in.s2.a, 42.0f);
+        AssertThat(in.s2.b, 42);
+        AssertThat(in.s2.c, "42");
     }
 
     TestCase(string_serialize_simple)
