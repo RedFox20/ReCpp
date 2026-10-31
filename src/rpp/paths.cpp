@@ -106,7 +106,7 @@ namespace rpp /* ReCpp */
 #endif
 
     template<StringViewType T>
-    static bool file_info_of(T filename, int64* filesize, time_t* created, time_t* accessed, time_t* modified) noexcept
+    static FINLINE bool file_info_of(T filename, int64* filesize, time_t* created, time_t* accessed, time_t* modified) noexcept
     {
         sys_min_fstats s;
         if (sys_minstat<T>(filename, &s)) {
@@ -164,12 +164,12 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     // one stat answers every query, so asking for all three times costs nothing extra
-    template<StringViewType T> static int64 size_of(T filename) noexcept
+    template<StringViewType T> static FINLINE int64 size_of(T filename) noexcept
     {
         int64 s;
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
-    template<StringViewType T> static time_t time_of(T filename, int which) noexcept
+    template<StringViewType T> static FINLINE time_t time_of(T filename, int which) noexcept
     {
         time_t t[3]; // created, accessed, modified
         return file_info(filename, nullptr, &t[0], &t[1], &t[2]) ? t[which] : time_t(0);
@@ -1117,7 +1117,7 @@ namespace rpp /* ReCpp */
 #else
     dir_iter_base::operator bool() const noexcept { return s->d && s->e; }
     // the d_type of an entry as st_mode bits, or a stat() of it when the file system leaves d_type unknown
-    static mode_t entry_mode(const dirent* e, const string& dirname) noexcept
+    static FINLINE mode_t entry_mode(const dirent* e, const string& dirname) noexcept
     {
         if (!e) return 0;
         if (e->d_type) return mode_t(e->d_type) << 12; // every POSIX libc defines DT_x as S_IFx >> 12

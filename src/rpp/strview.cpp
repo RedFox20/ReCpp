@@ -82,7 +82,7 @@ namespace rpp
 
     // strview and ustrview share these bodies, which differ only in the char type
 
-    template<class Char> static const Char* view_to_cstr(const Char* str, int len, Char* buf, int max) noexcept
+    template<class Char> static FINLINE const Char* view_to_cstr(const Char* str, int len, Char* buf, int max) noexcept
     {
         if (str[len] == Char(0))
             return str;
@@ -92,7 +92,7 @@ namespace rpp
         return buf;
     }
 
-    template<class View, class Skip> static View& trim_start_if(View& v, Skip skip) noexcept
+    template<class View, class Skip> static FINLINE View& trim_start_if(View& v, Skip skip) noexcept
     {
         auto* s = v.str;
         int n = v.len;
@@ -101,7 +101,7 @@ namespace rpp
         return v;
     }
 
-    template<class View, class Skip> static View& trim_end_if(View& v, Skip skip) noexcept
+    template<class View, class Skip> static FINLINE View& trim_end_if(View& v, Skip skip) noexcept
     {
         int n = v.len;
         const auto* e = v.str + n;
@@ -110,20 +110,20 @@ namespace rpp
         return v;
     }
 
-    template<class Char, class Match> static const Char* scan_forward(const Char* p, int len, Match match) noexcept
+    template<class Char, class Match> static FINLINE const Char* scan_forward(const Char* p, int len, Match match) noexcept
     {
         for (const Char* e = p + len; p < e; ++p) if (match(*p)) return p;
         return nullptr;
     }
 
-    template<class Char, class Match> static const Char* scan_backward(const Char* p, int len, Match match) noexcept
+    template<class Char, class Match> static FINLINE const Char* scan_backward(const Char* p, int len, Match match) noexcept
     {
         if (len <= 0) return nullptr;
         for (const Char* e = p + len - 1; e >= p; --e) if (match(*e)) return e;
         return nullptr;
     }
 
-    template<class View> static View clamp_substr(const View& v, int index, int length) noexcept
+    template<class View> static FINLINE View clamp_substr(const View& v, int index, int length) noexcept
     {
         int idx = index;
         if (idx > v.len)  idx = v.len;
@@ -574,7 +574,7 @@ namespace rpp
     ///////////////////////////////////////////////////////////////////////////////////////
 
     // one allocation for the whole result, as each hand-unrolled overload did
-    template<class String, class... Views> static String concat_views(const Views&... views)
+    template<class String, class... Views> static FINLINE String concat_views(const Views&... views)
     {
         String str;
         str.reserve((size_t(views.len) + ...));
