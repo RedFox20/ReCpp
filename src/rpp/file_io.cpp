@@ -281,7 +281,7 @@ namespace rpp /* ReCpp */
         try {
             if (count <= 0) // a /proc file or a pipe reports size 0, so read to EOF
             {
-                char buf[4096];
+                char buf[4096]; // a bigger chunk reads a pipe no faster, because the writer sets the pace
                 for (int n; (n = read(buf, sizeof(buf))) > 0;) out.append(buf, size_t(n));
                 return out;
             }
