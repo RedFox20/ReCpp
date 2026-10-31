@@ -231,7 +231,7 @@ namespace rpp
         return static_cast<int>(std::char_traits<wchar_t>::length(u_str));
     }
 
-    namespace detail
+    namespace views
     {
         /// Splits the next token off `self` into `out`. With Trim, `self` also skips the delimiter
         template<bool Trim, class View, class SearchFn> FINLINE bool next_token(View& self, View& out, SearchFn searchFn) noexcept
@@ -765,11 +765,11 @@ namespace rpp
         // don't forget to mark NOINLINE in the function where you call this...
         template<class SearchFn> NOINLINE bool _next_notrim(strview& out, SearchFn searchFn) noexcept
         {
-            return detail::next_token<false>(*this, out, searchFn);
+            return views::next_token<false>(*this, out, searchFn);
         }
         template<class SearchFn> NOINLINE bool _next_trim(strview& out, SearchFn searchFn) noexcept
         {
-            return detail::next_token<true>(*this, out, searchFn);
+            return views::next_token<true>(*this, out, searchFn);
         }
 
         /**
@@ -1214,7 +1214,7 @@ namespace rpp
 
         template<class SearchFn> NOINLINE bool _next_trim(ustrview& out, SearchFn searchFn) noexcept
         {
-            return detail::next_token<true>(*this, out, searchFn);
+            return views::next_token<true>(*this, out, searchFn);
         }
     };
 #endif // RPP_ENABLE_UNICODE
