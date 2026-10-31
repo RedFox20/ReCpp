@@ -193,6 +193,10 @@ change before you judge it.
   read better than any prefix, and many files use them. Keep them, and match the
   file you edit. A new file prefers `snake_case` with a distinct name.
 - Name a type once. Do not add a second name for a thing which already has one.
+- A parameter keeps a descriptive name such as `filename`, never `f`. A namespace says what it holds, such as
+  `rpp::views`, never `detail`.
+- Do not fold explicit repeated code into a template helper which the compiler may not inline. Verbose and
+  explicit code beats an extra layer, as in the `binary_stream` byte writes.
 - `auto` only when the initializer already names the type.
 - Never wrap right after `=`. Keep `type name = expression` on one line.
 

@@ -95,6 +95,9 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   merely to save typing. Use it when the initializer already makes the type plain.
 - **Never wrap immediately after `=`.** Keep `type name = expression` on one line
   and wrap inside the argument list.
+- **Prefer explicit code to a helper layer.** Do not fold repeated code into a template
+  helper which the compiler may not inline. Name a parameter `filename`, never `f`, and
+  name a namespace for what it holds, never `detail`. See `recpp-review` R6.
 - **Use the ReCpp timing and readiness API.** `future.await_ready()`, `rpp::yield()`,
   `rpp::Duration`, `rpp::TimePoint`, `rpp::millis()`. Never add `std::chrono` or a
   `std::this_thread` timing helper to source or tests.
