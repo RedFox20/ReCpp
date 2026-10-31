@@ -122,12 +122,19 @@ TestImpl(test_file_io)
     // the state field of a /proc stat line follows the last ')', and 'S' is an interruptible sleep
     static bool sleeps(const std::string& statPath)
     {
-        char buf[512]; // a /proc file reports size 0, so read_all_text() would return nothing
-        const int n = rpp::file{ statPath, rpp::file::READONLY }.read(buf, sizeof(buf));
-        const std::string stat(buf, size_t(n > 0 ? n : 0));
-        size_t end = stat.rfind(')');
-        return end != std::string::npos && end + 2 < stat.size() && stat[end + 2] == 'S';
+        const std::string text = rpp::file::read_all_text(statPath);
+        const rpp::strview stat = text;
+        const char* end = stat.rfind(')');
+        return end && end + 2 < stat.end() && end[2] == 'S';
     }
+
+#if __linux__
+    TestCase(read_all_text_reads_a_file_which_reports_size_0)
+    {
+        const std::string stat = rpp::file::read_all_text("/proc/self/stat");
+        AssertThat(rpp::strview{stat}.starts_with(std::to_string(getpid()) + " ("), true);
+    }
+#endif
 
     // a pipe has no size to seek to, so only a read to EOF gets its bytes
     TestCase(read_stdin_text_reads_a_pipe_to_eof)

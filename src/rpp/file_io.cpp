@@ -278,8 +278,13 @@ namespace rpp /* ReCpp */
         std::string out;
         int pos   = tell();
         int count = size() - pos;
-        if (count <= 0) return out;
         try {
+            if (count <= 0) // a /proc file or a pipe reports size 0, so read to EOF
+            {
+                char buf[4096];
+                for (int n; (n = read(buf, sizeof(buf))) > 0;) out.append(buf, size_t(n));
+                return out;
+            }
             out.resize(size_t(count));
             int n = read(const_cast<char*>(out.data()), count);
             if (n != count) {
