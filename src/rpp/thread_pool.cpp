@@ -297,6 +297,7 @@ namespace rpp
         rpp::task_delegate<void()> generic; // keep it top level to avoid errant dtors
         for (;;)
         {
+            bool threw = false;
             try
             {
                 // consume the Tasks atomically
@@ -351,9 +352,11 @@ namespace rpp
             }
             // prevent failures that would terminate the thread
             // always manually reset the generic task before signal_finished() is called
-            catch (const std::exception& e) { generic.reset(); unhandled_exception(e.what()); }
-            catch (const char* e)           { generic.reset(); unhandled_exception(e);        }
-            catch (...)                     { generic.reset(); unhandled_exception("");       }
+            catch (const std::exception& e) { threw = true; generic.reset(); unhandled_exception(e.what()); }
+            catch (const char* e)           { threw = true; generic.reset(); unhandled_exception(e);        }
+            catch (...)                     { threw = true; generic.reset(); unhandled_exception("");       }
+            // signal after the catch block, so __cxa_end_catch never frees the exception after the waiter woke, see BUGS.md C38
+            if (threw) { auto lock = new_task_flag.spin_lock(); current_task.signal_finish_and_cleanup(); }
         }
     }
 
@@ -371,7 +374,6 @@ namespace rpp
             (void)what;
         #endif // POOL_TASK_DEBUG
             strong->error = std::current_exception();
-            current_task.signal_finish_and_cleanup();
         }
     }
 
