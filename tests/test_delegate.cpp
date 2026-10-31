@@ -2,7 +2,6 @@
 #include <rpp/delegate.h>
 #include <rpp/stack_trace.h>
 #include <cstring> // strlen, strcmp
-#include <functional>
 #include <memory> // std::make_shared
 #include <stdexcept> // std::invalid_argument
 #include <string>

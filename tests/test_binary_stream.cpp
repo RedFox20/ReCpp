@@ -158,6 +158,24 @@ TestImpl(test_binary_stream)
             AssertThat(tmp[i], (uint8_t)(i + 1));
     }
 
+    TestCase(write_after_read_keeps_the_unread_bytes)
+    {
+        // the first size moves to a heap buffer, the second fits the unread bytes but not the bytes before the write head
+        for (int size : { rpp::binary_stream::SBSize, rpp::binary_stream::SBSize - 6 })
+        {
+            rpp::binary_buffer buf;
+            buf.write_int32(111);
+            buf.write_int32(222);
+            AssertThat(buf.read_int32(), 111);
+
+            std::string big(size, 'x');
+            buf.write(big.data(), (int)big.size());
+            AssertGreaterOrEqual(buf.capacity(), 8 + size);
+            AssertThat(buf.read_int32(), 222);
+            AssertThat(buf.view(), rpp::strview{big});
+        }
+    }
+
     TestCase(file_read_write)
     {
         int count = 512;

@@ -16,7 +16,6 @@
 // NOTE: had to remove, because clang-18 includes <algorithm> here, which crashes clang-tidy
 //#include <unordered_map> // std::unordered_map for to_string extensions
 #include <atomic>        // std::atomic<T> support
-#include <sstream>       // std::stringstream
 
 #ifndef RPP_SPRINT_H
 #define RPP_SPRINT_H 1
@@ -71,9 +70,6 @@ namespace rpp
     };
 
     struct string_buffer;
-
-    /// True when `std::ostream << T` compiles
-    template<class T> concept has_ostream_op = requires(std::ostream& os) { os << std::declval<T>(); };
 
     /// True when `T::operator<<(string_buffer&)` compiles
     template<class T> concept has_member_sbuf_op = requires(string_buffer& sb) { std::declval<const T&>().operator<<(sb); };
@@ -258,12 +254,6 @@ namespace rpp
                 this->write(std::to_string(value));
             }
         #endif
-            else if constexpr (has_ostream_op<T>)
-            {
-                std::ostringstream oss;
-                oss << value;
-                this->write(oss.str());
-            }
             else if constexpr (is_container<T>)
             {
                 this->write_cont(value);

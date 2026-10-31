@@ -36,4 +36,16 @@ TestImpl(test_vec)
         AssertThat(unitbox.depth(),  1.0f);
     }
 
+    TestCase(rect_clip_keeps_the_far_edges)
+    {
+        Recti r { 0, 0, 100, 100 };
+        r.clip({ 10, 10, 200, 200 });
+        AssertThat(r == Recti(10, 10, 90, 90), true);
+
+        RectF f { 0.0f, 0.0f, 100.0f, 100.0f };
+        f.clip({ 10.0f, 10.0f, 200.0f, 200.0f });
+        AssertThat(f.right(), 100.0f);
+        AssertThat(f.bottom(), 100.0f);
+    }
+
 };

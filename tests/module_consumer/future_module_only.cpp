@@ -7,7 +7,7 @@
 #if _MSC_VER
 // MSVC parses <thread> from the fragment here and needs the time_point operators. <chrono>
 // reaches exception_ptr.h, which the gcc-14 include set leaves out. See BUGS.md B28
-#include <chrono>
+#include <chrono> // BUGS.md B28
 #endif
 #if defined(__clang__) || defined(_MSC_VER) || __GNUC__ >= 15
 // B28 is a gcc-14 defect. gcc-15, clang and MSVC compile the lines below, which reach

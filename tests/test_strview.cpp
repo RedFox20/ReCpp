@@ -7,6 +7,7 @@
 #include <climits> // INT_MAX
 #include <cstdint> // INTPTR_MAX, SIZE_MAX
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
+#include <cmath> // std::isinf
 #include <limits>
 #include <unordered_map>
 #if SIZE_MAX / 3 < INT_MAX && __linux__
@@ -170,6 +171,20 @@ TestImpl(test_strview)
         AssertThat(rpp::strview{"120.55abcdefgh"}.to_float(), 120.55f);
         AssertThat(rpp::strview{"-120.55abcdefgh"}.to_float(), -120.55f);
     }
+    TestCase(parse_double_exponent)
+    {
+        AssertThat(rpp::strview{"1.0e+003"}.to_double(), 1000.0);
+        AssertThat(rpp::strview{"1.5e3"}.to_double(), 1500.0);
+        AssertThat(rpp::strview{"-1.5e-3"}.to_double(), -0.0015);
+        AssertThat(rpp::strview{"2.5E+10"}.to_double(), 2.5e10);
+        AssertThat(rpp::strview{"1e5"}.to_double(), 1e5);
+        AssertThat(rpp::strview{"2.5east"}.to_double(), 2.5);
+        AssertThat(std::isinf(rpp::strview{"1e3000000000"}.to_double()), true);
+        AssertThat(rpp::strview{"0e309"}.to_double(), 0.0); // 0 * inf would be NaN
+        AssertInRange(rpp::strview{"1.0e-309"}.to_double() / 1e-309, 0.999999, 1.000001);
+        AssertInRange(rpp::strview{"12345.0e-310"}.to_double() / 1.2345e-306, 0.999999, 1.000001);
+        AssertInRange(rpp::strview{"0.000001e310"}.to_double() / 1e304, 0.999999, 1.000001);
+    }
 
 
     TestCase(parse_bool_empty)
@@ -234,6 +249,10 @@ TestImpl(test_strview)
         AssertThat(toString(-2.00120, 6), "-2.0012");
         AssertThat(toString(+0.99590, 6), "0.9959");
         AssertThat(toString(+0.16, 6), "0.16");
+        AssertThat(toString(+0.9999999, 6), "1.0");
+        AssertThat(toString(+std::numeric_limits<double>::infinity(), 6), "inf");
+        AssertThat(toString(-std::numeric_limits<double>::infinity(), 6), "-inf");
+        AssertThat(toString(-9.9999999, 6), "-10.0");
 
         // the integral part saturates at UINT64_MAX on every CPU, and fits up to it
         AssertThat(toString(+1e19, 0), "10000000000000000000");
@@ -332,6 +351,14 @@ TestImpl(test_strview)
         AssertLess("aaaa", rpp::strview{"bbbbbbbb"});
         AssertLess(rpp::strview{"aaaa"}, rpp::strview{"bbbbbbbb"});
         AssertLess(std::string{"aaaa"}, rpp::strview{"bbbbbbbb"});
+        AssertLess(rpp::strview{"abc"}.compare("abcdef"), 0);
+    }
+
+    TestCase(string_compare_stops_at_the_c_string_end)
+    {
+        const char rhs[] = "abc";
+        const rpp::strview with_null { rhs, 4 };
+        AssertGreater(with_null.compare(rhs), 0);
     }
 
     TestCase(string_compare_greater)

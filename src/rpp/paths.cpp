@@ -666,11 +666,14 @@ namespace rpp /* ReCpp */
     static auto merge_dirups(T path) noexcept -> typename T::string_t
     {
         using tchar = typename T::char_t;
+        if (path.empty()) return {};
         T pathstr = path;
         const bool isDirPath = path.back() == tchar('/') || path.back() == tchar('\\');
+        const bool isAbsolute = path.front() == tchar('/') || path.front() == tchar('\\');
         std::vector<T> folders;
-        while (T folder = pathstr.next(constants<T>::slashes_a)) {
-            folders.push_back(folder);
+        while (pathstr) { // skip the empty tokens of a leading slash or of "a//b"
+            if (T folder = pathstr.next(constants<T>::slashes_a))
+                folders.push_back(folder);
         }
 
         for (size_t i = 0; i < folders.size(); ++i)
@@ -685,11 +688,12 @@ namespace rpp /* ReCpp */
         }
 
         typename T::string_t result;
+        if (isAbsolute) result += tchar('/');
         for (const T& folder : folders) {
             result += folder;
             result += tchar('/');
         }
-        if (!isDirPath) { // it's a filename? so pop the last /
+        if (!isDirPath && !folders.empty()) { // a file path drops the last slash
             result.pop_back();
         }
         return result;
@@ -1534,13 +1538,11 @@ namespace rpp /* ReCpp */
             win32_fixup_path(path, slen);
             return { path, path + slen };
         #else
-            char* p = getenv("HOME");
-            if (p) {
-                int len = (int)strlen(p);
-                append_slash(p, len);
-                return { p, p + len };
-            }
-            return {};
+            const char* p = getenv("HOME");
+            if (!p || !*p) return {};
+            string path = p; // a copy, because a slash appended in place would overwrite the environment
+            if (path.back() != '/') path += '/';
+            return path;
         #endif
     }
 

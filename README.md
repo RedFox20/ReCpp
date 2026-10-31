@@ -860,42 +860,41 @@ Fast string building and type-safe formatting. `string_buffer` is an always-null
 
 | Item | Description |
 |------|-------------|
-| [`string_buffer`](src/rpp/sprint.h#L73) | Fast, always-null-terminated string builder |
-| [`format_opt`](src/rpp/sprint.h#L66) | Format options enum: `none`, `lowercase`, `uppercase` |
-| [`has_ostream_op<T>`](src/rpp/sprint.h#L76) | True if `std::ostream << T` is valid |
-| [`has_member_sbuf_op<T>`](src/rpp/sprint.h#L79) | True if `T::operator<<(string_buffer&)` exists |
+| [`string_buffer`](src/rpp/sprint.h#L72) | Fast, always-null-terminated string builder |
+| [`format_opt`](src/rpp/sprint.h#L65) | Format options enum: `none`, `lowercase`, `uppercase` |
+| [`has_member_sbuf_op<T>`](src/rpp/sprint.h#L75) | True if `T::operator<<(string_buffer&)` exists |
 
 ### string_buffer Methods
 
 | Method | Description |
 |--------|-------------|
 | [`write(const T& v)`](src/rpp/sprint.h#L134) | Write a value (auto-converts most types) |
-| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L159) | Write a float or double with a chosen number of decimals, instead of the default 6 |
-| [`writeln(const Args&... args)`](src/rpp/sprint.h#L362) | Write values followed by newline |
-| [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L370) | Write every item of a container, with `sep` between the items, and return the buffer for chaining |
-| [`join(const C& container)`](src/rpp/sprint.h#L383) | Write every item of a container, with `string_buffer::separator` between the items, and return the buffer for chaining |
-| [`writef(const char* format, ...)`](src/rpp/sprint.h#L132) | Printf-style formatted write |
-| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L312) | Write data as hex string |
-| [`write_cont(const Container& c)`](src/rpp/sprint.h#L269) | Write container contents |
-| [`prettyprint(const T& value)`](src/rpp/sprint.h#L387) | Pretty-print a value |
-| [`clear()`](src/rpp/sprint.h#L123) | Clear the buffer |
-| [`reserve(int capacity)`](src/rpp/sprint.h#L124) | Reserve capacity |
-| [`resize(int size)`](src/rpp/sprint.h#L125) | Resize buffer |
-| [`append(const char* data, int len)`](src/rpp/sprint.h#L128) | Append raw data |
-| [`emplace_buffer(int n)`](src/rpp/sprint.h#L131) | Get writable buffer of N bytes |
+| [`write_real(double value, int maxDecimals)`](src/rpp/sprint.h#L155) | Write a float or double with a chosen number of decimals, instead of the default 6 |
+| [`writeln(const Args&... args)`](src/rpp/sprint.h#L352) | Write values followed by newline |
+| [`join(const C& container, const S& sep)`](src/rpp/sprint.h#L360) | Write every item of a container, with `sep` between the items, and return the buffer for chaining |
+| [`join(const C& container)`](src/rpp/sprint.h#L373) | Write every item of a container, with `string_buffer::separator` between the items, and return the buffer for chaining |
+| [`writef(const char* format, ...)`](src/rpp/sprint.h#L128) | Printf-style formatted write |
+| [`write_hex(const void* data, int numBytes)`](src/rpp/sprint.h#L302) | Write data as hex string |
+| [`write_cont(const Container& c)`](src/rpp/sprint.h#L259) | Write container contents |
+| [`prettyprint(const T& value)`](src/rpp/sprint.h#L390) | Pretty-print a value |
+| [`clear()`](src/rpp/sprint.h#L119) | Clear the buffer |
+| [`reserve(int capacity)`](src/rpp/sprint.h#L120) | Reserve capacity |
+| [`resize(int size)`](src/rpp/sprint.h#L121) | Resize buffer |
+| [`append(const char* data, int len)`](src/rpp/sprint.h#L124) | Append raw data |
+| [`emplace_buffer(int n)`](src/rpp/sprint.h#L127) | Get writable buffer of N bytes |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`to_string(char)`](src/rpp/sprint.h#L37) | Locale-agnostic char to string |
-| [`to_string(int)`](src/rpp/sprint.h#L45) | Locale-agnostic int to string |
-| [`to_string(float)`](src/rpp/sprint.h#L51) | Locale-agnostic float to string |
-| [`to_string(double)`](src/rpp/sprint.h#L52) | Locale-agnostic double to string |
-| [`to_string(bool)`](src/rpp/sprint.h#L55) | Bool to `"true"` or `"false"` |
-| [`print(args...)`](src/rpp/sprint.h#L501) | Print to stdout |
-| [`println(args...)`](src/rpp/sprint.h#L521) | Print to stdout with newline |
-| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L447) | Converts string bytes to hexadecimal representation |
+| [`to_string(char)`](src/rpp/sprint.h#L36) | Locale-agnostic char to string |
+| [`to_string(int)`](src/rpp/sprint.h#L44) | Locale-agnostic int to string |
+| [`to_string(float)`](src/rpp/sprint.h#L50) | Locale-agnostic float to string |
+| [`to_string(double)`](src/rpp/sprint.h#L51) | Locale-agnostic double to string |
+| [`to_string(bool)`](src/rpp/sprint.h#L54) | Bool to `"true"` or `"false"` |
+| [`print(args...)`](src/rpp/sprint.h#L499) | Print to stdout |
+| [`println(args...)`](src/rpp/sprint.h#L520) | Print to stdout with newline |
+| [`to_hex_string(s, opt)`](src/rpp/sprint.h#L437) | Converts string bytes to hexadecimal representation |
 
 ### Example: Basic String Building
 
@@ -3792,35 +3791,35 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 
 | Type | Description |
 |------|-------------|
-| [`element_range<T>`](src/rpp/collections.h#L18) | Non-owning view over contiguous elements |
-| [`index_range`](src/rpp/collections.h#L129) | Integer range with optional step |
+| [`element_range<T>`](src/rpp/collections.h#L17) | Non-owning view over contiguous elements |
+| [`index_range`](src/rpp/collections.h#L128) | Integer range with optional step |
 
 ### Range Construction
 
 | Function | Description |
 |----------|-------------|
 | [`range(data, size)`](src/rpp/collections.h#L71) | Create element range from pointer + size |
-| [`range(vector)`](src/rpp/collections.h#L74) | Create element range from vector |
-| [`range(count)`](src/rpp/collections.h#L174) | Create integer range `[0, count)` |
-| [`slice(container, start, count)`](src/rpp/collections.h#L116) | Sub-range of a container |
+| [`range(vector)`](src/rpp/collections.h#L73) | Create element range from vector |
+| [`range(count)`](src/rpp/collections.h#L178) | Create integer range `[0, count)` |
+| [`slice(container, start, count)`](src/rpp/collections.h#L115) | Sub-range of a container |
 
 ### Container Algorithms
 
 | Function | Description |
 |----------|-------------|
-| [`pop_back(vector)`](src/rpp/collections.h#L182) | Pop last element with return value |
-| [`push_unique(vector, item)`](src/rpp/collections.h#L199) | Push only if not already present |
-| [`erase_item(vector, item)`](src/rpp/collections.h#L207) | Erase first matching item |
-| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L258) | O(1) erase by swapping with last element |
-| [`contains(container, item)`](src/rpp/collections.h#L330) | Check membership |
-| [`find(vector, item)`](src/rpp/collections.h#L345) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](src/rpp/collections.h#L426) | Find minimum by selector |
-| [`find_largest(range, selector)`](src/rpp/collections.h#L448) | Find maximum by selector |
-| [`any_of(vector, predicate)`](src/rpp/collections.h#L466) | True if any element matches predicate |
-| [`all_of(vector, predicate)`](src/rpp/collections.h#L475) | True if all elements match predicate |
-| [`none_of(vector, predicate)`](src/rpp/collections.h#L484) | True if no elements match predicate |
-| [`sum_all(vector)`](src/rpp/collections.h#L494) | Sum all elements |
-| [`append(vector, other)`](src/rpp/collections.h#L335) | Append one vector to another |
+| [`pop_back(vector)`](src/rpp/collections.h#L186) | Pop last element with return value |
+| [`push_unique(vector, item)`](src/rpp/collections.h#L203) | Push only if not already present |
+| [`erase_item(vector, item)`](src/rpp/collections.h#L211) | Erase first matching item |
+| [`erase_back_swap(vector, i)`](src/rpp/collections.h#L262) | O(1) erase by swapping with last element |
+| [`contains(container, item)`](src/rpp/collections.h#L334) | Check membership |
+| [`find(vector, item)`](src/rpp/collections.h#L349) | Find element (returns iterator) |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L430) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L452) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L470) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L479) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L488) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L498) | Sum all elements |
+| [`append(vector, other)`](src/rpp/collections.h#L339) | Append one vector to another |
 
 ### Example: element_range & index_range
 

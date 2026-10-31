@@ -338,8 +338,10 @@ namespace rpp
         float fb = frame.bottom();
         if (x < frame.x) x = frame.x; else if (x > fr) x = fr;
         if (y < frame.y) y = frame.y; else if (y > fb) y = fb;
-        if (r > fr) w = fr - x;
-        if (b > fb) h = fb - y;
+        if (r > fr) r = fr;
+        if (b > fb) b = fb;
+        w = r > x ? r - x : 0.0f;
+        h = b > y ? b - y : 0.0f;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
@@ -442,8 +444,10 @@ namespace rpp
         int fb = frame.bottom();
         if (x < frame.x) x = frame.x; else if (x > fr) x = fr;
         if (y < frame.y) y = frame.y; else if (y > fb) y = fb;
-        if (r > fr) w = fr - x;
-        if (b > fb) h = fb - y;
+        if (r > fr) r = fr;
+        if (b > fb) b = fb;
+        w = r > x ? r - x : 0;
+        h = b > y ? b - y : 0;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////
