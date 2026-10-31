@@ -571,6 +571,9 @@ Worker `rpp_task_28` frees in `__cxa_end_catch`, while the main thread reads at 
 The creation stack again names `test_sockets::test_udp_poll_nonblocking_select`.
 All 748 cases passed, and TSAN alone set exit code 66.
 
+Twelfth sighting on 3a5b434 in #163, on `ubuntu-cpp20-tsan-gcc13`, with the two lines above and the same creation stack.
+All 750 cases passed, and TSAN alone set exit code 66.
+
 Another sighting on e0021f4 in #161, on `ubuntu-cpp20-tsan-gcc13`.
 The free is at `thread_pool.cpp:354` and the read at `tests.cpp:733`, with the same creation stack.
 All 753 cases passed, and TSAN alone set exit code 66.

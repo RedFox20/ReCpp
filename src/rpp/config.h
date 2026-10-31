@@ -413,7 +413,7 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  define RPP_HAS_BUILTIN(x) 0
 #endif
 
-// each macro guards itself, so a consumer which overrides one keeps the other three
+// each macro guards itself, so a consumer which overrides one keeps the others
 #if RPP_HAS_BUILTIN(__builtin_memcpy)
 #  ifndef RPP_BUILTIN_MEMCPY
 #    define RPP_BUILTIN_MEMCPY(dst, src, size)  __builtin_memcpy(dst, src, size)
@@ -426,6 +426,9 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #  ifndef RPP_BUILTIN_MEMCMP
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      __builtin_memcmp(a, b, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCHR
+#    define RPP_BUILTIN_MEMCHR(ptr, ch, size)   __builtin_memchr(ptr, ch, size)
 #  endif
 #else
 // MSVC offers no such builtin, so the macros need the declarations this header carries
@@ -441,6 +444,9 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  endif
 #  ifndef RPP_BUILTIN_MEMCMP
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
+#  endif
+#  ifndef RPP_BUILTIN_MEMCHR
+#    define RPP_BUILTIN_MEMCHR(ptr, ch, size)   memchr(ptr, ch, size)
 #  endif
 #endif
 

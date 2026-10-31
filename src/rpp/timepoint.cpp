@@ -618,16 +618,6 @@ namespace rpp
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /** @returns false if the calendar cannot represent this time */
-    static bool gmtime_safe(const time_t& time, std::tm& time_tm) noexcept
-    {
-        #if _MSC_VER || __MINGW32__ // MSVC++ or MinGW
-            return gmtime_s(&time_tm, &time) == 0; // arguments reversed for some reason
-        #else
-            return gmtime_r(&time, &time_tm) != nullptr;
-        #endif
-    }
-
     static std::tm localtime_safe(const time_t& time) noexcept
     {
         std::tm time_tm;
@@ -658,17 +648,23 @@ namespace rpp
             return CalendarTime{ utc.wYear, utc.wMonth, utc.wDay, utc.wHour, utc.wMinute, utc.wSecond, nanos };
     #endif
 
-        // Linux reads the clock with clock_gettime(), which the standard C calendar accepts.
-        // A narrow time_t wraps silently, so reject the value before the cast narrows it
-        time_t secs = time_t(seconds);
-        if (int64(secs) != seconds)
-            return CalendarTime{};
+        // clock_gettime() counts POSIX seconds, so integer math gives the date of gmtime_r().
+        // It needs no tzset lock and no wide time_t.
+        int64 days = seconds / 86400;
+        int64 secs = seconds % 86400;
+        if (secs < 0) { secs += 86400; --days; }
 
-        std::tm tm_utc {};
-        if (!gmtime_safe(secs, tm_utc))
-            return CalendarTime{};
-        return CalendarTime{ tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday,
-                             tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec, nanos };
+        // Howard Hinnant's civil_from_days(), which counts in 400 year eras from 0000-03-01
+        const int64 z = days + 719468;
+        const int64 era = (z >= 0 ? z : z - 146096) / 146097;
+        const int64 doe = z - era * 146097;
+        const int64 yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+        const int64 doy = doe - (365*yoe + yoe/4 - yoe/100);
+        const int64 mp = (5*doy + 2) / 153;
+        const int month = int(mp < 10 ? mp + 3 : mp - 9);
+        const int year = int(yoe + era * 400 + (month <= 2));
+        return CalendarTime{ year, month, int(doy - (153*mp + 2)/5 + 1),
+                             int(secs / 3600), int(secs % 3600 / 60), int(secs % 60), nanos };
     }
 
     // YYYY-MM-DD HH:MM:SS.mmm
@@ -716,16 +712,16 @@ namespace rpp
             }
         #endif
 
-        std::tm tm {};
-        tm.tm_year = year - 1900; // [0, 60] since 1900
-        tm.tm_mon  = month - 1;   // [0, 11] since Jan
-        tm.tm_mday = day;         // [1, 31]
-        tm.tm_hour = hour;        // [0, 23] since midnight
-        tm.tm_min  = minute;      // [0, 59] after the hour
-        tm.tm_sec  = second;      // [0, 60] after the min allows for 1 positive leap second
-        tm.tm_isdst = 0;          // [-1...] -1 for unknown, 0 for not DST, any positive value if DST.
-
-        int64 seconds = int64(timegm(&tm)); // input time as-is
+        // Howard Hinnant's days_from_civil(), the inverse of to_calendar(), with no time_t limit.
+        // A month outside [1, 12] carries into the year, and the other parts add up, as in timegm().
+        const int64 months = int64(year) * 12 + month - 1;
+        const int64 m = months - (months >= 0 ? months : months - 11) / 12 * 12 + 1;
+        const int64 y = (months - m + 1) / 12 - (m <= 2);
+        const int64 era = (y >= 0 ? y : y - 399) / 400;
+        const int64 yoe = y - era * 400;
+        const int64 doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + day - 1;
+        const int64 days = era * 146097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719468;
+        const int64 seconds = days * 86400 + hour * 3600LL + minute * 60LL + second;
         duration = Duration{seconds * NANOS_PER_SEC + nanos};
     }
 

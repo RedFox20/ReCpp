@@ -2,6 +2,7 @@
 #include <rpp/debugging.h>
 #include <rpp/proc_utils.h>
 #include <rpp/tests.h>
+#include <ctime> // gmtime_r, gmtime_s
 #include <thread>
 #include <string>
 #include <vector>
@@ -416,20 +417,54 @@ TestImpl(test_timer)
         AssertEqual(moon.nanos, 500'000'000LL);
     }
 
-    TestCase(timepoint_to_calendar_rejects_narrow_time_t)
+    TestCase(timepoint_to_calendar_past_a_narrow_time_t)
     {
-        // a narrow time_t cannot hold this year, so the split reports invalid instead of a wrapped date
+        // a narrow time_t cannot hold this year, and the calendar still splits it and builds it back
         constexpr rpp::int64 YEAR_2200_SECONDS = 7'272'378'123LL;
-        rpp::TimePoint far { rpp::Duration::from_seconds(YEAR_2200_SECONDS) };
-        rpp::CalendarTime cal = far.to_calendar();
-        if (cal.is_valid())
+        rpp::TimePoint far { rpp::seconds(YEAR_2200_SECONDS) };
+        AssertThat(far.to_calendar(), (rpp::CalendarTime{ 2200, 6, 15, 1, 2, 3, 0 }));
+        AssertThat(rpp::TimePoint(2200, 6, 15, 1, 2, 3, 0).duration, far.duration);
+    }
+
+    // the calendar constructor inverts to_calendar(), and a month outside [1, 12] carries into the year, as in timegm()
+    TestCase(timepoint_from_calendar_round_trips)
+    {
+        for (rpp::int64 secs = -9'000'000'000LL; secs < 9'000'000'000LL; secs += 9'876'541LL)
         {
-            AssertEqual(cal.year, 2200);
-            AssertEqual(cal.month, 6);
-            AssertEqual(cal.day, 15);
-            AssertEqual(cal.hour, 1);
-            AssertEqual(cal.minute, 2);
-            AssertEqual(cal.second, 3);
+            const rpp::CalendarTime c = rpp::TimePoint{ rpp::seconds(secs) }.to_calendar();
+            const rpp::TimePoint back { c.year, c.month, c.day, c.hour, c.minute, c.second, 0 };
+            if (back.duration.seconds() != secs)
+                AssertFailed("%lld s splits into %d-%d-%d %d:%d:%d, which builds %lld s", secs,
+                             c.year, c.month, c.day, c.hour, c.minute, c.second, back.duration.seconds());
+        }
+        AssertThat(rpp::TimePoint(2023, 13, 1, 0, 0, 0, 0).duration, rpp::TimePoint(2024, 1, 1, 0, 0, 0, 0).duration);
+        AssertThat(rpp::TimePoint(2024, 0, 1, 0, 0, 0, 0).duration, rpp::TimePoint(2023, 12, 1, 0, 0, 0, 0).duration);
+    }
+
+    static bool gmtime_safe(const time_t& time, std::tm& time_tm) noexcept
+    {
+    #if _MSC_VER || __MINGW32__
+        return gmtime_s(&time_tm, &time) == 0; // the arguments are reversed
+    #else
+        return gmtime_r(&time, &time_tm) != nullptr;
+    #endif
+    }
+
+    // the integer calendar must agree with gmtime() across leap days, centuries and the epoch
+    TestCase(timepoint_to_calendar_matches_gmtime)
+    {
+        for (rpp::int64 secs = -9'000'000'000LL; secs < 9'000'000'000LL; secs += 9'876'541LL)
+        {
+            const time_t t = time_t(secs);
+            std::tm tm {};
+            if (rpp::int64(t) != secs || !gmtime_safe(t, tm))
+                continue; // a narrow time_t, or an MSVC date before 1970, has no reference
+            rpp::CalendarTime expected { tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, 0 };
+            rpp::CalendarTime cal = rpp::TimePoint{ rpp::seconds(secs) }.to_calendar();
+            if (cal != expected)
+                AssertFailed("%lld s gives %d-%d-%d %d:%d:%d, gmtime gives %d-%d-%d %d:%d:%d", secs,
+                             cal.year, cal.month, cal.day, cal.hour, cal.minute, cal.second, expected.year,
+                             expected.month, expected.day, expected.hour, expected.minute, expected.second);
         }
     }
 
