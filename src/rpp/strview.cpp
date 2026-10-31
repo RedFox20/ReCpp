@@ -308,28 +308,29 @@ namespace rpp
         return count;
     }
 
-    // memchr scans whole words, where a byte loop with an early exit does not vectorize
-    int strview::indexof(char ch) const noexcept
+    // the builtin calls libc memchr even in a Debug build, where a byte loop is slow
+    static int find_char(const char* str, int start, int end, char ch) noexcept
     {
-        const char* p = len > 0 ? (const char*)memchr(str, ch, size_t(len)) : nullptr;
+        if (start >= end) return -1;
+    #ifdef RPP_BUILTIN_MEMCHR
+        const char* p = static_cast<const char*>(RPP_BUILTIN_MEMCHR(str + start, ch, size_t(end - start)));
         return p ? int(p - str) : -1;
+    #else
+        for (int i = start; i < end; ++i) if (str[i] == ch) return i;
+        return -1;
+    #endif
     }
+
+    int strview::indexof(char ch) const noexcept { return find_char(str, 0, len, ch); }
 
     int strview::indexof(char ch, int start) const noexcept
     {
-        if (start < 0) start = 0;
-        if (start >= len) return -1;
-        const char* p = (const char*)memchr(str + start, ch, size_t(len - start));
-        return p ? int(p - str) : -1;
+        return find_char(str, start < 0 ? 0 : start, len, ch);
     }
 
     int strview::indexof(char ch, int start, int end) const noexcept
     {
-        if (start < 0) start = 0;
-        if (end > len) end = len;
-        if (start >= end) return -1;
-        const char* p = (const char*)memchr(str + start, ch, size_t(end - start));
-        return p ? int(p - str) : -1;
+        return find_char(str, start < 0 ? 0 : start, end > len ? len : end, ch);
     }
 
     int strview::rindexof(char ch) const noexcept
