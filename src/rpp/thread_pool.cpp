@@ -313,6 +313,7 @@ namespace rpp
                     if (!wait_for_new_job(lock)) {
                         TaskDebug("%s wait_for_new_job stopped (%s)", name, killed ? "killed" : "timeout");
                         killed = true;
+                        current_task.signal_finish_and_cleanup(); // a task accepted before the kill never runs, so wake its waiters
                         return;
                     }
                     TaskDebug("%s wait_for_new_job elapsed: %.3fms", name, t.elapsed_millis());

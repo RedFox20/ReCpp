@@ -428,6 +428,21 @@ TestImpl(test_threadpool)
         releaser.join();
     }
 
+    // a task accepted just before the destructor may never start, and its waiters must still wake
+    TestCase(destroying_a_worker_releases_a_task_it_never_started)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_task_handle handle { nullptr };
+            {
+                rpp::pool_worker worker;
+                rpp::task_delegate<void()> task = [] {};
+                AssertTrue(worker.run_generic(task, &handle));
+            }
+            AssertTrue(handle.is_finished());
+        }
+    }
+
     // kill() from the task of the same worker must not wait for that task
     TestCase(a_task_can_kill_its_own_worker)
     {
