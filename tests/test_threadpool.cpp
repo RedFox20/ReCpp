@@ -412,6 +412,22 @@ TestImpl(test_threadpool)
         AssertThat(times_launched, 2);
     }
 
+    // a detached worker would run its task on the freed pool, see BUGS.md C39
+    TestCase(pool_destructor_waits_for_the_running_task)
+    {
+        rpp::semaphore_once_flag started, release;
+        std::atomic_bool finished { false };
+        std::thread releaser;
+        {
+            rpp::thread_pool pool { 1 };
+            (void)pool.parallel_task([&] { started.notify(); release.wait(); finished = true; });
+            started.wait();
+            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+        } // the destructor starts before the releaser wakes
+        AssertTrue(finished);
+        releaser.join();
+    }
+
     TestCase(parallel_task_resurrection)
     {
         thread_pool::global().max_task_idle_time(0.05f);

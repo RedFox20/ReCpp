@@ -261,15 +261,19 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (fileSize > 0)
+        if (fileSize <= 0) // a /proc file or a pipe reports size 0, so read_text() reads it to EOF
         {
-            // allocate +1 bytes for null terminator; this is for legacy API-s
-            if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
-            {
-                int bytesRead = read(buffer, fileSize);
-                buffer[bytesRead] = '\0';
-                return load_buffer{ buffer, bytesRead };
-            }
+            std::string text = read_text();
+            auto* buffer = text.empty() ? nullptr : static_cast<char*>(malloc(text.size() + 1u));
+            if (buffer) buffer[text.copy(buffer, text.size())] = '\0';
+            return buffer ? load_buffer{ buffer, int(text.size()) } : load_buffer{ nullptr, 0 };
+        }
+        // allocate +1 bytes for the null terminator, which legacy APIs expect
+        if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
+        {
+            int bytesRead = read(buffer, fileSize);
+            buffer[bytesRead] = '\0';
+            return load_buffer{ buffer, bytesRead };
         }
         return load_buffer{ nullptr, 0 };
     }

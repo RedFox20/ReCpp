@@ -862,6 +862,17 @@ TestImpl(test_file_io)
     }
 #endif
 
+#if __linux__
+    // a /proc file reports size 0, so read_all() must read it to EOF
+    TestCase(read_all_reads_a_proc_file_to_the_end)
+    {
+        load_buffer buf = file::read_all("/proc/self/status");
+        AssertGreater(buf.size(), 0);
+        AssertTrue(strview(buf.data(), buf.size()).starts_with("Name:"));
+        AssertTrue(buf.data() && buf.data()[buf.size()] == '\0');
+    }
+#endif
+
 #if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // test_obfuscated_string scans this file for plaintext, so it must name a real executable
     TestCase(module_path_names_the_running_executable)

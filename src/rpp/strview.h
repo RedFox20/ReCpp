@@ -417,7 +417,7 @@ namespace rpp
         inline strview& trim(strview s) noexcept { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
 
         /** Consumes the first character in the strview if possible. */
-        FINLINE strview& chomp_first() noexcept { if (len) ++str;--len; return *this; }
+        FINLINE strview& chomp_first() noexcept { if (len) { ++str; --len; } return *this; }
         /** Consumes the last character in the strview if possible. */
         FINLINE strview& chomp_last() noexcept { if (len) --len; return *this; }
 
@@ -1030,7 +1030,7 @@ namespace rpp
         inline ustrview& trim(ustrview s) noexcept { return trim_start(s.str, s.len).trim_end(s.str, s.len); }
 
         /** Consumes the first character in the strview if possible. */
-        FINLINE ustrview& chomp_first() noexcept { if (len) ++str;--len; return *this; }
+        FINLINE ustrview& chomp_first() noexcept { if (len) { ++str; --len; } return *this; }
         /** Consumes the last character in the strview if possible. */
         FINLINE ustrview& chomp_last() noexcept { if (len) --len; return *this; }
 
