@@ -544,6 +544,7 @@ while (text.next(line, '\n'))
 | [`strequalsi(s1, s2, len)`](src/rpp/strview.h#L86) | Case-insensitive string equality for given length |
 | [`to_int64(str, len, end)`](src/rpp/strview.h#L133) | Fast locale-agnostic string to 64-bit integer |
 | [`utf8len(c_str)`](src/rpp/strview.h#L224) | Returns int length of a UTF-8 C-string |
+| [`views::next_token(self, out, searchFn)`](src/rpp/strview.h#L237) | Splits the next token off a `strview` or `ustrview`, which `next()` uses |
 | [`utf16len(u_str)`](src/rpp/strview.h#L230) | Returns int length of a UTF-16 C-string |
 
 ### Utility Parsers
