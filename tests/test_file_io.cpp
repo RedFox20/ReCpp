@@ -125,6 +125,7 @@ TestImpl(test_file_io)
         create_test_file(TestFile);
         file f = { TestFile };
         AssertThat(f.seek(-10, SEEK_SET), -1);
+        AssertThat(f.seekl(-10, SEEK_SET), int64(-1));
         AssertThat(f.tell(), 0);
     }
 

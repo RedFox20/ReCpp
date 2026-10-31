@@ -241,7 +241,7 @@ namespace rpp /* ReCpp */
         return (int64)s.st_size;
     #else // Linux version is more complicated. It won't report correct size unless file is flushed:
         int64 pos = tell64();
-        int64 size = (int64)const_cast<file*>(this)->seekl(0LL, SEEK_END);
+        int64 size = const_cast<file*>(this)->seekl(0LL, SEEK_END);
         const_cast<file*>(this)->seekl(pos, SEEK_SET);
         return size;
     #endif
@@ -578,7 +578,7 @@ namespace rpp /* ReCpp */
     int file::seek(int filepos, int seekmode) noexcept { return int(seekl(filepos, seekmode)); }
 
     // ReSharper disable once CppMemberFunctionMayBeConst
-    uint64 file::seekl(int64 filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
+    int64 file::seekl(int64 filepos, int seekmode) noexcept // NOLINT(readability-make-member-function-const)
     {
         if (!Handle)
             return 0LL;
@@ -586,12 +586,12 @@ namespace rpp /* ReCpp */
         LARGE_INTEGER newpos, nseek;
         nseek.QuadPart = filepos;
         if (!SetFilePointerEx(reinterpret_cast<HANDLE>(Handle), nseek, &newpos, seekmode))
-            return uint64(-1); // seek() then reports -1
+            return -1;
         return newpos.QuadPart;
     #else
         if (fseeki64((FILE*)Handle, filepos, seekmode) != 0)
-            return uint64(-1);
-        return (uint64)ftelli64((FILE*)Handle);
+            return -1;
+        return (int64)ftelli64((FILE*)Handle);
     #endif
     }
     int file::tell() const noexcept { return int(tell64()); }
