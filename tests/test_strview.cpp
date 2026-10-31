@@ -355,6 +355,19 @@ TestImpl(test_strview)
         AssertTrue(final_finds_sigma);
     }
 
+    TestCase(concat_joins_two_to_five_parts)
+    {
+        AssertEqual(rpp::concat("ab", "cd"), "abcd");
+        AssertEqual(rpp::concat("a", "", "c"), "ac");
+        AssertEqual(rpp::concat("a", "b", "", "d"), "abd");
+        AssertEqual(rpp::concat("a", "b", "c", "d", "e"), "abcde");
+        AssertEqual(rpp::concat("", "", "", "", ""), "");
+    #if RPP_ENABLE_UNICODE
+        AssertEqual(rpp::concat(rpp::ustrview{u"ab"}, u"", u"c", u"€"), u"abc€");
+        AssertEqual(rpp::concat(rpp::ustrview{u"a"}, u"b", u"", u"d", u"€"), u"abd€");
+    #endif
+    }
+
     TestCase(string_compare_less)
     {
         AssertLess(rpp::strview{"aaaa"}, "bbbbbbbb");
