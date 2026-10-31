@@ -4,6 +4,7 @@
 #include <rpp/thread_pool.h> // draining the pool between test cases
 #include <rpp/timer.h>
 #include <rpp/tests.h>
+#include "parallel_threads.h"
 #include <thread>
 #include <deque>
 #include <vector>
@@ -111,18 +112,18 @@ TestImpl(test_semaphore)
         }
     }
 
-    TestCase(can_notify_worker_thread)
+    // the worker counts every notify, while both threads work between the notifies and the waits
+    template<class WorkerWork, class SenderWork>
+    static void run_notify_worker(int num_notifies_sent, WorkerWork worker_work, SenderWork sender_work)
     {
         rpp::semaphore sem;
         std::atomic_int num_notified = 0;
-        const int num_notifies_sent = 10;
-
         std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
         std::thread worker([&]
         {
             while (num_notified < num_notifies_sent)
             {
-                rpp::sleep_ms(1); // do some work
+                worker_work();
                 if (sem.wait(rpp::seconds(1)) == rpp::semaphore::timeout)
                 {
                     not_notified = true;
@@ -136,7 +137,7 @@ TestImpl(test_semaphore)
         for (int i = 0; i < num_notifies_sent; ++i)
         {
             sem.notify();
-            rpp::sleep_ms(2);
+            sender_work();
         }
         worker.join(); // the worker exits once it has counted every notify
 
@@ -144,38 +145,15 @@ TestImpl(test_semaphore)
         AssertEqual(num_notified, num_notifies_sent);
     }
 
+    TestCase(can_notify_worker_thread)
+    {
+        run_notify_worker(10, [] { rpp::sleep_ms(1); }, [] { rpp::sleep_ms(2); });
+    }
+
     // this is a much more intensive test
     TestCase(can_notify_worker_thread_sub_millisecond)
     {
-        rpp::semaphore sem;
-        std::atomic_int num_notified = 0;
-        const int num_notifies_sent = 500;
-
-        std::atomic_bool not_notified { false }; // only the case thread records an AssertFailed
-        std::thread worker([&]
-        {
-            while (num_notified < num_notifies_sent)
-            {
-                spin_sleep_for_us(100); // do some work
-                if (sem.wait(rpp::seconds(1)) == rpp::semaphore::timeout)
-                {
-                    not_notified = true;
-                    AssertFailed("semaphore was not notified");
-                    break;
-                }
-                ++num_notified;
-            }
-        });
-
-        for (int i = 0; i < num_notifies_sent; ++i)
-        {
-            sem.notify();
-            spin_sleep_for_us(100);
-        }
-        worker.join(); // the worker exits once it has counted every notify
-
-        AssertFalse(not_notified.load());
-        AssertEqual(num_notified, num_notifies_sent);
+        run_notify_worker(500, [] { spin_sleep_for_us(100); }, [] { spin_sleep_for_us(100); });
     }
 
     // this is a much more intensive test
@@ -399,16 +377,13 @@ TestImpl(test_semaphore)
             std::atomic_int woken { 0 };
             // a hang guard, the notify releases it
             auto wait_1s = [&] { started.notify(); woken += flag.wait(rpp::seconds(1)) == rpp::semaphore::notified; };
-            std::vector<std::thread> waiters;
-            waiters.reserve(3);
-            for (int i = 0; i < 3; ++i)
-                waiters.emplace_back(wait_1s);
+            parallel_threads waiters { 3, wait_1s };
             for (int i = 0; i < 3; ++i)
                 (void)started.wait(rpp::seconds(1)); // a hang guard, each waiter releases it
             rpp::sleep_ms(5); // lets the started waiters block, so none of them sees the flag set before it waits
             rpp::Timer t;
             (flag.*notify)();
-            for (std::thread& w : waiters) w.join();
+            waiters.join();
             AssertLess(t.elapsed_millis(), 500.0); // a waiter which missed the wake sees the flag only at the hang guard
             AssertThat(woken.load(), 3);
             AssertThat(flag.is_set(), true);
@@ -529,12 +504,8 @@ TestImpl(test_semaphore)
     {
         rpp::semaphore_flag flag;
         constexpr int NUM_WAITERS = 4;
-        std::vector<std::thread> waiters;
-        waiters.reserve(NUM_WAITERS);
         std::atomic_int timeouts { 0 };
-        for (int i = 0; i < NUM_WAITERS; ++i)
-            waiters.emplace_back([&] { if (flag.wait(rpp::millis(1)) == rpp::semaphore::timeout) ++timeouts; });
-        for (std::thread& w : waiters) w.join();
+        parallel_threads{ NUM_WAITERS, [&] { if (flag.wait(rpp::millis(1)) == rpp::semaphore::timeout) ++timeouts; } }.join();
         AssertEqual(timeouts.load(), NUM_WAITERS);
         flag.notify();
         AssertTrue(flag.is_set());

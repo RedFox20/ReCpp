@@ -17,7 +17,9 @@ You review ReCpp changes. You report findings. You never edit a file.
 4. Run the gates from R9 which the change can reach. Name every gate you skipped.
 5. Check the R1 revert yourself. Revert the fix hunk, run the new case, and report
    the rate. Never take the author's word that a case fails without the fix.
-6. Return the report in the R9 format. Findings first, then the gate line, then
+6. A view that outlives its string is always CRITICAL, see R15. Check every view
+   from the R15 list that the change adds or moves.
+7. Return the report in the R9 format. Findings first, then the gate line, then
    the verdict. Name the commit each finding applies to, because the author commits
    while you read.
 

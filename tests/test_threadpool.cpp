@@ -1,4 +1,5 @@
 #include <rpp/tests.h>
+#include "parallel_threads.h"
 #include <rpp/thread_pool.h>
 #include <rpp/async.h>
 #include <rpp/semaphore.h>
@@ -565,20 +566,15 @@ TestImpl(test_threadpool)
         rpp::semaphore started;
         rpp::semaphore_once_flag go; // its notify wakes every copier at once
 
-        std::vector<std::thread> copiers;
-        copiers.reserve(N_COPIERS);
-        for (int t = 0; t < N_COPIERS; ++t)
-        {
-            copiers.emplace_back([&]() {
-                started.notify();
-                go.wait(); // synchronize start with main + other copiers
-                while (!stop.load(std::memory_order_relaxed))
-                {
-                    pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref // NOLINT(performance-unnecessary-copy-initialization)
-                    (void)copy;                    // drop ref immediately → dec_ref
-                }
-            });
-        }
+        parallel_threads copiers { N_COPIERS, [&]() {
+            started.notify();
+            go.wait(); // synchronize start with main + other copiers
+            while (!stop.load(std::memory_order_relaxed))
+            {
+                pool_task_handle copy{shared}; // THE RACING OPERATION: load + inc_ref // NOLINT(performance-unnecessary-copy-initialization)
+                (void)copy;                    // drop ref immediately → dec_ref
+            }
+        }};
 
         for (int t = 0; t < N_COPIERS; ++t)
             started.wait();
@@ -596,7 +592,7 @@ TestImpl(test_threadpool)
         }
 
         stop.store(true, std::memory_order_release);
-        for (auto& t : copiers) t.join();
+        copiers.join();
 
         print_info("inc_ref_uaf_race: completed %d iterations with %d copier threads\n",
                    ITERATIONS, N_COPIERS);

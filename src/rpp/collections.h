@@ -393,8 +393,12 @@ namespace rpp
 
     template<class T, class Pred> T* find_last_if(element_range<T> v, const Pred& predicate) noexcept
     {
-        for (T* last = v.end(); last != v.begin();)
-            if (predicate(*--last)) return last;
+        T* first = v.begin();
+        T* last  = v.end();
+        while (last != first) {
+            --last;
+            if (predicate(*last)) return last;
+        }
         return nullptr;
     }
 

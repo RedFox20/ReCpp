@@ -283,12 +283,7 @@ TestImpl(test_collections)
         std::vector<std::string> b { "3"s, "4"s, "5"s };
 
         append(a, b);
-        AssertThat(a.size(), 5ul);
-        AssertThat(a[0], "1");
-        AssertThat(a[1], "2");
-        AssertThat(a[2], "3");
-        AssertThat(a[3], "4");
-        AssertThat(a[4], "5");
+        AssertThat(a, (std::vector<std::string>{ "1"s, "2"s, "3"s, "4"s, "5"s }));
     }
 
     TestCase(vector_find)
@@ -334,12 +329,15 @@ TestImpl(test_collections)
 
     TestCase(vector_find_last_if)
     {
-        std::vector<std::string> v { "0"s, "1"s, "2"s, "1"s, "2"s };
+        std::vector<int> v { 1, 2, 3, 2, 4, 5 };
+        element_range<int> r = range(v, 5); // the last vector element lies past the range, so a read of end() finds it
+        auto eq = [](int want) { return [want](int x) { return x == want; }; };
 
-        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
-        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "0"s; }), &v[0]);
-        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[3]);
-        AssertThat(find_last_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[4]);
+        AssertThat(find_last_if(r, eq(1)), v.data());
+        AssertThat(find_last_if(r, eq(4)), &v[4]);
+        AssertThat(find_last_if(r, eq(2)), &v[3]);
+        AssertThat(find_last_if(r, eq(5)), nullptr);
+        AssertThat(find_last_if(element_range<int>{}, eq(1)), nullptr);
     }
 
     TestCase(vector_find_smallest)
@@ -399,5 +397,15 @@ TestImpl(test_collections)
         });
         AssertThat(transformed2, expected);
     }
+
+    //TestCase(reduce)
+    //{
+    //    vector<string> v { "1"s, "2"s, "3"s, "4"s, "5"s };
+    //    int reduced = rpp::reduce(v, [](const string& a, const string& b)
+    //    {
+    //       return std::stoi(a) + std::stoi(b); 
+    //    });
+    //    AssertThat(reduced, 15);
+    //}
 
 };

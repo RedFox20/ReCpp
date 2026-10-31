@@ -3,6 +3,7 @@
 #include <rpp/atomic_shared_ptr.h>
 #include <rpp/semaphore.h>
 #include <rpp/tests.h>
+#include "parallel_threads.h"
 #include <thread>
 #include <vector>
 
@@ -115,27 +116,22 @@ TestImpl(test_atomic_shared_ptr)
         std::atomic_int invalid_reads{0};
         rpp::semaphore readers_started;
 
-        std::vector<std::thread> readers;
-        readers.reserve(NUM_READERS);
-        for (int i = 0; i < NUM_READERS; ++i)
+        parallel_threads readers { NUM_READERS, [&]
         {
-            readers.emplace_back([&]
+            readers_started.notify();
+            while (!stop.load(std::memory_order_acquire))
             {
-                readers_started.notify();
-                while (!stop.load(std::memory_order_acquire))
+                auto sp = asp.load(std::memory_order_acquire);
+                if (sp)
                 {
-                    auto sp = asp.load(std::memory_order_acquire);
-                    if (sp)
-                    {
-                        int val = *sp;
-                        if (val >= 0 && val <= NUM_ITERATIONS)
-                            valid_reads.fetch_add(1, std::memory_order_relaxed);
-                        else
-                            invalid_reads.fetch_add(1, std::memory_order_relaxed);
-                    }
+                    int val = *sp;
+                    if (val >= 0 && val <= NUM_ITERATIONS)
+                        valid_reads.fetch_add(1, std::memory_order_relaxed);
+                    else
+                        invalid_reads.fetch_add(1, std::memory_order_relaxed);
                 }
-            });
-        }
+            }
+        }};
 
         // every reader is about to enter its loop before the first store
         for (int i = 0; i < NUM_READERS; ++i)
@@ -145,8 +141,7 @@ TestImpl(test_atomic_shared_ptr)
             asp.store(std::make_shared<int>(i), std::memory_order_release);
 
         stop.store(true, std::memory_order_release);
-        for (auto& t : readers)
-            t.join();
+        readers.join();
 
         AssertEqual(invalid_reads.load(), 0);
         AssertGreater(valid_reads.load(), 0);
@@ -160,25 +155,16 @@ TestImpl(test_atomic_shared_ptr)
         constexpr int EXCHANGES_PER_THREAD = 100;
 
         std::atomic_int total_non_null{0};
-        std::vector<std::thread> threads;
-        threads.reserve(NUM_THREADS);
-        for (int t = 0; t < NUM_THREADS; ++t)
+        parallel_threads{ NUM_THREADS, [&](int t)
         {
-            threads.emplace_back([&, t]
+            for (int i = 0; i < EXCHANGES_PER_THREAD; ++i)
             {
-                for (int i = 0; i < EXCHANGES_PER_THREAD; ++i)
-                {
-                    int val = t * EXCHANGES_PER_THREAD + i + 1;
-                    auto old = asp.exchange(
-                        std::make_shared<int>(val), std::memory_order_acq_rel);
-                    if (old)
-                        total_non_null.fetch_add(1, std::memory_order_relaxed);
-                }
-            });
-        }
-
-        for (auto& t : threads)
-            t.join();
+                int val = t * EXCHANGES_PER_THREAD + i + 1;
+                auto old = asp.exchange(std::make_shared<int>(val), std::memory_order_acq_rel);
+                if (old)
+                    total_non_null.fetch_add(1, std::memory_order_relaxed);
+            }
+        }}.join();
 
         // every exchange received a non-null old value (initial was non-null)
         AssertEqual(total_non_null.load(), NUM_THREADS * EXCHANGES_PER_THREAD);
@@ -324,25 +310,20 @@ TestImpl(test_atomic_shared_ptr)
         kept_alive.reserve(NUM_ITERATIONS + 1);
         kept_alive.push_back(sp);
 
-        std::vector<std::thread> readers;
-        readers.reserve(NUM_READERS);
-        for (int i = 0; i < NUM_READERS; ++i)
+        parallel_threads readers { NUM_READERS, [&]
         {
-            readers.emplace_back([&]
+            readers_started.notify();
+            while (!stop.load(std::memory_order_acquire))
             {
-                readers_started.notify();
-                while (!stop.load(std::memory_order_acquire))
+                auto wp = awp.load(std::memory_order_acquire);
+                if (auto locked = wp.lock())
                 {
-                    auto wp = awp.load(std::memory_order_acquire);
-                    if (auto locked = wp.lock())
-                    {
-                        int val = *locked;
-                        if (val >= 0 && val <= NUM_ITERATIONS)
-                            valid_reads.fetch_add(1, std::memory_order_relaxed);
-                    }
+                    int val = *locked;
+                    if (val >= 0 && val <= NUM_ITERATIONS)
+                        valid_reads.fetch_add(1, std::memory_order_relaxed);
                 }
-            });
-        }
+            }
+        }};
 
         // every reader is about to enter its loop before the first store
         for (int i = 0; i < NUM_READERS; ++i)
@@ -356,8 +337,7 @@ TestImpl(test_atomic_shared_ptr)
         }
 
         stop.store(true, std::memory_order_release);
-        for (auto& t : readers)
-            t.join();
+        readers.join();
 
         AssertGreater(valid_reads.load(), 0);
         auto final_locked = awp.load(std::memory_order_acquire).lock();

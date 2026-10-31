@@ -51,12 +51,16 @@ TestImpl(test_concurrent_queue)
         AssertThat(queue.pop(), "item4");
     }
 
+    static std::vector<std::string> three_items() { return { "item1", "item2", "item3" }; }
+    static void push_three_items(concurrent_queue<std::string>& queue)
+    {
+        for (const std::string& item : three_items()) queue.push(item);
+    }
+
     TestCase(clear)
     {
         concurrent_queue<std::string> queue;
-        queue.push("item1");
-        queue.push("item2");
-        queue.push("item3");
+        push_three_items(queue);
         AssertThat(queue.size(), 3);
         AssertThat(queue.empty(), false);
         queue.clear();
@@ -67,30 +71,20 @@ TestImpl(test_concurrent_queue)
     TestCase(atomic_copy)
     {
         concurrent_queue<std::string> queue;
-        queue.push("item1");
-        queue.push("item2");
-        queue.push("item3");
+        push_three_items(queue);
         std::vector<std::string> items = queue.atomic_copy();
-        AssertThat(items.size(), 3);
-        AssertThat(items.at(0), "item1");
-        AssertThat(items.at(1), "item2");
-        AssertThat(items.at(2), "item3");
+        AssertThat(items, three_items());
     }
 
     TestCase(iterate_locked)
     {
         concurrent_queue<std::string> queue;
-        queue.push("item1");
-        queue.push("item2");
-        queue.push("item3");
+        push_three_items(queue);
 
         std::vector<std::string> items;
         for (const std::string& item : queue.iterator())
             items.push_back(item);
-        AssertThat(items.size(), 3);
-        AssertThat(items.at(0), "item1");
-        AssertThat(items.at(1), "item2");
-        AssertThat(items.at(2), "item3");
+        AssertThat(items, three_items());
     }
 
     // a consumer sees the item only after the producer releases its lock
@@ -112,9 +106,7 @@ TestImpl(test_concurrent_queue)
     TestCase(iterate_external_lock)
     {
         concurrent_queue<std::string> queue;
-        queue.push("item1");
-        queue.push("item2");
-        queue.push("item3");
+        push_three_items(queue);
 
         std::vector<std::string> items;
         {
@@ -122,10 +114,7 @@ TestImpl(test_concurrent_queue)
             for (const std::string& item : queue.iterator(lock))
                 items.push_back(item);
         }
-        AssertThat(items.size(), 3);
-        AssertThat(items.at(0), "item1");
-        AssertThat(items.at(1), "item2");
-        AssertThat(items.at(2), "item3");
+        AssertThat(items, three_items());
     }
 
     TestCase(can_erase_every_second_item)
@@ -226,9 +215,7 @@ TestImpl(test_concurrent_queue)
     TestCase(atomic_flush)
     {
         concurrent_queue<std::string> queue;
-        queue.push("item1");
-        queue.push("item2");
-        queue.push("item3");
+        push_three_items(queue);
 
         // count the number of tasks that were atomically processed
         std::atomic_int numProcessed = 0;
