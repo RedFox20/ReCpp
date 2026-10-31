@@ -514,85 +514,6 @@ and `std::make_exception_ptr` all export cleanly from the same file.
 No module exports a std name now, so nothing in ReCpp reaches this. A consumer which catches
 through a pointer includes `<exception>`.
 
-### B17. A pool worker frees the exception a test still reads (C18 recurred)
-`ubuntu-cpp23-tsan-gcc13` reported one race in `test_threadpool::parallel_task_reentrance`.
-A worker calls `free` through `generic.reset()` at `thread_pool.cpp:359`, and the main
-thread read the same address in `rpp::test::run_test_func()` at `tests.cpp:726`. All
-538 cases passed, and TSAN alone sets exit code 66.
-
-That statement is what C18 closed. It sat at `thread_pool.cpp:351` then, so the line moved
-and the code did not. C18 closed it as unreproducible after 120 runs on 32 saturated cores.
-This is the first report since, so the rate is far below what the old hunt covered.
-
-The thread which frees comes from an earlier suite. Its creation stack names
-`parallel_task_detached` under `test_sockets::test_udp_poll_nonblocking_select`, so a
-detached task outlives the suite which started it. Suite shutdown order is the place to
-look, not the `catch` block which reports the write.
-
-Four other TSAN jobs pass on the same commit: `cpp20-tsan-gcc13`, `cpp20-tsan-clang18`,
-`cpp23-tsan-clang18` and `cpp26-tsan-gcc14`.
-
-Second sighting on fd9c088, and this time it was `ubuntu-cpp20-tsan-gcc13`. Same test, same
-two stacks, same two lines. So the race is not specific to one standard, and the job which
-reports it moves between runs. A re-run of the same job passed.
-
-Third sighting on bebb416, back on `ubuntu-cpp23-tsan-gcc13`. All 540 cases passed, TSAN
-reported one warning, and the four other TSAN jobs passed on the same commit.
-
-Fourth sighting on cab12a8, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two stacks,
-same two lines, and all 553 cases passed. The job passes on the next commit, so the rate is
-still far below one run.
-
-Fifth sighting on c5a9d9b, again on `ubuntu-cpp23-tsan-gcc13`. Same test, same two lines, and
-the same creation stack under `test_sockets::test_udp_poll_nonblocking_select`. All 557 cases
-passed, and three other TSAN jobs passed on the same commit.
-
-Sixth sighting on b065e68 in #128, on `ubuntu-cpp26-tsan-gcc14`. The two lines are now
-`thread_pool.cpp:355` and `tests.cpp:733`, with the same creation stack. All 695 cases passed.
-
-Sixth sighting on 8dc779d, on `ubuntu-cpp20-tsan-gcc13`, and again the same two lines. That
-commit edits three markdown files, so the rate alone moved it, not the code. All 556 cases
-passed and TSAN set exit 66 on its own.
-
-Seventh sighting on 202654a, again on `ubuntu-cpp20-tsan-gcc13`, with the same two lines and
-the same creation stack. That commit edits two build files and two markdown files, so no C++
-changed. All 574 cases passed, the four other TSAN jobs passed on the same commit, and TSAN
-set exit 66 on its own.
-
-Eighth sighting on 74c5a71 in #131, on `ubuntu-cpp20-tsan-clang18`, so libc++ reports it too.
-A ninth came on 0d1bc06, on `ubuntu-cpp23-tsan-gcc13`, with the two lines above.
-
-Tenth sighting on 2f22f16 in #136, on `ubuntu-cpp23-tsan-clang18`. The free is in `__cxa_end_catch`,
-and the read is at `tests.cpp:744`. All 738 cases passed. The commit before it passed the same job, and
-this commit changes only an include and a comment.
-
-Eleventh sighting on 56e7bdb in #146, on `ubuntu-cpp23-tsan-clang18`.
-Worker `rpp_task_28` frees in `__cxa_end_catch`, while the main thread reads at `tests.cpp:744`.
-The creation stack again names `test_sockets::test_udp_poll_nonblocking_select`.
-All 748 cases passed, and TSAN alone set exit code 66.
-
-Twelfth sighting on 3a5b434 in #163, on `ubuntu-cpp20-tsan-gcc13`, with the two lines above and the same creation stack.
-All 750 cases passed, and TSAN alone set exit code 66.
-
-Another sighting on 8779aa6 in #162, on `ubuntu-cpp20-tsan-clang18`, with the two lines above and the same creation stack.
-All 743 cases passed, and TSAN alone set exit code 66.
-
-Another sighting on e0021f4 in #161, on `ubuntu-cpp20-tsan-gcc13`.
-The free is at `thread_pool.cpp:354` and the read at `tests.cpp:733`, with the same creation stack.
-All 753 cases passed, and TSAN alone set exit code 66.
-`ubuntu-cpp20-tsan-clang18` failed on the same commit, with the libc++ pair `__cxa_end_catch` and `tests.cpp:744`.
-That makes three sightings in one hour on branches based on 57a1b01, so the rate rose after #165.
-
-The libc++ stack names the freed object. The worker frees the exception of
-`parallel_task_exception` in `__cxa_end_catch`, at the end of its catch block in
-`pool_worker::run()`. The main thread read that exception at `tests.cpp:733`, in the
-`typeid(e)` of the expected exception check. The worker signals the waiter from inside the
-catch block, so it can drop the last reference after the waiter is done. libstdc++ and
-libc++abi count that reference in uninstrumented code, so TSAN sees no order between the read
-and the free. This is the C25 class, not `generic.reset()`. The creation stack under
-`test_sockets` only shows that the pool reuses its threads. A signal after the catch block is
-not enough, because the worker can still free the copy in the task state.
-
 ### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
 `rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
 changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `async.h` and
@@ -841,6 +762,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 `write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
+
+### C38. A pool worker freed a task exception after the waiter read it (was B17)
+The worker signaled from its catch block, so TSAN saw no order between the waiter read and the exception free.
+The worker now signals after the catch block, with `race:__cxa_decrement_exception_refcount` for libc++, which `tsan_reports_no_race_on_a_task_exception` pins.
 
 ### C37. `socket::poll()` reported a peer close as a timeout on Windows
 WSAPoll reports a FIN as POLLHUP alone, so `poll()` returned false, and `available()` cleared the `ESHUTDOWN` error.
