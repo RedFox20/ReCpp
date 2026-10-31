@@ -248,6 +248,9 @@ namespace rpp
             task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
+        // a task cannot wait for itself, so run() ends after it, and only the destructor gives up the thread
+        if (std::this_thread::get_id() == th.get_id())
+            return destroying ? join_or_detach(wait_result::timeout) : wait_result::timeout;
         // 0 waits without a timeout, because a detached runner would outlive this worker, see BUGS.md C39
         if (timeoutMillis <= 0) return join_or_detach(task_to_wait.wait(std::nothrow));
         wait_result result = task_to_wait.wait(rpp::millis(timeoutMillis), std::nothrow);

@@ -428,6 +428,16 @@ TestImpl(test_threadpool)
         releaser.join();
     }
 
+    // kill() from the task of the same worker must not wait for that task
+    TestCase(a_task_can_kill_its_own_worker)
+    {
+        rpp::semaphore_once_flag done;
+        rpp::pool_worker worker;
+        rpp::task_delegate<void()> task = [&] { (void)worker.kill(0); done.notify(); };
+        AssertTrue(worker.run_generic(task, nullptr));
+        AssertThat(done.wait(rpp::millis(1000)), rpp::semaphore::notified);
+    }
+
     TestCase(parallel_task_resurrection)
     {
         thread_pool::global().max_task_idle_time(0.05f);
