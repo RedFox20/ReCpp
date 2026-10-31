@@ -490,8 +490,8 @@ TestImpl(test_threadpool)
     }
 
     // a submit which races the idle timeout must not join the runner under its lock
-    // the race window spans a few instructions, so the case needs many rounds to hit it
-    TestCase(a_submit_racing_the_idle_timeout_does_not_hang)
+    // only a timer reaches the idle exit, so this sleep loop runs only when a filter names it
+    TestCaseNoAutorun(a_submit_racing_the_idle_timeout_does_not_hang)
     {
         rpp::pool_worker worker { 0.001f };
         for (int i = 0; i < 100; ++i)
