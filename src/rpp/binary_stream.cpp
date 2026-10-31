@@ -1,7 +1,6 @@
 #include "binary_stream.h"
 #include <cstdlib> // realloc (include needed for Linux build)
 #include <exception> // std::terminate
-#include <utility> // std::index_sequence
 
 namespace rpp
 {
@@ -132,29 +131,58 @@ namespace rpp
         return *this;
     }
 
-    // little-endian byte order on every CPU, at an unaligned address. The folds unroll, so the bytes merge into one access
-    template<class T, size_t... I> static FINLINE void store_le(char* p, T v, std::index_sequence<I...> /*bytes*/) noexcept
+    // NOLINTBEGIN(bugprone-narrowing-conversions)
+
+    void binary_stream::unsafe_write(rpp::uint16 data) noexcept
     {
-        ((p[I] = char(v >> (8 * I))), ...);
-    }
-    template<class T, size_t... I> static FINLINE T load_le(const char* p, std::index_sequence<I...> /*bytes*/) noexcept
-    {
-        return T(((T(uint8_t(p[I])) << (8 * I)) | ...));
-    }
-    template<class T> static FINLINE void store_le(char* p, T v) noexcept
-    {
-        store_le(p, v, std::make_index_sequence<sizeof(T)>{});
-    }
-    template<class T> static FINLINE T load_le(const char* p) noexcept
-    {
-        return load_le<T>(p, std::make_index_sequence<sizeof(T)>{});
+        // write int as 2 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        WritePos += 2;
+        End += 2;
     }
 
-    void binary_stream::unsafe_write(rpp::uint16 data) noexcept { store_le(Ptr + WritePos, data); WritePos += 2; End += 2; }
-    void binary_stream::unsafe_write(rpp::uint32 data) noexcept { store_le(Ptr + WritePos, data); WritePos += 4; End += 4; }
-    void binary_stream::unsafe_write(rpp::uint64 data) noexcept { store_le(Ptr + WritePos, data); WritePos += 8; End += 8; }
-    void binary_stream::unsafe_write(float data)  noexcept { unsafe_write(&data, sizeof(data)); }
-    void binary_stream::unsafe_write(double data) noexcept { unsafe_write(&data, sizeof(data)); }
+    void binary_stream::unsafe_write(rpp::uint32 data) noexcept
+    {
+        // write int as 4 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        Ptr[WritePos + 2] = rpp::byte((data >> 16) & 0xFF);
+        Ptr[WritePos + 3] = rpp::byte((data >> 24) & 0xFF);
+        WritePos += 4;
+        End += 4;
+    }
+
+    void binary_stream::unsafe_write(rpp::uint64 data) noexcept
+    {
+        // write int as 8 bytes in Little-Endian order, into unaligned address
+        Ptr[WritePos + 0] = rpp::byte(data & 0xFF);
+        Ptr[WritePos + 1] = rpp::byte((data >> 8) & 0xFF);
+        Ptr[WritePos + 2] = rpp::byte((data >> 16) & 0xFF);
+        Ptr[WritePos + 3] = rpp::byte((data >> 24) & 0xFF);
+        Ptr[WritePos + 4] = rpp::byte((data >> 32) & 0xFF);
+        Ptr[WritePos + 5] = rpp::byte((data >> 40) & 0xFF);
+        Ptr[WritePos + 6] = rpp::byte((data >> 48) & 0xFF);
+        Ptr[WritePos + 7] = rpp::byte((data >> 56) & 0xFF);
+        WritePos += 8;
+        End += 8;
+    }
+
+    // NOLINTEND(bugprone-narrowing-conversions)
+
+    void binary_stream::unsafe_write(float data) noexcept
+    {
+        memcpy(&Ptr[WritePos], &data, sizeof(float));
+        WritePos += sizeof(float);
+        End      += sizeof(float);
+    }
+
+    void binary_stream::unsafe_write(double data) noexcept
+    {
+        memcpy(&Ptr[WritePos], &data, sizeof(double));
+        WritePos += sizeof(double);
+        End      += sizeof(double);
+    }
 
     void binary_stream::unsafe_write(const void* data, int numBytes) noexcept
     {
@@ -181,9 +209,43 @@ namespace rpp
         return bytesToRead;
     }
 
-    void binary_stream::unsafe_buffer_decode(rpp::uint16& dst) noexcept { dst = load_le<rpp::uint16>(Ptr + ReadPos); }
-    void binary_stream::unsafe_buffer_decode(rpp::uint32& dst) noexcept { dst = load_le<rpp::uint32>(Ptr + ReadPos); }
-    void binary_stream::unsafe_buffer_decode(rpp::uint64& dst) noexcept { dst = load_le<rpp::uint64>(Ptr + ReadPos); }
+    void binary_stream::unsafe_buffer_decode(rpp::uint16& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint16 ret = 0;
+        ret |= rpp::uint16(p[0]);
+        ret |= rpp::uint16(p[1]) << 8;
+        dst = ret;
+    }
+
+    void binary_stream::unsafe_buffer_decode(rpp::uint32& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint32 ret = 0;
+        ret |= rpp::uint32(p[0]);
+        ret |= rpp::uint32(p[1]) << 8;
+        ret |= rpp::uint32(p[2]) << 16;
+        ret |= rpp::uint32(p[3]) << 24;
+        dst = ret;
+    }
+
+    void binary_stream::unsafe_buffer_decode(rpp::uint64& dst) noexcept
+    {
+        // unaligned read
+        const uint8_t* p = (const uint8_t*)(Ptr + ReadPos);
+        rpp::uint64 ret = 0;
+        ret |= rpp::uint64(p[0]);
+        ret |= rpp::uint64(p[1]) << 8;
+        ret |= rpp::uint64(p[2]) << 16;
+        ret |= rpp::uint64(p[3]) << 24;
+        ret |= rpp::uint64(p[4]) << 32;
+        ret |= rpp::uint64(p[5]) << 40;
+        ret |= rpp::uint64(p[6]) << 48;
+        ret |= rpp::uint64(p[7]) << 56;
+        dst = ret;
+    }
 
     void binary_stream::unsafe_buffer_decode(float& dst) noexcept
     {
