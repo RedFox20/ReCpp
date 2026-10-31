@@ -630,25 +630,6 @@ clang-tidy-18 --checks='-*,performance-enum-size' tests/test_sprint.cpp -- -std=
 ```
 A fix makes the documented command reconfigure, and turns modules off for the analysis.
 
-### B10. A pool worker reads its semaphore after the pool destroyed it
-TSAN reports `heap-use-after-free` at shutdown, 1 run in 80. The main thread runs
-`~unique_ptr<pool_worker>` out of the worker vector, while `pool_worker::run()` is still
-inside `rpp::semaphore::spin_lock()` at `semaphore.h:102`. A second report reads the
-`pool_task_state` shared pointer the same way.
-
-This is a lifecycle order defect, not a refcount TSAN cannot see, so C25 does not cover it
-and no suppression should. Two pinned cores reproduce it, and the `race:` patterns never hide
-a `heap-use-after-free`:
-```bash
-CXX20=1 mama gcc tsan build
-for i in $(seq 1 40); do for j in 1 2; do
-  taskset -c 0,1 env TSAN_OPTIONS="halt_on_error=0" \
-    packages/ReCpp/linux-tsan/RppTests test_async > /tmp/b10_${i}_$j.log 2>&1 &
-done; wait; done
-grep -l 'heap-use-after-free' /tmp/b10_*.log
-```
-The recipe ran `test_future` before 2.2. `test_async` holds its ported cases, and no run has measured the recipe there.
-
 ### B8. gcc-14 breaks a module for five shapes, and each one has a workaround
 `tools/gen_module_exports.py` carries `NO_EXPORT` with one entry. Every module ships now.
 Delete that entry when a newer gcc reads the module back.
@@ -762,6 +743,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 `write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
+
+### C39. A pool worker ran its task on the pool which the destructor freed (was B10)
+`~pool_worker()` called `kill(0)`, which waited 0 ms for a running task and then detached the thread.
+`kill(0)` now waits without a timeout, outside `TasksMutex`, and a task never waits for itself, which seven `test_threadpool` cases pin.
 
 ### C38. A pool worker freed a task exception after the waiter read it (was B17)
 The worker signaled from its catch block, so TSAN saw no order between the waiter read and the exception free.

@@ -412,6 +412,117 @@ TestImpl(test_threadpool)
         AssertThat(times_launched, 2);
     }
 
+    // a detached worker would run its task on the freed pool, see BUGS.md C39
+    TestCase(pool_destructor_waits_for_the_running_task)
+    {
+        rpp::semaphore_once_flag started, release;
+        std::atomic_bool finished { false };
+        std::thread releaser;
+        {
+            rpp::thread_pool pool { 1 };
+            (void)pool.parallel_task([&] { started.notify(); release.wait(); finished = true; });
+            started.wait();
+            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+        } // the destructor starts before the releaser wakes
+        AssertTrue(finished);
+        releaser.join();
+    }
+
+    // a task accepted just before the destructor may never start, and its waiters must still wake
+    TestCase(destroying_a_worker_releases_a_task_it_never_started)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_task_handle handle { nullptr };
+            {
+                rpp::pool_worker worker;
+                rpp::task_delegate<void()> task = [] {};
+                AssertTrue(worker.run_generic(task, &handle));
+            }
+            AssertTrue(handle.is_finished());
+        }
+    }
+
+    // kill() from the task of the same worker must not wait for that task
+    TestCase(kill_from_a_task_of_the_same_worker_returns_at_once)
+    {
+        rpp::pool_worker worker;
+        std::string first;
+        for (int i = 0; i < 20; ++i) // each submit follows the last finish at once, so it races the runner
+        {
+            rpp::pool_task_handle handle { nullptr };
+            rpp::task_delegate<void()> task = [&] { (void)worker.kill(0); };
+            AssertTrue(worker.run_generic(task, &handle));
+            AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+            if (i == 0) first = handle.worker_name();
+            AssertThat(std::string{handle.worker_name()}, first); // a resurrected runner takes a new name
+        }
+    }
+
+    // a task may still query its pool while the destructor waits for that task
+    TestCase(a_task_can_query_its_pool_during_the_destructor)
+    {
+        rpp::semaphore_once_flag started, release;
+        std::thread releaser;
+        int active = -1;
+        {
+            rpp::thread_pool pool { 1 };
+            (void)pool.parallel_task([&] { started.notify(); release.wait(); active = pool.active_tasks(); });
+            started.wait();
+            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+        } // the destructor starts before the releaser wakes
+        releaser.join();
+        AssertNotEqual(active, -1);
+    }
+
+    // a cancelled task destroys its captures outside the worker lock, so a capture may still query the worker
+    TestCase(a_cancelled_task_destroys_its_captures_outside_the_lock)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_worker worker;
+            std::shared_ptr<int> probe { new int{0}, [&worker](int* p) { (void)worker.running(); delete p; } };
+            rpp::task_delegate<void()> task = [probe] {};
+            probe.reset(); // the task holds the last reference
+            AssertTrue(worker.run_generic(task, nullptr));
+            (void)worker.kill(0);
+        }
+    }
+
+    // a submit which races the idle timeout must not join the runner under its lock
+    // only a timer reaches the idle exit, so this sleep loop runs only when a filter names it
+    TestCaseNoAutorun(a_submit_racing_the_idle_timeout_does_not_hang)
+    {
+        rpp::pool_worker worker { 0.001f };
+        for (int i = 0; i < 100; ++i)
+        {
+            rpp::pool_task_handle handle { nullptr };
+            rpp::task_delegate<void()> task = [] {};
+            while (!worker.run_generic(task, &handle)) rpp::yield();
+            AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+            rpp::sleep_ms(1); // the next submit lands near the idle exit
+        }
+    }
+
+    // a range which a kill cancelled must not run when the next task brings the worker back
+    TestCase(a_cancelled_range_never_runs_after_a_resurrection)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_worker worker;
+            auto body = [](int, int) {};
+            auto range = rpp::action<int, int>::from_function<decltype(body), &decltype(body)::operator()>(&body);
+            AssertTrue(worker.run_range(0, 1, range, nullptr));
+            (void)worker.kill(0);
+            bool ran = false;
+            rpp::pool_task_handle handle { nullptr };
+            rpp::task_delegate<void()> task = [&] { ran = true; };
+            AssertTrue(worker.run_generic(task, &handle));
+            AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
+            AssertTrue(ran);
+        }
+    }
+
     TestCase(parallel_task_resurrection)
     {
         thread_pool::global().max_task_idle_time(0.05f);

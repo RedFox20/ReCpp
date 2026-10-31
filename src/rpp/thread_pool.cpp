@@ -237,6 +237,9 @@ namespace rpp
         if (killed) {
             return join_or_detach(wait_result::finished);
         }
+        // a task cannot kill its own runner, because a later submit would join that runner under its lock
+        bool self = std::this_thread::get_id() == th.get_id();
+        if (self && !destroying) return wait_result::timeout;
 
         // Take a strong ref to current_task while holding the lock,
         // so we can safely wait on it after releasing the lock
@@ -248,8 +251,10 @@ namespace rpp
             task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
-        // wait for runner to finish current task before joining the thread
-        wait_result result = task_to_wait.wait(rpp::Duration::from_millis(timeoutMillis), std::nothrow);
+        if (self) return join_or_detach(wait_result::timeout); // exit() on this thread destroys the worker, so detach
+        // 0 waits without a timeout, because a detached runner would outlive this worker, see BUGS.md C39
+        if (timeoutMillis <= 0) return join_or_detach(task_to_wait.wait(std::nothrow));
+        wait_result result = task_to_wait.wait(rpp::millis(timeoutMillis), std::nothrow);
         return join_or_detach(result);
     }
 
@@ -309,6 +314,11 @@ namespace rpp
                     if (!wait_for_new_job(lock)) {
                         TaskDebug("%s wait_for_new_job stopped (%s)", name, killed ? "killed" : "timeout");
                         killed = true;
+                        range_task = {}; // a task accepted before the kill never runs, so clear it and wake its waiters
+                        generic = std::move(generic_task);
+                        // its captures may lock this worker, and its unsignaled task keeps every submit out meanwhile
+                        if (generic) { lock.unlock(); generic.reset(); lock.lock(); }
+                        current_task.signal_finish_and_cleanup();
                         return;
                     }
                     TaskDebug("%s wait_for_new_job elapsed: %.3fms", name, t.elapsed_millis());
@@ -428,9 +438,12 @@ namespace rpp
 
     thread_pool::~thread_pool() noexcept
     {
-        // defined destructor to prevent aggressive inlining and to manually control task destruction
-        std::lock_guard lock{TasksMutex};
-        Workers.clear();
+        // the workers wait for their tasks after the unlock, because a running task may still call active_tasks()
+        std::vector<worker_ptr> workers;
+        {
+            std::lock_guard lock{TasksMutex};
+            workers.swap(Workers);
+        }
     }
     
     void thread_pool::set_max_parallelism(int max_parallelism) noexcept

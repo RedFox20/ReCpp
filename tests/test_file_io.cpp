@@ -862,6 +862,40 @@ TestImpl(test_file_io)
     }
 #endif
 
+#if __linux__
+    // a /proc file reports size 0, so read_all() must read it to EOF
+    TestCase(read_all_reads_a_proc_file_to_the_end)
+    {
+        load_buffer buf = file::read_all("/proc/self/status");
+        AssertGreater(buf.size(), 0);
+        AssertTrue(strview(buf.data(), buf.size()).starts_with("Name:"));
+        AssertTrue(buf.data() && buf.data()[buf.size()] == '\0');
+    }
+#endif
+
+#if __linux__ && !RPP_ANDROID && !__EMSCRIPTEN__
+    // a FIFO reports size 0, so read_all() and read_text() must grow past the first chunk
+    TestCase(read_all_reads_a_fifo_longer_than_one_chunk)
+    {
+        Assert(create_folder(TestDir));
+        const std::string fifo = path_combine(TestDir, "fifo");
+        AssertThat(mkfifo(fifo.c_str(), 0600), 0);
+        const std::string payload(10000, 'x');
+        auto feed = [&] { return std::thread{[&] {
+            int fd = ::open(fifo.c_str(), O_WRONLY);
+            (void)!::write(fd, payload.data(), payload.size());
+            ::close(fd);
+        }}; };
+        std::thread writer = feed();
+        load_buffer buf = file::read_all(fifo);
+        writer.join();
+        AssertThat(std::string(buf.data(), size_t(buf.size())), payload);
+        writer = feed();
+        AssertThat(file::read_all_text(fifo), payload);
+        writer.join();
+    }
+#endif
+
 #if !__EMSCRIPTEN__ // the wasm module is not a file in the virtual file system
     // test_obfuscated_string scans this file for plaintext, so it must name a real executable
     TestCase(module_path_names_the_running_executable)

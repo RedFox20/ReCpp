@@ -258,18 +258,41 @@ namespace rpp /* ReCpp */
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
     #endif
     }
+    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF or to 512 MiB.
+    /// grow(n) returns n bytes which keep the bytes read, or null to stop
+    template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
+    {
+        int len = 0;
+        for (int capacity = 4096; capacity < (1 << 30); capacity *= 2)
+        {
+            char* buffer = grow(capacity);
+            if (!buffer) break;
+            for (int n; len < capacity && (n = input.read(buffer + len, capacity - len)) > 0;) len += n;
+            if (len < capacity) break; // EOF before the buffer filled
+        }
+        return len;
+    }
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (fileSize > 0)
+        if (fileSize <= 0)
         {
-            // allocate +1 bytes for null terminator; this is for legacy API-s
-            if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
-            {
-                int bytesRead = read(buffer, fileSize);
-                buffer[bytesRead] = '\0';
-                return load_buffer{ buffer, bytesRead };
-            }
+            char* buffer = nullptr;
+            auto grow = [&](int n) {
+                char* p = static_cast<char*>(realloc(buffer, size_t(n) + 1u)); // +1 keeps room for the null terminator
+                return p ? (buffer = p) : nullptr;
+            };
+            int len = read_until_eof(*this, grow);
+            if (len > 0) { buffer[len] = '\0'; return load_buffer{ buffer, len }; }
+            free(buffer);
+            return load_buffer{ nullptr, 0 };
+        }
+        // allocate +1 bytes for the null terminator, which legacy APIs expect
+        if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
+        {
+            int bytesRead = read(buffer, fileSize);
+            buffer[bytesRead] = '\0';
+            return load_buffer{ buffer, bytesRead };
         }
         return load_buffer{ nullptr, 0 };
     }
@@ -279,10 +302,10 @@ namespace rpp /* ReCpp */
         int pos   = tell();
         int count = size() - pos;
         try {
-            if (count <= 0) // a /proc file or a pipe reports size 0, so read to EOF
+            if (count <= 0)
             {
-                char buf[4096]; // a bigger chunk reads a pipe no faster, because the writer sets the pace
-                for (int n; (n = read(buf, sizeof(buf))) > 0;) out.append(buf, size_t(n));
+                int len = read_until_eof(*this, [&](int n) { out.resize(size_t(n)); return out.data(); });
+                out.resize(size_t(len));
                 return out;
             }
             out.resize(size_t(count));
