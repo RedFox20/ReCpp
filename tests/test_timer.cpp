@@ -2,7 +2,7 @@
 #include <rpp/debugging.h>
 #include <rpp/proc_utils.h>
 #include <rpp/tests.h>
-#include <ctime> // gmtime_r
+#include <ctime> // gmtime_r, gmtime_s
 #include <thread>
 #include <string>
 #include <vector>
@@ -441,25 +441,32 @@ TestImpl(test_timer)
         AssertThat(rpp::TimePoint(2024, 0, 1, 0, 0, 0, 0).duration, rpp::TimePoint(2023, 12, 1, 0, 0, 0, 0).duration);
     }
 
-#if !_MSC_VER
-    // the integer calendar must agree with gmtime_r() across leap days, centuries and the epoch
+    static bool gmtime_safe(const time_t& time, std::tm& time_tm) noexcept
+    {
+    #if _MSC_VER || __MINGW32__
+        return gmtime_s(&time_tm, &time) == 0; // the arguments are reversed
+    #else
+        return gmtime_r(&time, &time_tm) != nullptr;
+    #endif
+    }
+
+    // the integer calendar must agree with gmtime() across leap days, centuries and the epoch
     TestCase(timepoint_to_calendar_matches_gmtime)
     {
         for (rpp::int64 secs = -9'000'000'000LL; secs < 9'000'000'000LL; secs += 9'876'541LL)
         {
             const time_t t = time_t(secs);
             std::tm tm {};
-            if (rpp::int64(t) != secs || !gmtime_r(&t, &tm))
-                continue; // a narrow time_t has no reference for this date
+            if (rpp::int64(t) != secs || !gmtime_safe(t, tm))
+                continue; // a narrow time_t, or an MSVC date before 1970, has no reference
             rpp::CalendarTime expected { tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, 0 };
             rpp::CalendarTime cal = rpp::TimePoint{ rpp::seconds(secs) }.to_calendar();
             if (cal != expected)
-                AssertFailed("%lld s gives %d-%d-%d %d:%d:%d, gmtime_r gives %d-%d-%d %d:%d:%d", secs,
+                AssertFailed("%lld s gives %d-%d-%d %d:%d:%d, gmtime gives %d-%d-%d %d:%d:%d", secs,
                              cal.year, cal.month, cal.day, cal.hour, cal.minute, cal.second, expected.year,
                              expected.month, expected.day, expected.hour, expected.minute, expected.second);
         }
     }
-#endif
 
     TestCase(timepoint_to_calendar_matches_to_string)
     {
