@@ -164,28 +164,28 @@ namespace rpp /* ReCpp */
     ////////////////////////////////////////////////////////////////////////////////
 
     // one stat answers every query, so asking for all three times costs nothing extra
-    template<StringViewType T> static int64 size_of(T f) noexcept
+    template<StringViewType T> static int64 size_of(T filename) noexcept
     {
         int64 s;
-        return file_info(f, &s, nullptr, nullptr, nullptr) ? s : 0ll;
+        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
-    template<StringViewType T> static time_t time_of(T f, int which) noexcept
+    template<StringViewType T> static time_t time_of(T filename, int which) noexcept
     {
         time_t t[3]; // created, accessed, modified
-        return file_info(f, nullptr, &t[0], &t[1], &t[2]) ? t[which] : time_t(0);
+        return file_info(filename, nullptr, &t[0], &t[1], &t[2]) ? t[which] : time_t(0);
     }
 
-    int    file_size(strview f)     noexcept { return static_cast<int>(size_of(f)); }
-    int64  file_sizel(strview f)    noexcept { return size_of(f); }
-    time_t file_created(strview f)  noexcept { return time_of(f, 0); }
-    time_t file_accessed(strview f) noexcept { return time_of(f, 1); }
-    time_t file_modified(strview f) noexcept { return time_of(f, 2); }
+    int    file_size(strview filename)     noexcept { return static_cast<int>(size_of(filename)); }
+    int64  file_sizel(strview filename)    noexcept { return size_of(filename); }
+    time_t file_created(strview filename)  noexcept { return time_of(filename, 0); }
+    time_t file_accessed(strview filename) noexcept { return time_of(filename, 1); }
+    time_t file_modified(strview filename) noexcept { return time_of(filename, 2); }
 #if RPP_ENABLE_UNICODE
-    int    file_size(ustrview f)     noexcept { return static_cast<int>(size_of(f)); }
-    int64  file_sizel(ustrview f)    noexcept { return size_of(f); }
-    time_t file_created(ustrview f)  noexcept { return time_of(f, 0); }
-    time_t file_accessed(ustrview f) noexcept { return time_of(f, 1); }
-    time_t file_modified(ustrview f) noexcept { return time_of(f, 2); }
+    int    file_size(ustrview filename)     noexcept { return static_cast<int>(size_of(filename)); }
+    int64  file_sizel(ustrview filename)    noexcept { return size_of(filename); }
+    time_t file_created(ustrview filename)  noexcept { return time_of(filename, 0); }
+    time_t file_accessed(ustrview filename) noexcept { return time_of(filename, 1); }
+    time_t file_modified(ustrview filename) noexcept { return time_of(filename, 2); }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
