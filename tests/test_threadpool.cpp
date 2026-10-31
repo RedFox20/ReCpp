@@ -475,6 +475,20 @@ TestImpl(test_threadpool)
         AssertNotEqual(active, -1);
     }
 
+    // a cancelled task destroys its captures outside the worker lock, so a capture may still query the worker
+    TestCase(a_cancelled_task_destroys_its_captures_outside_the_lock)
+    {
+        for (int i = 0; i < 20; ++i)
+        {
+            rpp::pool_worker worker;
+            std::shared_ptr<int> probe { new int{0}, [&worker](int* p) { (void)worker.running(); delete p; } };
+            rpp::task_delegate<void()> task = [probe] {};
+            probe.reset(); // the task holds the last reference
+            AssertTrue(worker.run_generic(task, nullptr));
+            (void)worker.kill(0);
+        }
+    }
+
     // a range which a kill cancelled must not run when the next task brings the worker back
     TestCase(a_cancelled_range_never_runs_after_a_resurrection)
     {
