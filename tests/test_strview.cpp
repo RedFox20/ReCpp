@@ -368,6 +368,25 @@ TestImpl(test_strview)
     #endif
     }
 
+    TestCase(trim_substr_and_to_cstr_on_both_view_types)
+    {
+        AssertTrue(rpp::strview{"--ab--"}.trim_start('-') == "ab--");
+        AssertTrue(rpp::strview{"--ab--"}.trim_end('-') == "--ab");
+        AssertTrue(rpp::strview{"  ab  "}.trim_end() == "  ab");
+        AssertTrue(rpp::strview{"--ab--"}.substr(2, 2) == "ab");
+        char buf[4];
+        AssertTrue(rpp::strview{rpp::strview("abcdef", 5).to_cstr(buf, sizeof(buf))} == "abc");
+    #if RPP_ENABLE_UNICODE
+        AssertTrue(rpp::ustrview{u"--ab--"}.trim_start(u'-') == u"ab--");
+        AssertTrue(rpp::ustrview{u"--ab--"}.trim_end(u'-') == u"--ab");
+        AssertTrue(rpp::ustrview{u"  ab  "}.trim_start() == u"ab  ");
+        AssertTrue(rpp::ustrview{u"  ab  "}.trim_end() == u"  ab");
+        AssertTrue(rpp::ustrview{u"--ab--"}.substr(2, 2) == u"ab");
+        char16_t ubuf[4];
+        AssertTrue(rpp::ustrview{rpp::ustrview(u"abcdef", 5).to_cstr(ubuf, 4)} == u"abc");
+    #endif
+    }
+
     TestCase(string_compare_less)
     {
         AssertLess(rpp::strview{"aaaa"}, "bbbbbbbb");

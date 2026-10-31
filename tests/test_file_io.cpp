@@ -140,6 +140,23 @@ TestImpl(test_file_io)
         AssertThat(f.size() > 0, true);
         AssertThat(f.size(), TestFileSize);
         AssertThat(f.read_text(), TestFileContents);
+        AssertTrue(file_or_folder_exists(TestUnicodeFile));
+        AssertFalse(is_symlink(TestUnicodeFile));
+        AssertThat(file_created(TestUnicodeFile), file_created(TestFile));
+        AssertThat(file_accessed(TestUnicodeFile), file_accessed(TestFile));
+        AssertThat(file_modified(TestUnicodeFile), file_modified(TestFile));
+        const rpp::ustrview a = u"a/", b = u"/b/", c = u"c", d = u"/d/";
+        AssertThat(path_combine(a, b, c, d), u"a/b/c/d");
+    }
+
+    TestCase(path_combine_trims_slashes_between_four_parts)
+    {
+        AssertThat(path_combine("a/", "/b/", "c", "/d/"), "a/b/c/d");
+        AssertThat(path_combine("a", "", "c", ""), "a/c");
+        create_test_file(TestFile);
+        AssertTrue(file_or_folder_exists(TestFile));
+        AssertFalse(file_or_folder_exists(path_combine(TestDir, "missing")));
+        AssertFalse(is_symlink(TestFile));
     }
 #endif // RPP_ENABLE_UNICODE
 
