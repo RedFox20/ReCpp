@@ -755,37 +755,12 @@ namespace rpp
         bool wait_notify_for(lock_t& lock_guard, const rpp::Duration& timeout,
                              const rpp::AtomicTimeSource* time_source) const noexcept
         {
-            if (is_destroying()) {
-                rpp::yield(); // need to yield here to avoid burning a hole into the CPU
-                return false; // give up immediately
+            // both early outs skip the clock read, and wait_notify_until() gives up on a destroying queue
+            if (!is_destroying()) {
+                if (Head != Tail) return true; // wait is not needed
+                if (timeout <= rpp::Duration::zero()) return false; // a zero timeout does not enter the wait loop
             }
-            if (Head != Tail) return true; // wait is not needed
-            if (timeout <= rpp::Duration::zero()) {
-                // NOTE: this makes CI fail, because a yield() on a busy CI machine can take more than 1ms
-                //rpp::yield(); // need to yield here to avoid burning a hole into the CPU
-                return false; // zero timeout, don't enter wait loop
-            }
-            auto now = time_now(time_source);
-            auto end = now + timeout;
-            // When using a virtual time source, we must use real system time for
-            // the CV wait, and poll in short intervals so that time warping
-            // (fast-forward) causes the wait to exit promptly.
-            constexpr rpp::Duration warp_poll = rpp::millis(1);
-            do {
-                rpp::Duration remaining = end - now;
-                rpp::Duration real_wait;
-                if (time_source) real_wait = (remaining < warp_poll ? remaining : warp_poll);
-                else             real_wait = remaining;
-
-                // use wait_for(duration) instead of wait_until(absolute) to avoid
-                // NTP time jumps in the condition variable
-                (void)Waiter.wait_for(lock_guard, real_wait); // noexcept
-
-                if (is_destroying()) return false; // give up immediately
-                if (Head != Tail) return true; // got an item
-                now = time_now(time_source);
-            } while (now < end); // handle spurious wakeups
-            return false;
+            return wait_notify_until(lock_guard, time_now(time_source) + timeout, time_source);
         }
         // PRECONDITION: until.is_valid()
         bool wait_notify_until(lock_t& lock_guard, const rpp::TimePoint& until,

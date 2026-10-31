@@ -193,6 +193,10 @@ change before you judge it.
   read better than any prefix, and many files use them. Keep them, and match the
   file you edit. A new file prefers `snake_case` with a distinct name.
 - Name a type once. Do not add a second name for a thing which already has one.
+- A parameter keeps a descriptive name such as `filename`, never `f`. A namespace says what it holds, such as
+  `rpp::views`, never `detail`.
+- Do not fold explicit repeated code into a template helper which the compiler may not inline. Verbose and
+  explicit code beats an extra layer, as in the `binary_stream` byte writes.
 - `auto` only when the initializer already names the type.
 - Never wrap right after `=`. Keep `type name = expression` on one line.
 
@@ -378,6 +382,7 @@ proves it runs under ASAN and reports the rate, per R1.
 A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built library
 bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
 Report a missing bump, or a bump below that level, as blocking. An API break needs MINOR, not MAJOR.
+Report an ABI break as blocking when another open PR also breaks the ABI. Move both into one changeset.
 
 ### R15. A view never outlives its string
 

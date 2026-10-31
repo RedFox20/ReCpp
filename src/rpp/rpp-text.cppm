@@ -80,4 +80,8 @@ export namespace rpp::inline literals {
     using rpp::literals::operator""_sv;
     using rpp::literals::operator""_obfuscated;
 }
+
+export namespace rpp::views {
+    using rpp::views::next_token;
+}
 // GENERATED EXPORTS END

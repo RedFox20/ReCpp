@@ -7,40 +7,16 @@ namespace rpp /* ReCpp */
 {
     ////////////////////////////////////////////////////////////////////////////////
 
-    bool file_exists(strview filename) noexcept
-    {
-        return (read_file_flags(filename) & FF_FILE) != 0;
-    }
-    bool is_symlink(strview filename) noexcept
-    {
-        return (read_file_flags(filename) & FF_SYMLINK) != 0;
-    }
-    bool folder_exists(strview folder) noexcept
-    {
-        return (read_file_flags(folder) & FF_FOLDER) != 0;
-    }
-    bool file_or_folder_exists(strview fileOrFolder) noexcept
-    {
-        return (read_file_flags(fileOrFolder) & FF_FILE_OR_FOLDER) != 0;
-    }
+    bool file_exists(strview filename) noexcept { return (read_file_flags(filename) & FF_FILE) != 0; }
+    bool is_symlink(strview filename) noexcept { return (read_file_flags(filename) & FF_SYMLINK) != 0; }
+    bool folder_exists(strview folder) noexcept { return (read_file_flags(folder) & FF_FOLDER) != 0; }
+    bool file_or_folder_exists(strview path) noexcept { return (read_file_flags(path) & FF_FILE_OR_FOLDER) != 0; }
 
 #if RPP_ENABLE_UNICODE
-    bool file_exists(ustrview filename) noexcept
-    {
-        return (read_file_flags(filename) & FF_FILE) != 0;
-    }
-    bool is_symlink(ustrview filename) noexcept
-    {
-        return (read_file_flags(filename) & FF_SYMLINK) != 0;
-    }
-    bool folder_exists(ustrview folder) noexcept
-    {
-        return (read_file_flags(folder) & FF_FOLDER) != 0;
-    }
-    bool file_or_folder_exists(ustrview fileOrFolder) noexcept
-    {
-        return (read_file_flags(fileOrFolder) & FF_FILE_OR_FOLDER) != 0;
-    }
+    bool file_exists(ustrview filename) noexcept { return (read_file_flags(filename) & FF_FILE) != 0; }
+    bool is_symlink(ustrview filename) noexcept { return (read_file_flags(filename) & FF_SYMLINK) != 0; }
+    bool folder_exists(ustrview folder) noexcept { return (read_file_flags(folder) & FF_FOLDER) != 0; }
+    bool file_or_folder_exists(ustrview path) noexcept { return (read_file_flags(path) & FF_FILE_OR_FOLDER) != 0; }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -129,11 +105,11 @@ namespace rpp /* ReCpp */
     }
 #endif
 
-    bool file_info(strview filename, int64*  filesize, time_t* created,
-                                     time_t* accessed, time_t* modified) noexcept
+    template<StringViewType T>
+    static FINLINE bool file_info_of(T filename, int64* filesize, time_t* created, time_t* accessed, time_t* modified) noexcept
     {
         sys_min_fstats s;
-        if (sys_minstat<strview>(filename, &s)) {
+        if (sys_minstat<T>(filename, &s)) {
             if (filesize) *filesize = s.size;
             if (created)  *created  = s.ctime;
             if (accessed) *accessed = s.atime;
@@ -143,19 +119,14 @@ namespace rpp /* ReCpp */
         return false;
     }
 
-#if RPP_ENABLE_UNICODE
-    bool file_info(ustrview filename, int64*  filesize, time_t* created,
-                                      time_t* accessed, time_t* modified) noexcept
+    bool file_info(strview filename, int64* filesize, time_t* created, time_t* accessed, time_t* modified) noexcept
     {
-        sys_min_fstats s;
-        if (sys_minstat<ustrview>(filename, &s)) {
-            if (filesize) *filesize = s.size;
-            if (created)  *created  = s.ctime;
-            if (accessed) *accessed = s.atime;
-            if (modified) *modified = s.mtime;
-            return true;
-        }
-        return false;
+        return file_info_of(filename, filesize, created, accessed, modified);
+    }
+#if RPP_ENABLE_UNICODE
+    bool file_info(ustrview filename, int64* filesize, time_t* created, time_t* accessed, time_t* modified) noexcept
+    {
+        return file_info_of(filename, filesize, created, accessed, modified);
     }
 #endif // RPP_ENABLE_UNICODE
 
@@ -192,58 +163,29 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
-    int file_size(strview filename) noexcept
-    {
-        int64 s;
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
-    }
-    int64 file_sizel(strview filename) noexcept
+    // one stat answers every query, so asking for all three times costs nothing extra
+    template<StringViewType T> static FINLINE int64 size_of(T filename) noexcept
     {
         int64 s;
         return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
     }
-    time_t file_created(strview filename) noexcept
+    template<StringViewType T> static FINLINE time_t time_of(T filename, int which) noexcept
     {
-        time_t t;
-        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
-    }
-    time_t file_accessed(strview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
-    }
-    time_t file_modified(strview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
+        time_t t[3]; // created, accessed, modified
+        return file_info(filename, nullptr, &t[0], &t[1], &t[2]) ? t[which] : time_t(0);
     }
 
+    int    file_size(strview filename)     noexcept { return static_cast<int>(size_of(filename)); }
+    int64  file_sizel(strview filename)    noexcept { return size_of(filename); }
+    time_t file_created(strview filename)  noexcept { return time_of(filename, 0); }
+    time_t file_accessed(strview filename) noexcept { return time_of(filename, 1); }
+    time_t file_modified(strview filename) noexcept { return time_of(filename, 2); }
 #if RPP_ENABLE_UNICODE
-    int file_size(ustrview filename) noexcept
-    {
-        int64 s;
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? static_cast<int>(s) : 0;
-    }
-    int64 file_sizel(ustrview filename) noexcept
-    {
-        int64 s;
-        return file_info(filename, &s, nullptr, nullptr, nullptr) ? s : 0ll;
-    }
-    time_t file_created(ustrview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, &t, nullptr, nullptr) ? t : time_t(0);
-    }
-    time_t file_accessed(ustrview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, nullptr, &t, nullptr) ? t : time_t(0);
-    }
-    time_t file_modified(ustrview filename) noexcept
-    {
-        time_t t;
-        return file_info(filename, nullptr, nullptr, nullptr, &t) ? t : time_t(0);
-    }
+    int    file_size(ustrview filename)     noexcept { return static_cast<int>(size_of(filename)); }
+    int64  file_sizel(ustrview filename)    noexcept { return size_of(filename); }
+    time_t file_created(ustrview filename)  noexcept { return time_of(filename, 0); }
+    time_t file_accessed(ustrview filename) noexcept { return time_of(filename, 1); }
+    time_t file_modified(ustrview filename) noexcept { return time_of(filename, 2); }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -958,9 +900,14 @@ namespace rpp /* ReCpp */
 
     ////////////////////////////////////////////////////////////////////////////////
 
+    // trims the slashes between the parts, so each part joins with exactly one slash
     template<StringViewType T, size_t N>
-    static auto slash_combine(const std::array<T, N>& args) noexcept -> typename T::string_t
+    static auto slash_combine(std::array<T, N> args) noexcept -> typename T::string_t
     {
+        args[0].trim_end(constants<T>::slashes_a);
+        for (size_t i = 1; i < N; ++i)
+            args[i].trim(constants<T>::slashes_a);
+
         size_t res = args[0].size();
         for (size_t i = 1; i < N; ++i) {
             if (auto n = static_cast<size_t>(args[i].size())) {
@@ -985,46 +932,28 @@ namespace rpp /* ReCpp */
 
     string path_combine(strview path1, strview path2) noexcept
     {
-        path1.trim_end(constants<strview>::slashes_a);
-        path2.trim(constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 2>{{path1, path2}});
     }
     string path_combine(strview path1, strview path2, strview path3) noexcept
     {
-        path1.trim_end(constants<strview>::slashes_a);
-        path2.trim(constants<strview>::slashes_a);
-        path3.trim(constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 3>{{path1, path2, path3}});
     }
     string path_combine(strview path1, strview path2, strview path3, strview path4) noexcept
     {
-        path1.trim_end(constants<strview>::slashes_a);
-        path2.trim(constants<strview>::slashes_a);
-        path3.trim(constants<strview>::slashes_a);
-        path4.trim(constants<strview>::slashes_a);
         return slash_combine(std::array<strview, 4>{{path1, path2, path3, path4}});
     }
 
 #if RPP_ENABLE_UNICODE
     ustring path_combine(ustrview path1, ustrview path2) noexcept
     {
-        path1.trim_end(constants<ustrview>::slashes_a);
-        path2.trim(constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 2>{{ path1, path2 }});
     }
     ustring path_combine(ustrview path1, ustrview path2, ustrview path3) noexcept
     {
-        path1.trim_end(constants<ustrview>::slashes_a);
-        path2.trim(constants<ustrview>::slashes_a);
-        path3.trim(constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 3>{{ path1, path2, path3 }});
     }
     ustring path_combine(ustrview path1, ustrview path2, ustrview path3, ustrview path4) noexcept
     {
-        path1.trim_end(constants<ustrview>::slashes_a);
-        path2.trim(constants<ustrview>::slashes_a);
-        path3.trim(constants<ustrview>::slashes_a);
-        path4.trim(constants<ustrview>::slashes_a);
         return slash_combine(std::array<ustrview, 4>{{ path1, path2, path3, path4 }});
     }
 #endif
@@ -1187,47 +1116,22 @@ namespace rpp /* ReCpp */
     bool dir_iter_base::is_device()  const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
 #else
     dir_iter_base::operator bool() const noexcept { return s->d && s->e; }
-    bool dir_iter_base::is_dir() const noexcept
+    // the d_type of an entry as st_mode bits, or a stat() of it when the file system leaves d_type unknown
+    static FINLINE mode_t entry_mode(const dirent* e, const string& dirname) noexcept
     {
-        if (dirent* e = s->e) {
-            if (e->d_type) return e->d_type == DT_DIR;
-            struct stat st;
-            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-        }
-        return false;
+        if (!e) return 0;
+        if (e->d_type) return mode_t(e->d_type) << 12; // every POSIX libc defines DT_x as S_IFx >> 12
+        // the CV25 Yocto filesystem gives DT_UNKNOWN, and no filesystem in CI or the tests does
+        struct stat st;
+        return ::stat(path_combine(dirname, e->d_name).c_str(), &st) == 0 ? st.st_mode : 0;
     }
-    bool dir_iter_base::is_file() const noexcept
+    bool dir_iter_base::is_dir()     const noexcept { return S_ISDIR(entry_mode(s->e, s->dirname)); }
+    bool dir_iter_base::is_file()    const noexcept { return S_ISREG(entry_mode(s->e, s->dirname)); }
+    bool dir_iter_base::is_symlink() const noexcept { return S_ISLNK(entry_mode(s->e, s->dirname)); }
+    bool dir_iter_base::is_device()  const noexcept
     {
-        if (dirent* e = s->e) {
-            if (e->d_type) return e->d_type == DT_REG;
-            struct stat st;
-            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISREG(st.st_mode);
-        }
-        return false;
-    }
-    bool dir_iter_base::is_symlink() const noexcept
-    {
-        if (dirent* e = s->e) {
-            if (e->d_type) return e->d_type == DT_LNK;
-            struct stat st;
-            return ::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0 && S_ISLNK(st.st_mode);
-        }
-        return false;
-    }
-    bool dir_iter_base::is_device() const noexcept
-    {
-        if (dirent* e = s->e) {
-            if (e->d_type) {
-                int dt = e->d_type;
-                return dt == DT_BLK || dt == DT_CHR || dt == DT_FIFO || dt == DT_SOCK;
-            }
-            struct stat st;
-            if (::stat(path_combine(s->dirname, e->d_name).c_str(), &st) == 0) {
-                auto m = st.st_mode;
-                return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
-            }
-        }
-        return false;
+        const mode_t m = entry_mode(s->e, s->dirname);
+        return S_ISBLK(m) || S_ISCHR(m) || S_ISFIFO(m) || S_ISSOCK(m);
     }
 #endif
 

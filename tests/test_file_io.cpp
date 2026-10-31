@@ -18,6 +18,8 @@
     #include <unistd.h> // pipe, dup2
     #include <csignal> // sigaction
     #include <pthread.h> // pthread_kill
+    #include <sys/stat.h> // mkfifo
+    #include <utime.h> // utime
 #endif
 using namespace rpp;
 
@@ -118,6 +120,15 @@ TestImpl(test_file_io)
     }
 #endif
 
+    TestCase(seek_before_the_start_fails)
+    {
+        create_test_file(TestFile);
+        file f = { TestFile };
+        AssertThat(f.seek(-10, SEEK_SET), -1);
+        AssertThat(f.seekl(-10, SEEK_SET), int64(-1));
+        AssertThat(f.tell(), 0);
+    }
+
 #if RPP_ENABLE_UNICODE
     TestCase(basic_file_utf16)
     {
@@ -130,6 +141,23 @@ TestImpl(test_file_io)
         AssertThat(f.size() > 0, true);
         AssertThat(f.size(), TestFileSize);
         AssertThat(f.read_text(), TestFileContents);
+        AssertTrue(file_or_folder_exists(TestUnicodeFile));
+        AssertFalse(is_symlink(TestUnicodeFile));
+        AssertThat(file_created(TestUnicodeFile), file_created(TestFile));
+        AssertThat(file_accessed(TestUnicodeFile), file_accessed(TestFile));
+        AssertThat(file_modified(TestUnicodeFile), file_modified(TestFile));
+        const rpp::ustrview a = u"a/", b = u"/b/", c = u"c", d = u"/d/";
+        AssertThat(path_combine(a, b, c, d), u"a/b/c/d");
+    }
+
+    TestCase(path_combine_trims_slashes_between_four_parts)
+    {
+        AssertThat(path_combine("a/", "/b/", "c", "/d/"), "a/b/c/d");
+        AssertThat(path_combine("a", "", "c", ""), "a/c");
+        create_test_file(TestFile);
+        AssertTrue(file_or_folder_exists(TestFile));
+        AssertFalse(file_or_folder_exists(path_combine(TestDir, "missing")));
+        AssertFalse(is_symlink(TestFile));
     }
 #endif // RPP_ENABLE_UNICODE
 
@@ -265,6 +293,46 @@ TestImpl(test_file_io)
         Assert(folder_exists(dir));
         Assert(folder_exists(dir + u"/"));
         Assert(!folder_exists(u"/complete/rubbish/path"_sv));
+    }
+#endif
+
+    TestCase(file_times_select_created_accessed_and_modified)
+    {
+        create_test_file(TestFile);
+    #if !_MSC_VER // distinct atime and mtime catch a swapped selector
+        const utimbuf times { 1'000'000, 2'000'000 };
+        AssertThat(utime(TestFile.c_str(), &times), 0);
+    #endif
+        time_t created, accessed, modified;
+        Assert(file_info(TestFile, nullptr, &created, &accessed, &modified));
+        AssertThat(file_created(TestFile), created);
+        AssertThat(file_accessed(TestFile), accessed);
+        AssertThat(file_modified(TestFile), modified);
+    #if !_MSC_VER
+        AssertThat(accessed, time_t(1'000'000));
+        AssertThat(modified, time_t(2'000'000));
+    #endif
+        AssertThat(file_modified(path_combine(TestDir, "missing")), time_t(0));
+    }
+
+#if __linux__ && !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__
+    TestCase(dir_iterator_classifies_each_entry_type)
+    {
+        Assert(create_folder(TestDir));
+        create_test_file(path_combine(TestDir, "file"));
+        Assert(create_folder(path_combine(TestDir, "dir")));
+        AssertThat(symlink("file", path_combine(TestDir, "link").c_str()), 0);
+        AssertThat(mkfifo(path_combine(TestDir, "fifo").c_str(), 0600), 0);
+        int entries = 0;
+        for (auto e : dir_iterator{TestDir})
+        {
+            AssertThat(e.is_file(), e.name == "file");
+            AssertThat(e.is_dir(), e.name == "dir");
+            AssertThat(e.is_symlink(), e.name == "link");
+            AssertThat(e.is_device(), e.name == "fifo");
+            ++entries;
+        }
+        AssertThat(entries, 4);
     }
 #endif
 

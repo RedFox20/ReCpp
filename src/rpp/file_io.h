@@ -416,10 +416,10 @@ namespace rpp /* ReCpp */
          *
          * @param filepos Position in file where to seek to
          * @param seekmode Seekmode to use: SEEK_SET, SEEK_CUR or SEEK_END
-         * @return The new position in the file
+         * @return The new position in the file, or -1 when the seek fails
          */
         int seek(int filepos, int seekmode = SEEK_SET) noexcept;
-        uint64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
+        int64 seekl(int64 filepos, int seekmode = SEEK_SET) noexcept;
 
         /**
          * @return Current position in the file

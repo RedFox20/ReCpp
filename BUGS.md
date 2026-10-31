@@ -574,6 +574,9 @@ All 748 cases passed, and TSAN alone set exit code 66.
 Twelfth sighting on 3a5b434 in #163, on `ubuntu-cpp20-tsan-gcc13`, with the two lines above and the same creation stack.
 All 750 cases passed, and TSAN alone set exit code 66.
 
+Another sighting on 8779aa6 in #162, on `ubuntu-cpp20-tsan-clang18`, with the two lines above and the same creation stack.
+All 743 cases passed, and TSAN alone set exit code 66.
+
 Another sighting on e0021f4 in #161, on `ubuntu-cpp20-tsan-gcc13`.
 The free is at `thread_pool.cpp:354` and the read at `tests.cpp:733`, with the same creation stack.
 All 753 cases passed, and TSAN alone set exit code 66.

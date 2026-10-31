@@ -231,6 +231,25 @@ namespace rpp
         return static_cast<int>(std::char_traits<wchar_t>::length(u_str));
     }
 
+    namespace views
+    {
+        /// Splits the next token off `self` into `out`. With Trim, `self` also skips the delimiter
+        template<bool Trim, class View, class SearchFn> FINLINE bool next_token(View& self, View& out, SearchFn searchFn) noexcept
+        {
+            auto s = self.str, end = s + self.len;
+            if (s >= end)
+                return false; // no more tokens available
+            auto p = searchFn(s, int(end - s));
+            if (!p) p = end; // the last token runs to the end
+            out.str = s;
+            out.len = int(p - s);
+            if (Trim && p != end) ++p;
+            self.str = p;
+            self.len = int(end - p);
+            return true;
+        }
+    }
+
     /**
      * String token for efficient parsing.
      * Represents a 'weak' reference string with Start pointer and Length.
@@ -746,45 +765,11 @@ namespace rpp
         // don't forget to mark NOINLINE in the function where you call this...
         template<class SearchFn> NOINLINE bool _next_notrim(strview& out, SearchFn searchFn) noexcept
         {
-            auto s = str, end = s + len;
-            for (;;) { // using a loop to skip empty tokens
-                if (s >= end)       // out of bounds?
-                    return false;   // no more tokens available
-                if (const char* p = searchFn(s, int(end - s))) {
-                    out.str = s;    // writeout start/end
-                    out.len = int(p - s);
-                    str = p;        // stop on identified token
-                    len = int(end - p);
-                    return true;    // we got what we needed
-                }
-                out.str = s;        // writeout start/end
-                out.len = int(end - s);  // 
-                str = end;          // last token, set to end for debugging convenience
-                len = 0;
-                return true;
-            }
+            return views::next_token<false>(*this, out, searchFn);
         }
-
         template<class SearchFn> NOINLINE bool _next_trim(strview& out, SearchFn searchFn) noexcept
         {
-            auto s = str, end = s + len;
-            for (;;) { // using a loop to skip empty tokens
-                if (s >= end)       // out of bounds?
-                    return false;   // no more tokens available
-                if (const char* p = searchFn(s, int(end - s))) {
-                    out.str = s;    // writeout start/end
-                    out.len = int(p - s);
-                    str = p;        // stop on identified token
-                    len = int(end - p);
-                    if (len) { ++str; --len; }
-                    return true;    // we got what we needed
-                }
-                out.str = s;        // writeout start/end
-                out.len = int(end - s);  // 
-                str = end;          // last token, set to end for debugging convenience
-                len = 0;
-                return true;
-            }
+            return views::next_token<true>(*this, out, searchFn);
         }
 
         /**
@@ -1229,24 +1214,7 @@ namespace rpp
 
         template<class SearchFn> NOINLINE bool _next_trim(ustrview& out, SearchFn searchFn) noexcept
         {
-            auto s = str, end = s + len;
-            for (;;) { // using a loop to skip empty tokens
-                if (s >= end)       // out of bounds?
-                    return false;   // no more tokens available
-                if (const char16_t* p = searchFn(s, int(end - s))) {
-                    out.str = s;    // writeout start/end
-                    out.len = int(p - s);
-                    str = p;        // stop on identified token
-                    len = int(end - p);
-                    if (len) { ++str; --len; }
-                    return true;    // we got what we needed
-                }
-                out.str = s;        // writeout start/end
-                out.len = int(end - s);  // 
-                str = end;          // last token, set to end for debugging convenience
-                len = 0;
-                return true;
-            }
+            return views::next_token<true>(*this, out, searchFn);
         }
     };
 #endif // RPP_ENABLE_UNICODE

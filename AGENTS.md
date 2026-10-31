@@ -95,6 +95,9 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   merely to save typing. Use it when the initializer already makes the type plain.
 - **Never wrap immediately after `=`.** Keep `type name = expression` on one line
   and wrap inside the argument list.
+- **Prefer explicit code to a helper layer.** Do not fold repeated code into a template
+  helper which the compiler may not inline. Name a parameter `filename`, never `f`, and
+  name a namespace for what it holds, never `detail`. See `recpp-review` R6.
 - **Use the ReCpp timing and readiness API.** `future.await_ready()`, `rpp::yield()`,
   `rpp::Duration`, `rpp::TimePoint`, `rpp::millis()`. Never add `std::chrono` or a
   `std::this_thread` timing helper to source or tests.
@@ -130,6 +133,8 @@ Only a PATCH bump keeps the ABI.
 1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, a changed inline body, or a regenerated `.cppm` file.
 2. Bump MINOR when the ABI or the API changes: a class layout, an inline signature, a template, an ABI flag, or a removed symbol.
 3. Bump MAJOR only for a new major release, such as the C++20 modules refactor in 2.0.0.
+
+Put all pending ABI breaks into one changeset, so that one MINOR bump covers them. Each PR which breaks the ABI alone adds a MINOR bump and a rebuild of each dependent package.
 
 ## Reference
 
