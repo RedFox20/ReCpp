@@ -316,9 +316,8 @@ namespace rpp
                         killed = true;
                         range_task = {}; // a task accepted before the kill never runs, so clear it and wake its waiters
                         generic = std::move(generic_task);
-                        lock.unlock();
-                        generic.reset(); // its captures may lock this worker, as on the run path
-                        lock.lock();
+                        // its captures may lock this worker, and its unsignaled task keeps every submit out meanwhile
+                        if (generic) { lock.unlock(); generic.reset(); lock.lock(); }
                         current_task.signal_finish_and_cleanup();
                         return;
                     }

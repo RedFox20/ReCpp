@@ -746,7 +746,7 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 
 ### C39. A pool worker ran its task on the pool which the destructor freed (was B10)
 `~pool_worker()` called `kill(0)`, which waited 0 ms for a running task and then detached the thread.
-`kill(0)` now waits without a timeout, outside `TasksMutex`, and a task never waits for itself, which six `test_threadpool` cases pin.
+`kill(0)` now waits without a timeout, outside `TasksMutex`, and a task never waits for itself, which seven `test_threadpool` cases pin.
 
 ### C38. A pool worker freed a task exception after the waiter read it (was B17)
 The worker signaled from its catch block, so TSAN saw no order between the waiter read and the exception free.
