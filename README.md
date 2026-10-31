@@ -420,7 +420,7 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_HAS_EXCEPTIONS`](src/rpp/config.h#L403) | `1` if C++ exceptions are enabled. Auto-detected via `_CPPUNWIND` (MSVC), `__EXCEPTIONS`/`__cpp_exceptions` (GCC/Clang). Defaults to `1` on unknown compilers. Can be overridden manually. |
 | [`RPP_HAS_BUILTIN(x)`](src/rpp/config.h#L417) | `1` when the compiler offers the named builtin, and `0` where `__has_builtin` does not exist |
 | [`RPP_BUILTIN_MEMCPY(dst, src, size)`](src/rpp/config.h#L437) | Copies bytes through the compiler builtin, which needs no `<cstring>` |
-| [`RPP_BUILTIN_MEMCHR(ptr, ch, size)`](src/rpp/config.h#L431) | Finds a byte through the compiler builtin. MSVC has none, so a caller keeps a byte loop there |
+| [`RPP_BUILTIN_MEMCHR(ptr, ch, size)`](src/rpp/config.h#L431) | Finds a byte through the compiler builtin, or through `memchr` on MSVC |
 | [`RPP_BUILTIN_MEMMOVE(dst, src, size)`](src/rpp/config.h#L440) | Moves overlapping bytes through the compiler builtin, see `BUGS.md` C27 |
 | [`RPP_BUILTIN_MEMSET(dst, value, size)`](src/rpp/config.h#L443) | Fills bytes through the compiler builtin |
 | [`RPP_BUILTIN_MEMCMP(a, b, size)`](src/rpp/config.h#L446) | Compares bytes through the compiler builtin |

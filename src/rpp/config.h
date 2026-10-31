@@ -445,7 +445,9 @@ static_assert(RPP_WCHAR_IS_UTF32 == (sizeof(wchar_t) == 4),
 #  ifndef RPP_BUILTIN_MEMCMP
 #    define RPP_BUILTIN_MEMCMP(a, b, size)      memcmp(a, b, size)
 #  endif
-// no RPP_BUILTIN_MEMCHR here, because the MSVC CRT memchr is slow, so a caller keeps a byte loop
+#  ifndef RPP_BUILTIN_MEMCHR
+#    define RPP_BUILTIN_MEMCHR(ptr, ch, size)   memchr(ptr, ch, size)
+#  endif
 #endif
 
 // config.types.h holds the integer aliases and the size macros. The include stays

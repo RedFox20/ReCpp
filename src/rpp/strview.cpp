@@ -312,13 +312,8 @@ namespace rpp
     static int find_char(const char* str, int start, int end, char ch) noexcept
     {
         if (start >= end) return -1;
-    #ifdef RPP_BUILTIN_MEMCHR
         const char* p = static_cast<const char*>(RPP_BUILTIN_MEMCHR(str + start, ch, size_t(end - start)));
         return p ? int(p - str) : -1;
-    #else
-        for (int i = start; i < end; ++i) if (str[i] == ch) return i;
-        return -1;
-    #endif
     }
 
     int strview::indexof(char ch) const noexcept { return find_char(str, 0, len, ch); }
