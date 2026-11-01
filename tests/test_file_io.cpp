@@ -894,8 +894,8 @@ TestImpl(test_file_io)
         AssertLess(file::read_all_text(empty).capacity(), size_t(64));
     }
 
-#if __linux__ && !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
-    // a FIFO reports size 0, so read_all() and read_text() must grow past the first chunk
+#if !_WIN32 && !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
+    // a FIFO has no size, so read_all() and read_text() must grow past the first chunk
     TestCase(read_all_reads_a_fifo_longer_than_one_chunk)
     {
         Assert(create_folder(TestDir));

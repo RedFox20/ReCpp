@@ -307,7 +307,12 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (fileSize <= 0 || tell() < 0) // a /proc file reports size 0, and a pipe has no position
+    #if _MSC_VER // GetFileSize() on a named pipe gives only the buffered bytes, but tell() fails on it
+        bool to_eof = fileSize <= 0 || tell() < 0;
+    #else // a /proc file reports size 0, and a pipe fails the seek in size()
+        bool to_eof = fileSize <= 0;
+    #endif
+        if (to_eof)
         {
             char* buffer = nullptr;
             auto grow = [&](int n) -> char* {
