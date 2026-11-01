@@ -258,17 +258,22 @@ namespace rpp /* ReCpp */
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
     #endif
     }
-    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF or to 512 MiB.
+    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF or to max_capacity.
     /// grow(n) returns n bytes which keep the bytes read, or null to stop
     template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
     {
+        constexpr int max_capacity = 512 * 1024 * 1024;
         int len = 0;
-        for (int capacity = 4096; capacity < (1 << 30); capacity *= 2)
+        for (int capacity = 4096; capacity <= max_capacity; capacity *= 2)
         {
             char* buffer = grow(capacity);
             if (!buffer) break;
-            for (int n; len < capacity && (n = input.read(buffer + len, capacity - len)) > 0;) len += n;
-            if (len < capacity) break; // EOF before the buffer filled
+            while (len < capacity) // fill the buffer, then grow it
+            {
+                int bytes_read = input.read(buffer + len, capacity - len);
+                if (bytes_read <= 0) return len; // EOF or a read error
+                len += bytes_read;
+            }
         }
         return len;
     }
