@@ -880,7 +880,17 @@ TestImpl(test_file_io)
     }
 #endif
 
-#if __linux__ && !RPP_ANDROID && !__EMSCRIPTEN__
+    // an empty input takes the read-to-EOF path, which must not allocate before the first byte arrives
+    TestCase(reading_an_empty_file_allocates_nothing)
+    {
+        Assert(create_folder(TestDir));
+        const std::string empty = path_combine(TestDir, "empty.txt");
+        Assert(file::write_new(empty, "") == 0);
+        AssertTrue(file::read_all(empty).data() == nullptr);
+        AssertLess(file::read_all_text(empty).capacity(), size_t(64));
+    }
+
+#if __linux__ && !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
     // a FIFO reports size 0, so read_all() and read_text() must grow past the first chunk
     TestCase(read_all_reads_a_fifo_longer_than_one_chunk)
     {
