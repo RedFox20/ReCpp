@@ -533,11 +533,11 @@ while (text.next(line, '\n'))
 | [`to_int(str, len, end)`](src/rpp/strview.h#L123) | Fast locale-agnostic atoi |
 | [`to_inthx(str, len, end)`](src/rpp/strview.h#L144) | Fast locale-agnostic atoi for HEX strings |
 | [`_tostring(buffer, value)`](src/rpp/strview.h#L165) | Fast locale-agnostic itoa/ftoa for int, float, double |
-| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1499) | Replaces characters in a string buffer |
-| [`concat(a, b, ...)`](src/rpp/strview.h#L1367) | Concatenates multiple strviews into std::string |
-| [`to_lower(str, len)`](src/rpp/strview.h#L1479) | Converts string to lowercase |
-| [`to_upper(str, len)`](src/rpp/strview.h#L1484) | Converts string to uppercase |
-| [`operator""_sv`](src/rpp/strview.h#L1257) | String literal for creating `strview` |
+| [`replace(str, len, chOld, chNew)`](src/rpp/strview.h#L1513) | Replaces characters in a string buffer |
+| [`concat(a, b, ...)`](src/rpp/strview.h#L1372) | Concatenates multiple strviews into std::string |
+| [`to_lower(str, len)`](src/rpp/strview.h#L1493) | Converts string to lowercase |
+| [`to_upper(str, len)`](src/rpp/strview.h#L1498) | Converts string to uppercase |
+| [`operator""_sv`](src/rpp/strview.h#L1266) | String literal for creating `strview` |
 | [`strcontains(str, len, ch)`](src/rpp/strview.h#L78) | Checks if character is found within a string |
 | [`strcontainsi(str, len, ch)`](src/rpp/strview.h#L79) | Case-insensitive character search |
 | [`strequals(s1, s2, len)`](src/rpp/strview.h#L85) | Case-sensitive string equality for given length |
@@ -551,9 +551,9 @@ while (text.next(line, '\n'))
 
 | Class | Description |
 |-------|-------------|
-| [`line_parser`](src/rpp/strview.h#L1516) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
-| [`keyval_parser`](src/rpp/strview.h#L1554) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
-| [`bracket_parser`](src/rpp/strview.h#L1603) | Parses a buffer for balanced-parentheses structures |
+| [`line_parser`](src/rpp/strview.h#L1530) | Parses an input buffer for individual lines, returned trimmed of `\r` or `\n` |
+| [`keyval_parser`](src/rpp/strview.h#L1568) | Parses a buffer for `Key=Value` pairs, returned one by one with `read_next` |
+| [`bracket_parser`](src/rpp/strview.h#L1617) | Parses a buffer for balanced-parentheses structures |
 
 ### strview Class
 
@@ -576,45 +576,45 @@ while (text.next(line, '\n'))
 | [`trim_end()`](src/rpp/strview.h#L393) | Trims whitespace (or given char/chars) from the end |
 | [`trim()`](src/rpp/strview.h#L409) | Trims both start and end |
 | [`chomp_first()`](src/rpp/strview.h#L420) | Consumes the first character if possible |
-| [`chomp_last()`](src/rpp/strview.h#L422) | Consumes the last character if possible |
-| [`pop_front()`](src/rpp/strview.h#L425) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L427) | Pops and returns the last character |
-| [`contains(char c)`](src/rpp/strview.h#L454) | True if contains a char or substring |
-| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L464) | True if contains any of the given chars |
-| [`find(char c)`](src/rpp/strview.h#L472) | Pointer to start of substring if found, NULL otherwise |
-| [`rfind(char c)`](src/rpp/strview.h#L502) | Reverse search for a character |
-| [`findany(const char* chars, int n)`](src/rpp/strview.h#L508) | Forward search for any of the specified chars |
-| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L517) | Reverse search for any of the specified chars |
-| [`count(char ch)`](src/rpp/strview.h#L526) | Count occurrences of a character |
-| [`indexof(char ch)`](src/rpp/strview.h#L529) | Index of character, or -1 |
-| [`rindexof(char ch)`](src/rpp/strview.h#L534) | Reverse iterating index of character |
-| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L537) | First index of any matching char |
-| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L543) | True if starts with the string |
-| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L554) | Case-insensitive starts_with |
-| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L565) | True if ends with the string |
-| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L576) | Case-insensitive ends_with |
-| [`equals(const char* s, int len)`](src/rpp/strview.h#L587) | Exact equality |
-| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L593) | Case-insensitive equality |
-| [`compare(const char* s, int n)`](src/rpp/strview.h#L614) | Compare to another string |
-| [`split_first(char delim)`](src/rpp/strview.h#L636) | Split into two, return the first part |
-| [`split_second(char delim)`](src/rpp/strview.h#L652) | Split into two, return the second part |
-| [`next(strview& out, char delim)`](src/rpp/strview.h#L660) | Gets the next token and moves the view past the delimiter |
-| [`next(char delim)`](src/rpp/strview.h#L683) | Returns next token directly |
-| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L727) | Gets the next token without trimming, and stops on the delimiter |
-| [`substr(int index, int length)`](src/rpp/strview.h#L824) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L830) | Creates a substring from index to end |
-| [`next_double()`](src/rpp/strview.h#L838) | Parses next double from current position |
-| [`next_float()`](src/rpp/strview.h#L838) | Parses next float from current position |
-| [`next_int()`](src/rpp/strview.h#L844) | Parses next int from current position |
-| [`skip(int nchars)`](src/rpp/strview.h#L855) | Safely skips N characters |
-| [`skip_until(char ch)`](src/rpp/strview.h#L861) | Skips until the specified char is found |
-| [`skip_after(char ch)`](src/rpp/strview.h#L885) | Skips past the specified char |
-| [`to_lower()`](src/rpp/strview.h#L909) | Modifies the referenced string to lowercase |
-| [`as_lower()`](src/rpp/strview.h#L914) | Returns a lowercase copy as std::string |
-| [`to_upper()`](src/rpp/strview.h#L925) | Modifies the referenced string to uppercase |
-| [`as_upper()`](src/rpp/strview.h#L930) | Returns an uppercase copy as std::string |
-| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L944) | Replaces all occurrences of chOld with chNew |
-| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L806) | Decomposes strview into multiple typed outputs |
+| [`chomp_last()`](src/rpp/strview.h#L429) | Consumes the last character if possible |
+| [`pop_front()`](src/rpp/strview.h#L432) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L434) | Pops and returns the last character |
+| [`contains(char c)`](src/rpp/strview.h#L461) | True if contains a char or substring |
+| [`contains_any(const char* chars, int nchars)`](src/rpp/strview.h#L471) | True if contains any of the given chars |
+| [`find(char c)`](src/rpp/strview.h#L479) | Pointer to start of substring if found, NULL otherwise |
+| [`rfind(char c)`](src/rpp/strview.h#L509) | Reverse search for a character |
+| [`findany(const char* chars, int n)`](src/rpp/strview.h#L515) | Forward search for any of the specified chars |
+| [`rfindany(const char* chars, int n)`](src/rpp/strview.h#L524) | Reverse search for any of the specified chars |
+| [`count(char ch)`](src/rpp/strview.h#L533) | Count occurrences of a character |
+| [`indexof(char ch)`](src/rpp/strview.h#L536) | Index of character, or -1 |
+| [`rindexof(char ch)`](src/rpp/strview.h#L541) | Reverse iterating index of character |
+| [`indexofany(const char* chars, int n)`](src/rpp/strview.h#L544) | First index of any matching char |
+| [`starts_with(const char* s, int len)`](src/rpp/strview.h#L550) | True if starts with the string |
+| [`starts_withi(const char* s, int len)`](src/rpp/strview.h#L561) | Case-insensitive starts_with |
+| [`ends_with(const char* s, int slen)`](src/rpp/strview.h#L572) | True if ends with the string |
+| [`ends_withi(const char* s, int slen)`](src/rpp/strview.h#L583) | Case-insensitive ends_with |
+| [`equals(const char* s, int len)`](src/rpp/strview.h#L594) | Exact equality |
+| [`equalsi(const char* s, int len)`](src/rpp/strview.h#L600) | Case-insensitive equality |
+| [`compare(const char* s, int n)`](src/rpp/strview.h#L621) | Compare to another string |
+| [`split_first(char delim)`](src/rpp/strview.h#L643) | Split into two, return the first part |
+| [`split_second(char delim)`](src/rpp/strview.h#L659) | Split into two, return the second part |
+| [`next(strview& out, char delim)`](src/rpp/strview.h#L667) | Gets the next token and moves the view past the delimiter |
+| [`next(char delim)`](src/rpp/strview.h#L690) | Returns next token directly |
+| [`next_notrim(strview& out, char delim)`](src/rpp/strview.h#L734) | Gets the next token without trimming, and stops on the delimiter |
+| [`substr(int index, int length)`](src/rpp/strview.h#L831) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L831) | Creates a substring from index to end |
+| [`next_double()`](src/rpp/strview.h#L844) | Parses next double from current position |
+| [`next_float()`](src/rpp/strview.h#L845) | Parses next float from current position |
+| [`next_int()`](src/rpp/strview.h#L851) | Parses next int from current position |
+| [`skip(int nchars)`](src/rpp/strview.h#L862) | Safely skips N characters |
+| [`skip_until(char ch)`](src/rpp/strview.h#L868) | Skips until the specified char is found |
+| [`skip_after(char ch)`](src/rpp/strview.h#L892) | Skips past the specified char |
+| [`to_lower()`](src/rpp/strview.h#L916) | Modifies the referenced string to lowercase |
+| [`as_lower()`](src/rpp/strview.h#L921) | Returns a lowercase copy as std::string |
+| [`to_upper()`](src/rpp/strview.h#L932) | Modifies the referenced string to uppercase |
+| [`as_upper()`](src/rpp/strview.h#L937) | Returns an uppercase copy as std::string |
+| [`replace(char chOld, char chNew)`](src/rpp/strview.h#L951) | Replaces all occurrences of chOld with chNew |
+| [`decompose(delim, T& outFirst, Rest&... rest)`](src/rpp/strview.h#L813) | Decomposes strview into multiple typed outputs |
 
 ### Example: Splitting Paths and URLs
 
@@ -767,37 +767,37 @@ if (a < b) // true — lexicographic ordering via compare()
 
 ### ustrview Class
 
-[`struct ustrview`](src/rpp/strview.h#L955) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
+[`struct ustrview`](src/rpp/strview.h#L962) — UTF-16 (`char16_t`) counterpart of `strview`. Requires `RPP_ENABLE_UNICODE=1` to be defined before including the header. Provides the same non-owning, non-null-terminated string view semantics as `strview`, but operates on `char16_t` data. Implicitly converts from `std::u16string` and `std::u16string_view`. On MSVC, also accepts `const wchar_t*`.
 
 | Method | Description |
 |--------|-------------|
-| [`size()`](src/rpp/strview.h#L988) | Returns the length |
-| [`empty()`](src/rpp/strview.h#L990) | True if empty |
-| [`clear()`](src/rpp/strview.h#L985) | Clears the ustrview |
-| [`is_nullterm()`](src/rpp/strview.h#L1008) | True if the referenced string is null-terminated |
-| [`trim_start()`](src/rpp/strview.h#L1030) | Trims whitespace (or given char/chars) from the start |
+| [`size()`](src/rpp/strview.h#L995) | Returns the length |
+| [`empty()`](src/rpp/strview.h#L997) | True if empty |
+| [`clear()`](src/rpp/strview.h#L992) | Clears the ustrview |
+| [`is_nullterm()`](src/rpp/strview.h#L1015) | True if the referenced string is null-terminated |
+| [`trim_start()`](src/rpp/strview.h#L1033) | Trims whitespace (or given char/chars) from the start |
 | [`trim_end()`](src/rpp/strview.h#L1030) | Trims whitespace (or given char/chars) from the end |
-| [`trim()`](src/rpp/strview.h#L1030) | Trims both start and end |
-| [`chomp_first()`](src/rpp/strview.h#L1043) | Consumes the first character |
+| [`trim()`](src/rpp/strview.h#L1033) | Trims both start and end |
+| [`chomp_first()`](src/rpp/strview.h#L1040) | Consumes the first character |
 | [`chomp_last()`](src/rpp/strview.h#L1049) | Consumes the last character |
-| [`pop_front()`](src/rpp/strview.h#L1038) | Pops and returns the first character |
-| [`pop_back()`](src/rpp/strview.h#L1040) | Pops and returns the last character |
-| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1065) | True if starts with the string |
-| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1076) | Case-insensitive starts_with |
-| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1087) | True if ends with the string |
-| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1098) | Case-insensitive ends_with |
-| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1108) | Exact equality |
+| [`pop_front()`](src/rpp/strview.h#L1052) | Pops and returns the first character |
+| [`pop_back()`](src/rpp/strview.h#L1054) | Pops and returns the last character |
+| [`starts_with(const char16_t* s, int length)`](src/rpp/strview.h#L1079) | True if starts with the string |
+| [`starts_withi(const char16_t* s, int length)`](src/rpp/strview.h#L1090) | Case-insensitive starts_with |
+| [`ends_with(const char16_t* s, int slen)`](src/rpp/strview.h#L1101) | True if ends with the string |
+| [`ends_withi(const char16_t* s, int slen)`](src/rpp/strview.h#L1112) | Case-insensitive ends_with |
+| [`equals(const char16_t* s, int length)`](src/rpp/strview.h#L1122) | Exact equality |
 | [`compare(const char16_t* s, int n)`](src/rpp/strview.h#L1140) | Compare to another string |
-| [`rfind(char16_t c)`](src/rpp/strview.h#L1144) | Reverse search for a character |
-| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1150) | Forward search for any of the specified chars |
-| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1159) | Reverse search for any of the specified chars |
-| [`substr(int index, int length)`](src/rpp/strview.h#L1168) | Creates a substring from index with given length |
-| [`substr(int index)`](src/rpp/strview.h#L1174) | Creates a substring from index to end |
-| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1182) | Gets the next token and moves the view past the delimiter |
-| [`next(char16_t delim)`](src/rpp/strview.h#L1205) | Returns next token directly |
-| [`to_string()`](src/rpp/strview.h#L978) | Convert to `std::u16string` |
-| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1059) | Copy to null-terminated C-string buffer |
-| [`to_string(const wchar_t* wstr, int wstrlen)`](src/rpp/strview.h#L1443) | Converts a UTF-16 wide string to UTF-8, Windows only |
+| [`rfind(char16_t c)`](src/rpp/strview.h#L1158) | Reverse search for a character |
+| [`findany(const char16_t* chars, int n)`](src/rpp/strview.h#L1164) | Forward search for any of the specified chars |
+| [`rfindany(const char16_t* chars, int n)`](src/rpp/strview.h#L1173) | Reverse search for any of the specified chars |
+| [`substr(int index, int length)`](src/rpp/strview.h#L1182) | Creates a substring from index with given length |
+| [`substr(int index)`](src/rpp/strview.h#L1182) | Creates a substring from index to end |
+| [`next(ustrview& out, char16_t delim)`](src/rpp/strview.h#L1196) | Gets the next token and moves the view past the delimiter |
+| [`next(char16_t delim)`](src/rpp/strview.h#L1219) | Returns next token directly |
+| [`to_string()`](src/rpp/strview.h#L985) | Convert to `std::u16string` |
+| [`to_cstr(char16_t* buf, int max)`](src/rpp/strview.h#L1073) | Copy to null-terminated C-string buffer |
+| [`to_string(const wchar_t* wstr, int wstrlen)`](src/rpp/strview.h#L1457) | Converts a UTF-16 wide string to UTF-8, Windows only |
 
 ```cpp
 #define RPP_ENABLE_UNICODE 1

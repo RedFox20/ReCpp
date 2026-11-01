@@ -420,9 +420,16 @@ TestImpl(test_threadpool)
         std::thread releaser;
         {
             rpp::thread_pool pool { 1 };
-            (void)pool.parallel_task([&] { started.notify(); release.wait(); finished = true; });
+            (void)pool.parallel_task([&] {
+                started.notify();
+                release.wait();
+                finished = true;
+            });
             started.wait();
-            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+            releaser = std::thread{[&] {
+                rpp::sleep_ms(5);
+                release.notify();
+            }};
         } // the destructor starts before the releaser wakes
         AssertTrue(finished);
         releaser.join();
@@ -467,9 +474,16 @@ TestImpl(test_threadpool)
         int active = -1;
         {
             rpp::thread_pool pool { 1 };
-            (void)pool.parallel_task([&] { started.notify(); release.wait(); active = pool.active_tasks(); });
+            (void)pool.parallel_task([&] {
+                started.notify();
+                release.wait();
+                active = pool.active_tasks();
+            });
             started.wait();
-            releaser = std::thread{[&] { rpp::sleep_ms(5); release.notify(); }};
+            releaser = std::thread{[&] {
+                rpp::sleep_ms(5);
+                release.notify();
+            }};
         } // the destructor starts before the releaser wakes
         releaser.join();
         AssertNotEqual(active, -1);
@@ -481,7 +495,11 @@ TestImpl(test_threadpool)
         for (int i = 0; i < 20; ++i)
         {
             rpp::pool_worker worker;
-            std::shared_ptr<int> probe { new int{0}, [&worker](int* p) { (void)worker.running(); delete p; } };
+            auto query_worker_then_delete = [&worker](int* p) {
+                (void)worker.running();
+                delete p;
+            };
+            std::shared_ptr<int> probe { new int{0}, query_worker_then_delete };
             rpp::task_delegate<void()> task = [probe] {};
             probe.reset(); // the task holds the last reference
             AssertTrue(worker.run_generic(task, nullptr));

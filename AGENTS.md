@@ -93,6 +93,8 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
 
 - **Prefer an explicit type when the type is not obvious.** Do not reach for `auto`
   merely to save typing. Use it when the initializer already makes the type plain.
+- **One statement per line.** Never fold a block such as `if (x) { a(); return b; }` onto one
+  line. A lambda with two statements or more spans several lines. See `recpp-review` R7.
 - **Never wrap immediately after `=`.** Keep `type name = expression` on one line
   and wrap inside the argument list.
 - **Prefer explicit code to a helper layer.** Do not fold repeated code into a template

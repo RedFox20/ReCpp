@@ -288,9 +288,13 @@ namespace rpp /* ReCpp */
                 return p ? (buffer = p) : nullptr;
             };
             int len = read_until_eof(*this, grow);
-            if (len > 0) { buffer[len] = '\0'; return load_buffer{ buffer, len }; }
-            free(buffer);
-            return load_buffer{ nullptr, 0 };
+            if (len <= 0)
+            {
+                free(buffer);
+                return load_buffer{ nullptr, 0 };
+            }
+            buffer[len] = '\0';
+            return load_buffer{ buffer, len };
         }
         // allocate +1 bytes for the null terminator, which legacy APIs expect
         if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
@@ -309,7 +313,11 @@ namespace rpp /* ReCpp */
         try {
             if (count <= 0)
             {
-                int len = read_until_eof(*this, [&](int n) { out.resize(size_t(n)); return out.data(); });
+                auto grow = [&](int n) {
+                    out.resize(size_t(n));
+                    return out.data();
+                };
+                int len = read_until_eof(*this, grow);
                 out.resize(size_t(len));
                 return out;
             }

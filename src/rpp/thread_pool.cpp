@@ -238,8 +238,8 @@ namespace rpp
             return join_or_detach(wait_result::finished);
         }
         // a task cannot kill its own runner, because a later submit would join that runner under its lock
-        bool self = std::this_thread::get_id() == th.get_id();
-        if (self && !destroying) return wait_result::timeout;
+        if (!destroying && std::this_thread::get_id() == th.get_id())
+            return wait_result::timeout;
 
         // Take a strong ref to current_task while holding the lock,
         // so we can safely wait on it after releasing the lock
@@ -251,7 +251,9 @@ namespace rpp
             task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
-        if (self) return join_or_detach(wait_result::timeout); // exit() on this thread destroys the worker, so detach
+        // exit() on the runner thread destroys the worker, so detach
+        if (destroying && std::this_thread::get_id() == th.get_id())
+            return join_or_detach(wait_result::timeout);
         // 0 waits without a timeout, because a detached runner would outlive this worker, see BUGS.md C39
         if (timeoutMillis <= 0) return join_or_detach(task_to_wait.wait(std::nothrow));
         wait_result result = task_to_wait.wait(rpp::millis(timeoutMillis), std::nothrow);
@@ -317,7 +319,12 @@ namespace rpp
                         range_task = {}; // a task accepted before the kill never runs, so clear it and wake its waiters
                         generic = std::move(generic_task);
                         // its captures may lock this worker, and its unsignaled task keeps every submit out meanwhile
-                        if (generic) { lock.unlock(); generic.reset(); lock.lock(); }
+                        if (generic)
+                        {
+                            lock.unlock();
+                            generic.reset();
+                            lock.lock();
+                        }
                         current_task.signal_finish_and_cleanup();
                         return;
                     }

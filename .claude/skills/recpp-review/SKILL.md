@@ -206,6 +206,8 @@ Scrolling is the bottleneck. The column limit is 130.
 
 - One statement per line, but no padding. Keep a single blank line between
   functions, and none after an opening brace.
+- Never fold a block of statements onto one line, as in `if (x) { a(); return b; }`.
+  A lambda with two statements or more spans several lines. Report a folded block as WARN.
 - A single statement `if` needs no braces. `readability-braces-around-statements`
   is off on purpose.
 - Do not put one argument per line when the call fits on one line.
