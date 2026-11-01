@@ -14,6 +14,13 @@
 #include <fcntl.h> // fcntl, FD_CLOEXEC, _O_TEXT
 #if _MSC_VER
     #include <io.h> // _pipe, dup2
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN 1
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX 1
+    #endif
+    #include <windows.h> // CreateNamedPipeA
 #else
     #include <unistd.h> // pipe, dup2
     #include <csignal> // sigaction
@@ -892,6 +899,33 @@ TestImpl(test_file_io)
         AssertThat(std::string(buf.data(), size_t(buf.size())), payload);
         writer = feed();
         AssertThat(file::read_all_text(fifo), payload);
+        writer.join();
+    }
+#endif
+
+#if _MSC_VER
+    // a named pipe has no position, so read_all() and read_text() must read it to EOF past the first chunk
+    TestCase(read_all_reads_a_named_pipe_longer_than_one_chunk)
+    {
+        const char* pipe_name = "\\\\.\\pipe\\rpp_read_all_test";
+        const std::string payload(10000, 'x');
+        auto feed = [&] {
+            HANDLE pipe = CreateNamedPipeA(pipe_name, PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 65536, 65536, 0, nullptr);
+            AssertNotEqual(pipe, INVALID_HANDLE_VALUE);
+            return std::thread{[&payload, pipe] {
+                (void)ConnectNamedPipe(pipe, nullptr); // false with ERROR_PIPE_CONNECTED when the reader came first
+                DWORD written = 0;
+                (void)WriteFile(pipe, payload.data(), DWORD(payload.size()), &written, nullptr);
+                (void)FlushFileBuffers(pipe); // returns after the reader took every byte
+                CloseHandle(pipe);
+            }};
+        };
+        std::thread writer = feed();
+        load_buffer buf = file::read_all(pipe_name);
+        writer.join();
+        AssertThat(std::string(buf.data(), size_t(buf.size())), payload);
+        writer = feed();
+        AssertThat(file::read_all_text(pipe_name), payload);
         writer.join();
     }
 #endif

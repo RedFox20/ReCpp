@@ -127,7 +127,10 @@ namespace rpp
             auto lock = new_task_flag.spin_lock();
             destroying = true;
         }
-        kill(0/*0=no timeout*/);
+        if (std::this_thread::get_id() == th.get_id()) // exit() on the runner thread, which cannot wait for itself
+            th.detach();
+        else
+            kill(0/*0=no timeout*/);
     }
 
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
@@ -234,12 +237,12 @@ namespace rpp
 
     wait_result pool_worker::kill(int timeoutMillis) noexcept
     {
+        // a task cannot kill its own runner, which would wait for itself or detach under the destructor
+        if (std::this_thread::get_id() == th.get_id())
+            return wait_result::timeout;
         if (killed) {
             return join_or_detach(wait_result::finished);
         }
-        // a task cannot kill its own runner, because a later submit would join that runner under its lock
-        if (!destroying && std::this_thread::get_id() == th.get_id())
-            return wait_result::timeout;
 
         // Take a strong ref to current_task while holding the lock,
         // so we can safely wait on it after releasing the lock
@@ -251,9 +254,6 @@ namespace rpp
             task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
-        // exit() on the runner thread destroys the worker, so detach
-        if (destroying && std::this_thread::get_id() == th.get_id())
-            return join_or_detach(wait_result::timeout);
         // 0 waits without a timeout, because a detached runner would outlive this worker, see BUGS.md C39
         if (timeoutMillis <= 0) return join_or_detach(task_to_wait.wait(std::nothrow));
         wait_result result = task_to_wait.wait(rpp::millis(timeoutMillis), std::nothrow);
@@ -321,9 +321,8 @@ namespace rpp
                         // its captures may lock this worker, and its unsignaled task keeps every submit out meanwhile
                         if (generic)
                         {
-                            lock.unlock();
+                            rpp::unlock_guard unlocked { lock };
                             generic.reset();
-                            lock.lock();
                         }
                         current_task.signal_finish_and_cleanup();
                         return;
@@ -451,6 +450,7 @@ namespace rpp
             std::lock_guard lock{TasksMutex};
             workers.swap(Workers);
         }
+        workers.clear();
     }
     
     void thread_pool::set_max_parallelism(int max_parallelism) noexcept

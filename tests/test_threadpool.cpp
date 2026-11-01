@@ -466,6 +466,29 @@ TestImpl(test_threadpool)
         }
     }
 
+    // a task which calls kill() while the destructor waits for it must not detach its runner
+    TestCase(kill_from_a_task_during_the_destructor_keeps_the_runner)
+    {
+        rpp::semaphore_once_flag started, release;
+        rpp::wait_result result = rpp::wait_result::finished;
+        std::thread releaser;
+        auto worker = std::make_unique<rpp::pool_worker>();
+        rpp::task_delegate<void()> task = [&, w = worker.get()] {
+            started.notify();
+            release.wait();
+            result = w->kill(0); // finished means it detached its own runner
+        };
+        AssertTrue(worker->run_generic(task, nullptr));
+        started.wait();
+        releaser = std::thread{[&] {
+            rpp::sleep_ms(5);
+            release.notify();
+        }};
+        worker.reset(); // the destructor starts before the releaser wakes
+        releaser.join();
+        AssertThat(result, rpp::wait_result::timeout);
+    }
+
     // a task may still query its pool while the destructor waits for that task
     TestCase(a_task_can_query_its_pool_during_the_destructor)
     {

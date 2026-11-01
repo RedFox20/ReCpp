@@ -258,8 +258,8 @@ namespace rpp /* ReCpp */
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
     #endif
     }
-    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF or to max_capacity.
-    /// grow(n) returns n bytes which keep the bytes read, or null to stop
+    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF. grow(n) returns n bytes which keep
+    /// the bytes read, or null. @returns -1 when grow fails or the input outgrows max_capacity, so nothing is cut off
     template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
     {
         constexpr int max_capacity = 512 * 1024 * 1024;
@@ -267,20 +267,26 @@ namespace rpp /* ReCpp */
         for (int capacity = 4096; capacity <= max_capacity; capacity *= 2)
         {
             char* buffer = grow(capacity);
-            if (!buffer) break;
+            if (!buffer)
+                return -1;
             while (len < capacity) // fill the buffer, then grow it
             {
                 int bytes_read = input.read(buffer + len, capacity - len);
-                if (bytes_read <= 0) return len; // EOF or a read error
+                if (bytes_read <= 0) // EOF or a read error
+                    return len;
                 len += bytes_read;
             }
         }
-        return len;
+        char probe;
+        if (input.read(&probe, 1) <= 0) // the input ended exactly at max_capacity
+            return len;
+        LogError("file::read_until_eof input is larger than %d bytes", max_capacity);
+        return -1;
     }
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (fileSize <= 0)
+        if (fileSize <= 0 || tell() < 0) // a /proc file reports size 0, and a pipe has no position
         {
             char* buffer = nullptr;
             auto grow = [&](int n) {
@@ -311,13 +317,15 @@ namespace rpp /* ReCpp */
         int pos   = tell();
         int count = size() - pos;
         try {
-            if (count <= 0)
+            if (count <= 0 || pos < 0) // a /proc file reports size 0, and a pipe has no position
             {
                 auto grow = [&](int n) {
                     out.resize(size_t(n));
                     return out.data();
                 };
                 int len = read_until_eof(*this, grow);
+                if (len < 0)
+                    return {};
                 out.resize(size_t(len));
                 return out;
             }
