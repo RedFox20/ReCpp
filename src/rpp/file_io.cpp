@@ -286,8 +286,8 @@ namespace rpp /* ReCpp */
         RPP_BUILTIN_MEMCPY(buffer, first, size_t(len));
         while (full)
         {
-            char probe;
-            if (input.read(&probe, 1) <= 0) // an input which ends at the capacity takes no larger buffer
+            int extra = input.read(first, int(sizeof(first))); // an input which ends at the capacity takes no larger buffer
+            if (extra <= 0)
                 return len;
             if (capacity == max_capacity)
             {
@@ -298,8 +298,8 @@ namespace rpp /* ReCpp */
             buffer = grow(capacity);
             if (!buffer)
                 return -1;
-            buffer[len] = probe;
-            ++len;
+            RPP_BUILTIN_MEMCPY(buffer + len, first, size_t(extra)); // the grown capacity holds len plus one chunk
+            len += extra;
             full = fill(buffer, capacity);
         }
         return len;
