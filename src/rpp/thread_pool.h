@@ -112,6 +112,7 @@ namespace rpp
     #if !RPP_POOL_TASK_USE_ATOMIC_SP
         std::atomic_int ref_count;
     #endif
+        rpp::semaphore_once_flag started; // a worker picked the task up, or a kill cancelled it
         rpp::semaphore_once_flag finished;
         std::string trace;
         std::exception_ptr error;
@@ -291,6 +292,9 @@ namespace rpp
         //                     is initialized with the caught exception (if any)
         wait_result wait() const;
         wait_result wait(std::nothrow_t nothrow, std::exception_ptr* outErr = nullptr) const noexcept;
+
+        /// Waits until a worker picks this task up, or until a kill cancels it. A null handle returns at once
+        void wait_until_started() const noexcept;
 
     private:
         friend class pool_worker;

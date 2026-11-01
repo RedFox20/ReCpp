@@ -97,10 +97,17 @@ namespace rpp
         return result;
     }
 
+    void pool_task_handle::wait_until_started() const noexcept
+    {
+        if (auto strong = get())
+            strong->started.wait();
+    }
+
     void pool_task_handle::signal_finish_and_cleanup() noexcept
     {
         if (auto strong = take()) // takes ownership and nulls this handle
         {
+            strong->started.notify_all(); // a cancelled task never started, and its waiters wake here
             strong->finished.notify_all();
             // cleanup (decref) at the end of this scope:
         }
@@ -115,7 +122,7 @@ namespace rpp
     }
 
     pool_worker::pool_worker(float max_idle_seconds)
-        : max_idle_timeout(rpp::Duration::from_millis(int(max_idle_seconds*1000)))
+        : max_idle_timeout(rpp::seconds_f(max_idle_seconds))
     {
         // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
         th = std::thread{[this] { run(); }};
@@ -136,7 +143,7 @@ namespace rpp
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
     {
         auto lock = new_task_flag.spin_lock();
-        max_idle_timeout = rpp::Duration::from_millis(int(max_idle_seconds*1000));
+        max_idle_timeout = rpp::seconds_f(max_idle_seconds);
     }
 
     bool pool_worker::run_range(int start, int end, const action<int, int>& newTask, pool_task_handle* out) noexcept
@@ -332,6 +339,8 @@ namespace rpp
                     range = range_task;
                     range_task = {};
                     generic = std::move(generic_task); // this should swap()
+                    if (auto strong = current_task.get())
+                        strong->started.notify_all();
                 }
                 InTaskDebug(rpp::Timer task_timer);
                 if (range)

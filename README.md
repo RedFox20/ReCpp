@@ -1952,9 +1952,9 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Class | Description |
 |-------|-------------|
-| [`thread_pool`](src/rpp/thread_pool.h#L389) | Thread pool manager with auto-scaling workers |
-| [`pool_task_handle`](src/rpp/thread_pool.h#L134) | Waitable, reference-counted handle for pool tasks |
-| [`pool_worker`](src/rpp/thread_pool.h#L307) | Individual worker thread in the pool |
+| [`thread_pool`](src/rpp/thread_pool.h#L393) | Thread pool manager with auto-scaling workers |
+| [`pool_task_handle`](src/rpp/thread_pool.h#L135) | Waitable, reference-counted handle for pool tasks |
+| [`pool_worker`](src/rpp/thread_pool.h#L311) | Individual worker thread in the pool |
 
 ### Configuration
 
@@ -1966,23 +1966,29 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 
 | Method | Description |
 |--------|-------------|
-| [`parallel_for(int range_start, int range_end, int max_range_size, const Func& func)`](src/rpp/thread_pool.h#L525) | Split work across threads |
-| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L532) | Run a single async task, returns `pool_task_handle` |
-| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L428) | Set max concurrent workers |
-| [`max_parallelism()`](src/rpp/thread_pool.h#L431) | Get max concurrent workers |
-| [`active_tasks()`](src/rpp/thread_pool.h#L444) | Number of currently running tasks |
-| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L462) | Blocks until no pool task is running, including task delegate destruction |
-| [`idle_tasks()`](src/rpp/thread_pool.h#L465) | Number of idle workers |
-| [`total_tasks()`](src/rpp/thread_pool.h#L468) | Total number of workers |
-| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L472) | Remove idle workers |
+| [`parallel_for(int range_start, int range_end, int max_range_size, const Func& func)`](src/rpp/thread_pool.h#L529) | Split work across threads |
+| [`parallel_task(Task task)`](src/rpp/thread_pool.h#L536) | Run a single async task, returns `pool_task_handle` |
+| [`set_max_parallelism(int max)`](src/rpp/thread_pool.h#L432) | Set max concurrent workers |
+| [`max_parallelism()`](src/rpp/thread_pool.h#L435) | Get max concurrent workers |
+| [`active_tasks()`](src/rpp/thread_pool.h#L448) | Number of currently running tasks |
+| [`wait_until_idle(rpp::Duration timeout)`](src/rpp/thread_pool.h#L466) | Blocks until no pool task is running, including task delegate destruction |
+| [`idle_tasks()`](src/rpp/thread_pool.h#L469) | Number of idle workers |
+| [`total_tasks()`](src/rpp/thread_pool.h#L472) | Total number of workers |
+| [`clear_idle_tasks()`](src/rpp/thread_pool.h#L476) | Remove idle workers |
+
+### pool_task_handle Methods
+
+| Method | Description |
+|--------|-------------|
+| [`wait_until_started()`](src/rpp/thread_pool.h#L297) | Waits until a worker picks the task up, or until a kill cancels it |
 
 ### Free Functions (Global Pool)
 
 | Function | Description |
 |----------|-------------|
-| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L582) | Parallel for on the global thread pool |
-| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L603) | Parallel foreach on the global pool |
-| [`parallel_task(task)`](src/rpp/thread_pool.h#L622) | Run async task on the global pool |
+| [`parallel_for(rangeStart, rangeEnd, maxRangeSize, func)`](src/rpp/thread_pool.h#L586) | Parallel for on the global thread pool |
+| [`parallel_foreach(items, forEach)`](src/rpp/thread_pool.h#L607) | Parallel foreach on the global pool |
+| [`parallel_task(task)`](src/rpp/thread_pool.h#L626) | Run async task on the global pool |
 | [`action<TArgs...>`](src/rpp/thread_pool.h#L44) | Lightweight non-owning delegate for blocking call contexts |
 
 ### Example: parallel_for

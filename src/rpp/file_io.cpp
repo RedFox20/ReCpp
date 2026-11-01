@@ -2,6 +2,7 @@
 #include "strview.h"
 #include "debugging.h"
 #include <cerrno> // EINTR
+#include <climits> // INT_MAX
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
@@ -262,9 +263,10 @@ namespace rpp /* ReCpp */
     /// the bytes read, or null. @returns -1 when grow fails or the input outgrows max_capacity, so nothing is cut off
     template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
     {
-        constexpr int max_capacity = 512 * 1024 * 1024;
+        constexpr int max_capacity = INT_MAX; // read() and load_buffer count bytes in an int
         int len = 0;
-        for (int capacity = 4096; capacity <= max_capacity; capacity *= 2)
+        int capacity = 4 * 1024;
+        for (;;)
         {
             char* buffer = grow(capacity);
             if (!buffer)
@@ -276,6 +278,9 @@ namespace rpp /* ReCpp */
                     return len;
                 len += bytes_read;
             }
+            if (capacity == max_capacity)
+                break;
+            capacity = capacity <= max_capacity / 2 ? capacity * 2 : max_capacity;
         }
         char probe;
         if (input.read(&probe, 1) <= 0) // the input ended exactly at max_capacity

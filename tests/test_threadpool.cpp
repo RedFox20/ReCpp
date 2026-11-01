@@ -412,20 +412,40 @@ TestImpl(test_threadpool)
         AssertThat(times_launched, 2);
     }
 
+    // a running task wakes the waiter, and so does a task which a kill cancels before it starts
+    TestCase(wait_until_started_returns_for_a_running_or_a_cancelled_task)
+    {
+        rpp::semaphore_once_flag release;
+        rpp::pool_task_handle running = rpp::parallel_task([&] { release.wait(); });
+        running.wait_until_started();
+        AssertTrue(running.is_running());
+        release.notify();
+        running.wait();
+
+        rpp::pool_task_handle cancelled { nullptr };
+        {
+            rpp::pool_worker worker;
+            rpp::task_delegate<void()> task = [] {};
+            AssertTrue(worker.run_generic(task, &cancelled));
+        }
+        cancelled.wait_until_started();
+        AssertTrue(cancelled.is_finished());
+        rpp::pool_task_handle{nullptr}.wait_until_started();
+    }
+
     // a detached worker would run its task on the freed pool, see BUGS.md C39
     TestCase(pool_destructor_waits_for_the_running_task)
     {
-        rpp::semaphore_once_flag started, release;
+        rpp::semaphore_once_flag release;
         std::atomic_bool finished { false };
         std::thread releaser;
         {
             rpp::thread_pool pool { 1 };
-            (void)pool.parallel_task([&] {
-                started.notify();
+            rpp::pool_task_handle task = pool.parallel_task([&] {
                 release.wait();
                 finished = true;
             });
-            started.wait();
+            task.wait_until_started();
             releaser = std::thread{[&] {
                 rpp::sleep_ms(5);
                 release.notify();
@@ -462,24 +482,24 @@ TestImpl(test_threadpool)
             AssertTrue(worker.run_generic(task, &handle));
             AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
             if (i == 0) first = handle.worker_name();
-            AssertThat(std::string{handle.worker_name()}, first); // a resurrected runner takes a new name
+            AssertThat(handle.worker_name(), first); // a resurrected runner takes a new name
         }
     }
 
     // a task which calls kill() while the destructor waits for it must not detach its runner
     TestCase(kill_from_a_task_during_the_destructor_keeps_the_runner)
     {
-        rpp::semaphore_once_flag started, release;
+        rpp::semaphore_once_flag release;
         rpp::wait_result result = rpp::wait_result::finished;
         std::thread releaser;
         auto worker = std::make_unique<rpp::pool_worker>();
         rpp::task_delegate<void()> task = [&, w = worker.get()] {
-            started.notify();
             release.wait();
             result = w->kill(0); // finished means it detached its own runner
         };
-        AssertTrue(worker->run_generic(task, nullptr));
-        started.wait();
+        rpp::pool_task_handle handle { nullptr };
+        AssertTrue(worker->run_generic(task, &handle));
+        handle.wait_until_started();
         releaser = std::thread{[&] {
             rpp::sleep_ms(5);
             release.notify();
@@ -492,17 +512,16 @@ TestImpl(test_threadpool)
     // a task may still query its pool while the destructor waits for that task
     TestCase(a_task_can_query_its_pool_during_the_destructor)
     {
-        rpp::semaphore_once_flag started, release;
+        rpp::semaphore_once_flag release;
         std::thread releaser;
         int active = -1;
         {
             rpp::thread_pool pool { 1 };
-            (void)pool.parallel_task([&] {
-                started.notify();
+            rpp::pool_task_handle task = pool.parallel_task([&] {
                 release.wait();
                 active = pool.active_tasks();
             });
-            started.wait();
+            task.wait_until_started();
             releaser = std::thread{[&] {
                 rpp::sleep_ms(5);
                 release.notify();
@@ -531,17 +550,17 @@ TestImpl(test_threadpool)
     }
 
     // a submit which races the idle timeout must not join the runner under its lock
-    // only a timer reaches the idle exit, so this sleep loop runs only when a filter names it
-    TestCaseNoAutorun(a_submit_racing_the_idle_timeout_does_not_hang)
+    // the window spans a few instructions, so the case takes many short rounds to hit it
+    TestCase(a_submit_racing_the_idle_timeout_does_not_hang)
     {
-        rpp::pool_worker worker { 0.001f };
-        for (int i = 0; i < 100; ++i)
+        rpp::pool_worker worker { 0.00001f };
+        for (int i = 0; i < 200; ++i)
         {
             rpp::pool_task_handle handle { nullptr };
             rpp::task_delegate<void()> task = [] {};
             while (!worker.run_generic(task, &handle)) rpp::yield();
             AssertThat(handle.wait(rpp::millis(1000)), rpp::wait_result::finished);
-            rpp::sleep_ms(1); // the next submit lands near the idle exit
+            rpp::sleep_us(10); // only the idle timer reaches the idle exit, so the next submit lands near it
         }
     }
 
