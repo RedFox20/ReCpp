@@ -264,36 +264,43 @@ namespace rpp /* ReCpp */
     template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
     {
         constexpr int max_capacity = INT_MAX; // read() and load_buffer count bytes in an int
-        char first[4 * 1024]; // an empty input returns before any allocation
-        int len = input.read(first, int(sizeof(first)));
-        if (len <= 0)
+        int len = 0;
+        auto fill = [&](char* buffer, int capacity) -> bool { // true when the buffer is full and more may follow
+            while (len < capacity)
+            {
+                int bytes_read = input.read(buffer + len, capacity - len);
+                if (bytes_read <= 0) // EOF or a read error
+                    return false;
+                len += bytes_read;
+            }
+            return true;
+        };
+        char first[4 * 1024]; // a short input stays here, then takes one allocation of its exact size
+        bool full = fill(first, int(sizeof(first)));
+        if (len == 0)
             return 0;
-        int capacity = int(sizeof(first));
+        int capacity = len;
         char* buffer = grow(capacity);
         if (!buffer)
             return -1;
         RPP_BUILTIN_MEMCPY(buffer, first, size_t(len));
-        for (;;)
+        while (full)
         {
-            while (len < capacity) // fill the buffer, then grow it
-            {
-                int bytes_read = input.read(buffer + len, capacity - len);
-                if (bytes_read <= 0) // EOF or a read error
-                    return len;
-                len += bytes_read;
-            }
             if (capacity == max_capacity)
-                break;
+            {
+                char probe;
+                if (input.read(&probe, 1) <= 0) // the input ended exactly at max_capacity
+                    return len;
+                LogError("file::read_until_eof input is larger than %d bytes", max_capacity);
+                return -1;
+            }
             capacity = capacity <= max_capacity / 2 ? capacity * 2 : max_capacity;
             buffer = grow(capacity);
             if (!buffer)
                 return -1;
+            full = fill(buffer, capacity);
         }
-        char probe;
-        if (input.read(&probe, 1) <= 0) // the input ended exactly at max_capacity
-            return len;
-        LogError("file::read_until_eof input is larger than %d bytes", max_capacity);
-        return -1;
+        return len;
     }
     load_buffer file::read_all() noexcept
     {

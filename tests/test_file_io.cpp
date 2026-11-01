@@ -877,6 +877,10 @@ TestImpl(test_file_io)
         AssertGreater(buf.size(), 0);
         AssertTrue(strview(buf.data(), buf.size()).starts_with("Name:"));
         AssertTrue(buf.data() && buf.data()[buf.size()] == '\0');
+        // a short input fills only the stack chunk, so its string takes the exact size, not a whole chunk
+        const std::string stat = file::read_all_text("/proc/self/stat");
+        AssertGreater(stat.size(), size_t(0));
+        AssertLess(stat.capacity(), size_t(1024));
     }
 #endif
 
