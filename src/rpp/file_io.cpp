@@ -307,9 +307,9 @@ namespace rpp /* ReCpp */
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-    #if _MSC_VER // GetFileSize() on a named pipe gives only the buffered bytes, but tell() fails on it
+    #if _MSC_VER || TARGET_OS_IPHONE // size() of a pipe gives only its buffered bytes, but tell() fails on it
         bool to_eof = fileSize <= 0 || tell() < 0;
-    #else // a /proc file reports size 0, and a pipe fails the seek in size()
+    #else // a /proc file reports size 0, and a pipe gives size 0 or -1
         bool to_eof = fileSize <= 0;
     #endif
         if (to_eof)
