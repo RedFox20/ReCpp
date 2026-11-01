@@ -95,6 +95,14 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   merely to save typing. Use it when the initializer already makes the type plain.
 - **One statement per line.** Never fold a block such as `if (x) { a(); return b; }` onto one
   line. A lambda with two statements or more spans several lines. See `recpp-review` R7.
+- **A `for` header only iterates, and a ternary only picks a value.** Neither reads input or
+  assigns. An assignment never sits inside a condition. See `recpp-review` R7.
+- **Never make a path slower.** Add no allocation or copy which the code did not make before.
+  Test a cheap flag before a thread id or a system call. Measure on MSVC and in Debug too. See R17.
+- **Use the ReCpp tool which exists**, such as `rpp::unlock_guard` or `RPP_BUILTIN_MEMCPY`. A destructor
+  clears what it owns explicitly. Write a size in its unit, as `512 * 1024 * 1024`. See R6.
+- **Cover each platform a feature runs on.** Never turn a case off on one platform without a written
+  reason in the code. See `recpp-review` R3.
 - **Never wrap immediately after `=`.** Keep `type name = expression` on one line
   and wrap inside the argument list.
 - **Prefer explicit code to a helper layer.** Do not fold repeated code into a template

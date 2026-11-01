@@ -289,9 +289,11 @@ namespace rpp /* ReCpp */
         if (fileSize <= 0 || tell() < 0) // a /proc file reports size 0, and a pipe has no position
         {
             char* buffer = nullptr;
-            auto grow = [&](int n) {
+            auto grow = [&](int n) -> char* {
                 char* p = static_cast<char*>(realloc(buffer, size_t(n) + 1u)); // +1 keeps room for the null terminator
-                return p ? (buffer = p) : nullptr;
+                if (p)
+                    buffer = p;
+                return p;
             };
             int len = read_until_eof(*this, grow);
             if (len <= 0)
