@@ -901,7 +901,7 @@ TestImpl(test_file_io)
         Assert(create_folder(TestDir));
         const std::string fifo = path_combine(TestDir, "fifo");
         AssertThat(mkfifo(fifo.c_str(), 0600), 0);
-        const std::string payload(10000, 'x');
+        std::string payload(10000, 'x');
         auto feed = [&] { return std::thread{[&] {
             int fd = ::open(fifo.c_str(), O_WRONLY);
             (void)!::write(fd, payload.data(), payload.size());
@@ -914,6 +914,13 @@ TestImpl(test_file_io)
         writer = feed();
         AssertThat(file::read_all_text(fifo), payload);
         writer.join();
+        // an input which ends at the end of the first chunk takes no second chunk
+        payload.resize(4096);
+        writer = feed();
+        std::string text = file::read_all_text(fifo);
+        writer.join();
+        AssertThat(text, payload);
+        AssertLess(text.capacity(), size_t(8192));
     }
 #endif
 
@@ -922,7 +929,7 @@ TestImpl(test_file_io)
     TestCase(read_all_reads_a_named_pipe_longer_than_one_chunk)
     {
         const char* pipe_name = "\\\\.\\pipe\\rpp_read_all_test";
-        const std::string payload(10000, 'x');
+        std::string payload(10000, 'x');
         auto feed = [&] {
             HANDLE pipe = CreateNamedPipeA(pipe_name, PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 65536, 65536, 0, nullptr);
             AssertNotEqual(pipe, INVALID_HANDLE_VALUE);
@@ -941,6 +948,13 @@ TestImpl(test_file_io)
         writer = feed();
         AssertThat(file::read_all_text(pipe_name), payload);
         writer.join();
+        // an input which ends at the end of the first chunk takes no second chunk
+        payload.resize(4096);
+        writer = feed();
+        std::string text = file::read_all_text(pipe_name);
+        writer.join();
+        AssertThat(text, payload);
+        AssertLess(text.capacity(), size_t(8192));
     }
 #endif
 

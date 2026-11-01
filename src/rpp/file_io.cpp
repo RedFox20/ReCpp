@@ -286,11 +286,11 @@ namespace rpp /* ReCpp */
         RPP_BUILTIN_MEMCPY(buffer, first, size_t(len));
         while (full)
         {
+            char probe;
+            if (input.read(&probe, 1) <= 0) // an input which ends at the capacity takes no larger buffer
+                return len;
             if (capacity == max_capacity)
             {
-                char probe;
-                if (input.read(&probe, 1) <= 0) // the input ended exactly at max_capacity
-                    return len;
                 LogError("file::read_until_eof input is larger than %d bytes", max_capacity);
                 return -1;
             }
@@ -298,6 +298,8 @@ namespace rpp /* ReCpp */
             buffer = grow(capacity);
             if (!buffer)
                 return -1;
+            buffer[len] = probe;
+            ++len;
             full = fill(buffer, capacity);
         }
         return len;
