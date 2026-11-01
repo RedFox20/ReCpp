@@ -70,6 +70,8 @@ The whole suite runs 512 cases in about 4.3 seconds, and 5.5 seconds under TSAN.
 Protect that number.
 
 - A case over 100ms needs a reason in the review. A case over 500ms is a defect.
+- Make a slow case fast, and keep it in the default run. `TestCaseNoAutorun` is only for a case
+  which needs gigabytes of memory or a 32-bit target. Measure the hit rate after you shrink a race case.
 - Sleeps in this repo are 1ms to 10ms. `rpp::sleep_ms(50)` and above needs a
   reason. Never put a sleep inside a loop.
 - **A timeout the case expects to elapse is 5ms or 10ms.** That covers every
@@ -204,6 +206,7 @@ change before you judge it.
 - Do not fold explicit repeated code into a template helper which the compiler may not inline. Verbose and
   explicit code beats an extra layer, as in the `binary_stream` byte writes.
 - `auto` only when the initializer already names the type.
+- No cast or conversion which the expression does not need, such as `std::string{name}` beside a `std::string`.
 - Never wrap right after `=`. Keep `type name = expression` on one line.
 - Use the ReCpp tool which exists. `rpp::unlock_guard` replaces an `unlock()` and `lock()` pair,
   the `RPP_BUILTIN_*` macros replace a libc call, and `strview` replaces `std::string::find`.
