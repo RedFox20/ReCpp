@@ -84,18 +84,10 @@ namespace rpp
         template <typename T, class Handle>
         T take_result(Handle handle)
         {
-            if constexpr (std::is_void_v<T>)
-            {
-                if (handle.promise().error)
-                    std::rethrow_exception(handle.promise().error);
-            }
-            else
-            {
-                auto& r = handle.promise().result;
-                if (std::exception_ptr* ex = std::get_if<2>(&r))
-                    std::rethrow_exception(*ex);
-                return std::move(std::get<1>(r)); // moved out before the frame is destroyed
-            }
+            if (handle.promise().error)
+                std::rethrow_exception(handle.promise().error);
+            if constexpr (!std::is_void_v<T>)
+                return std::move(std::get<1>(handle.promise().result)); // moved out before the frame is destroyed
         }
 
         // Promise shared by task (Lazy=false) and deferred (Lazy=true); only initial_suspend differs.
@@ -105,13 +97,14 @@ namespace rpp
         {
             using value_type = T;
             rpp::coro_handle<> continuation{}; // awaiter to resume when we finish
-            std::variant<std::monostate, T, std::exception_ptr> result{};
+            std::variant<std::monostate, T> result{};
+            std::exception_ptr error{}; // a separate field, so g++ -O3 sees no exception_ptr in the variant reset
 
             Owner get_return_object() noexcept { return Owner{rpp::coro_handle<task_promise>::from_promise(*this)}; }
             std::conditional_t<Lazy, rpp::suspend_always, rpp::suspend_never> initial_suspend() noexcept { return {}; }
             task_final_awaiter final_suspend() noexcept { return {}; }
             void return_value(T value) noexcept { result.template emplace<1>(std::move(value)); }
-            void unhandled_exception() noexcept { result.template emplace<2>(std::current_exception()); }
+            void unhandled_exception() noexcept { error = std::current_exception(); }
         };
 
         template <bool Lazy, class Owner>

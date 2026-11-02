@@ -1750,8 +1750,8 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 |------|-------------|
 | [`task<T>`](src/rpp/task.h#L62) | Eager coroutine; body runs at construction. `co_await` resumes the caller on its loop |
 | [`deferred<T>`](src/rpp/task.h#L64) | Lazy coroutine; body runs only when first awaited / `start()`ed. Same API as `task` |
-| [`done()`](src/rpp/task.h#L178) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
-| [`deferred<T>::start()`](src/rpp/task.h#L232) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
+| [`done()`](src/rpp/task.h#L173) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
+| [`deferred<T>::start()`](src/rpp/task.h#L225) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
 Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L498) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L509).
 

@@ -311,6 +311,9 @@ if (BUILD_TESTS)
         set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tests/test_debugging.cpp
                                     PROPERTIES COMPILE_OPTIONS "/Zc:preprocessor-")
     endif()
+    if (GCC) # g++ 14 warns about the task<bool> result reset only at -O3, see test_task.cpp
+        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/tests/test_task.cpp PROPERTIES COMPILE_OPTIONS "-O3")
+    endif()
     install(TARGETS RppTests DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/bin)
     if (EMSCRIPTEN) # RppTests.js loads the .wasm from its own dir, and install(TARGETS) skips it
         target_link_options(RppTests PRIVATE -pthread -sPROXY_TO_PTHREAD -sEXIT_RUNTIME

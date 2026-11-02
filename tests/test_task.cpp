@@ -8,6 +8,11 @@
 #include <stdexcept>
 using namespace rpp;
 
+#if defined(__GNUC__) && !defined(__clang__)
+// g++ -O3 can warn about the task<bool> result reset, so that warning fails this file
+#pragma GCC diagnostic error "-Wmaybe-uninitialized"
+#endif
+
 // rpp::task<T> is eager (starts at construction) and resumes its awaiter on whatever thread the
 // body completes on, never a background worker (unlike a bare `co_await rpp::future<T>`).
 // The leaves here use loop.run_async(), which hops to a pool worker and posts the resume back to
@@ -79,6 +84,29 @@ namespace
         co_await loop.run_async([] { rpp::sleep_ms(2); });
         co_return 7;
     }
+
+    struct sync_starter
+    {
+        virtual ~sync_starter() = default;
+        virtual rpp::task<bool> start(std::weak_ptr<int> weak) noexcept = 0;
+    };
+    // g++ -O3 inlines this body into its ramp, where it checks the result reset
+    struct sync_start_once final : sync_starter
+    {
+        std::atomic_bool started{false};
+        std::shared_ptr<int> owner;
+        rpp::task<bool> start(std::weak_ptr<int> weak) noexcept override;
+    };
+    rpp::task<bool> sync_start_once::start(std::weak_ptr<int> weak) noexcept
+    {
+        if (started)
+            co_return true;
+        owner = weak.lock();
+        if (!owner)
+            co_return false;
+        started = true;
+        co_return true;
+    }
 } // namespace
 
 TestImpl(test_task)
@@ -129,6 +157,23 @@ TestImpl(test_task)
         loop->run_async_void([&]() -> rpp::event_task { result = co_await task_sync(); });
         loop->run_until_idle();
         AssertThat(result.load(), 99);
+    }
+
+    // A virtual task<bool> which never suspends returns each of its values
+    TestCase(synchronous_virtual_bool_task_returns_each_value)
+    {
+        sync_start_once once;
+        sync_starter& starter = once;
+        auto start = [&](std::weak_ptr<int> weak)
+        {
+            rpp::task<bool> t = starter.start(std::move(weak));
+            return loop->run_until_done(t);
+        };
+        auto owner = std::make_shared<int>(1);
+        AssertThat(start(std::weak_ptr<int>{}), false);
+        AssertThat(start(owner), true);
+        owner.reset();
+        AssertThat(start(owner), true); // started already
     }
 
     // An exception thrown in the body propagates out of co_await.
