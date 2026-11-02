@@ -427,7 +427,8 @@ TestImpl(test_async)
         AssertThrows(loop.run_until_done(task), std::runtime_error);
         task = await_launcher(loop, launcher{3}, value, thread);
         AssertThrows(loop.run_until_done(task), std::logic_error);
-        AssertThat(loop.background_tasks(), 0);
+        // the worker drops its count after it posts the resume, so the task can finish first
+        AssertTrue(loop.wait_on_all(rpp::seconds(1)));
     }
 
     TestCase(simple_chaining)

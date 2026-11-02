@@ -976,6 +976,24 @@ TestImpl(test_file_io)
         AssertLess(file::read_all_text(empty).capacity(), size_t(64));
     }
 
+    TestCase(write_new_tells_an_empty_payload_from_a_failed_open)
+    {
+        Assert(create_folder(TestDir));
+        const std::string parent = path_combine(TestDir, "parent.txt");
+        const std::string child = path_combine(parent, "child.txt"); // the parent is a file, so the open fails
+        AssertThat(file::write_new(parent, ""), 0);
+        AssertThat(file::write_new(child, ""), -1);
+        AssertThat(file::write_new(child, "abc"), -1);
+        AssertTrue(file::write_all(parent, ""));
+        AssertTrue(file::write_all(parent, "abc"));
+        AssertFalse(file::write_all(child, ""));
+        AssertFalse(file::write_all(child, "abc"));
+    #if __linux__ // /dev/full takes the open and fails the flush with ENOSPC
+        AssertThat(file::write_new("/dev/full", "abc"), -1);
+        AssertFalse(file::write_all("/dev/full", "abc"));
+    #endif
+    }
+
 #if !_WIN32 && !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
     // a FIFO has no size, so read_all() and read_text() must grow past the first chunk
     TestCase(read_all_reads_a_fifo_longer_than_one_chunk)
@@ -1057,7 +1075,7 @@ TestImpl(test_file_io)
     {
         prepare_unicode_file_paths();
 
-        AssertTrue(file::write_new(TestFile, "abcdefgh"));
+        AssertTrue(file::write_all(TestFile, "abcdefgh"));
         AssertTrue(file_exists(TestFile));
         AssertThat(file::read_all_text(TestFile), "abcdefgh");
         AssertTrue(delete_file(TestFile));
@@ -1072,7 +1090,7 @@ TestImpl(test_file_io)
     {
         prepare_unicode_file_paths();
 
-        AssertTrue(file::write_new(TestUnicodeFile, "abcdefgh"));
+        AssertTrue(file::write_all(TestUnicodeFile, "abcdefgh"));
         AssertTrue(file_exists(TestUnicodeFile));
         AssertThat(file::read_all_text(TestUnicodeFile), "abcdefgh");
         AssertTrue(delete_file(TestUnicodeFile));
@@ -1086,7 +1104,7 @@ TestImpl(test_file_io)
 
     TestCase(rename_file_basic)
     {
-        AssertTrue(file::write_new(TestFile, "rename_me"));
+        AssertTrue(file::write_all(TestFile, "rename_me"));
         std::string dest = path_combine(temp_dir(), "_rpp_test_renamed.txt");
         AssertTrue(rename_file(TestFile, dest));
         AssertFalse(file_exists(TestFile)); // original removed
@@ -1097,9 +1115,9 @@ TestImpl(test_file_io)
 
     TestCase(rename_file_overwrites_existing)
     {
-        AssertTrue(file::write_new(TestFile, "original"));
+        AssertTrue(file::write_all(TestFile, "original"));
         std::string dest = path_combine(temp_dir(), "_rpp_test_renamed.txt");
-        AssertTrue(file::write_new(dest, "old_content"));
+        AssertTrue(file::write_all(dest, "old_content"));
         AssertTrue(rename_file(TestFile, dest));
         AssertFalse(file_exists(TestFile));
         AssertThat(file::read_all_text(dest), "original");
@@ -1116,7 +1134,7 @@ TestImpl(test_file_io)
 
     TestCase(move_file_is_rename)
     {
-        AssertTrue(file::write_new(TestFile, "move_me"));
+        AssertTrue(file::write_all(TestFile, "move_me"));
         std::string dest = path_combine(temp_dir(), "_rpp_test_moved.txt");
         AssertTrue(move_file(TestFile, dest));
         AssertFalse(file_exists(TestFile));
@@ -1129,7 +1147,7 @@ TestImpl(test_file_io)
     TestCase(rename_file_unicode)
     {
         prepare_unicode_file_paths();
-        AssertTrue(file::write_new(TestUnicodeFile, "unicode_rename"));
+        AssertTrue(file::write_all(TestUnicodeFile, "unicode_rename"));
         rpp::ustring dest = path_combine(temp_diru(), u"_rpp_test_renamed_😀.txt");
         AssertTrue(rename_file(TestUnicodeFile, dest));
         AssertFalse(file_exists(TestUnicodeFile));

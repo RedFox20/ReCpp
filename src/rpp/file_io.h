@@ -372,7 +372,7 @@ namespace rpp /* ReCpp */
          * @param filename Name of the file to create and write to
          * @param buffer Buffer to write bytes from
          * @param bytesToWrite Number of bytes to write to the file
-         * @return Number of bytes actually written to the file
+         * @return Number of bytes written, 0 for an empty payload, or -1 when the open or the final flush failed
          */
         static int write_new(strview filename, const void* buffer, int bytesToWrite) noexcept;
 
@@ -407,6 +407,48 @@ namespace rpp /* ReCpp */
         static int write_new(ustrview filename, const std::vector<T, U>& plainOldData) noexcept
         {
             return write_new(filename, plainOldData.data(), int(plainOldData.size() * sizeof(T)));
+        }
+    #endif // RPP_ENABLE_UNICODE
+
+        /**
+         * Same as write_new(), for a caller which checks only for success.
+         * @return TRUE when the file holds every byte, also for an empty payload
+         */
+        static bool write_all(strview filename, const void* buffer, int bytesToWrite) noexcept
+        {
+            return write_new(filename, buffer, bytesToWrite) == bytesToWrite;
+        }
+        static bool write_all(strview filename, strview data) noexcept
+        {
+            return write_all(filename, data.str, data.len);
+        }
+        template<class T, class U>
+        static bool write_all(strview filename, const std::vector<T, U>& plainOldData) noexcept
+        {
+            return write_all(filename, plainOldData.data(), int(plainOldData.size() * sizeof(T)));
+        }
+
+    #if RPP_ENABLE_UNICODE
+        static bool write_all(ustrview filename, const void* buffer, int bytesToWrite) noexcept
+        {
+            return write_new(filename, buffer, bytesToWrite) == bytesToWrite;
+        }
+        static bool write_all(ustrview filename, strview data) noexcept
+        {
+            return write_all(filename, data.str, data.len);
+        }
+        static bool write_all(strview filename, ustrview data) noexcept
+        {
+            return write_all(filename, data.str, int(data.len * sizeof(char16_t)));
+        }
+        static bool write_all(ustrview filename, ustrview data) noexcept
+        {
+            return write_all(filename, data.str, int(data.len * sizeof(char16_t)));
+        }
+        template<class T, class U>
+        static bool write_all(ustrview filename, const std::vector<T, U>& plainOldData) noexcept
+        {
+            return write_all(filename, plainOldData.data(), int(plainOldData.size() * sizeof(T)));
         }
     #endif // RPP_ENABLE_UNICODE
 

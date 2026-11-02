@@ -585,12 +585,23 @@ namespace rpp
     #if _WIN32
         InitWinSock();
 
-        ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS;
-        ULONG bufLen = 0;
-        GetAdaptersAddresses(family, flags, nullptr, nullptr, &bufLen);
-        IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)_malloca(bufLen);
+        ULONG flags = GAA_FLAG_INCLUDE_PREFIX | GAA_FLAG_INCLUDE_GATEWAYS | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_DNS_SERVER;
+        if (family != AF_INET6) // only IPv6 reads its broadcast address from the multicast list
+            flags |= GAA_FLAG_SKIP_MULTICAST;
+        // the buffer size which Microsoft recommends usually fits the list, so one call replaces the size query
+        alignas(IP_ADAPTER_ADDRESSES) char stackBuf[15 * 1024];
+        ULONG bufLen = sizeof(stackBuf);
+        IP_ADAPTER_ADDRESSES* ipa_addrs = (IP_ADAPTER_ADDRESSES*)stackBuf;
+        ULONG status = GetAdaptersAddresses(family, flags, nullptr, ipa_addrs, &bufLen);
+        void* heapBuf = nullptr;
+        if (status == ERROR_BUFFER_OVERFLOW) // bufLen now holds the size of the list
+        {
+            heapBuf = malloc(bufLen);
+            ipa_addrs = (IP_ADAPTER_ADDRESSES*)heapBuf;
+            status = GetAdaptersAddresses(family, flags, nullptr, ipa_addrs, &bufLen);
+        }
 
-        if (!GetAdaptersAddresses(family, flags, nullptr, ipa_addrs, &bufLen))
+        if (status == NO_ERROR)
         {
             int count = 0;
             for (auto ipaa = ipa_addrs; ipaa != nullptr; ipaa = ipaa->Next)
@@ -646,7 +657,7 @@ namespace rpp
                 }
             }
         }
-        _freea(ipa_addrs); // free the allocated memory
+        free(heapBuf);
     #else
         ifaddrs* if_addrs;
         if (!getifaddrs(&if_addrs))
