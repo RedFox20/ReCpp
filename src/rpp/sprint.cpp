@@ -76,8 +76,12 @@ namespace rpp
 
     void string_buffer::resize(int count) noexcept
     {
-        reserve(count);
+        if (count > len) // reserve() takes the growth, not the new length
+            reserve(count - len);
+        if (count >= cap) // reserve() could not allocate
+            return;
         len = count;
+        ptr[len] = '\0';
     }
 
     
