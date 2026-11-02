@@ -283,6 +283,9 @@ CXX23=1 mama android verbose build with_tests && ./run_android_tests -vv
 git log --merges --oneline origin/master..HEAD
 ```
 
+The PR body names `Fixes #n` once for each issue the PR finishes, so the merge closes it. Report
+an issue which the PR fixes but does not name as blocking.
+
 mama builds each compiler and sanitizer into its own directory, such as
 `packages/ReCpp/linux`, `linux-clang`, `linux-tsan`, and `linux-clang-tsan`. A
 switch keeps the other directory, so it rebuilds nothing there, and it never mixes

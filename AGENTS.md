@@ -29,7 +29,7 @@ brevity.
 
 ## Editing Workflow
 
-Every change runs these four steps in order. A later step never starts before the
+Every change runs these steps in order. A later step never starts before the
 one above it passes.
 
 1. **Plan, and write the test first.** A bug needs a recipe which fails on demand,
@@ -54,6 +54,8 @@ one above it passes.
    form which still carries the why.
 6. **Never create a merge commit.** Rebase the branch onto master, and push it
    with `--force-with-lease`.
+7. **Close each issue through the PR.** The PR body names `Fixes #n` once for each
+   issue which the PR finishes, so the merge closes the issue. Never close it by hand.
 
 ## Review Feedback
 
