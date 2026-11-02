@@ -29,6 +29,9 @@
     #include <sys/stat.h> // mkfifo
     #include <utime.h> // utime
 #endif
+#if __APPLE__
+    #include <TargetConditionals.h> // TARGET_OS_IPHONE
+#endif
 using namespace rpp;
 
 TestImpl(test_file_io)
@@ -385,6 +388,46 @@ TestImpl(test_file_io)
         AssertThat(fileSize, expectedSize);
         f.close();
     }
+
+    TestCase(size_of_a_read_only_file_keeps_its_read_buffer)
+    {
+        Assert(create_folder(TestDir));
+        const std::string path = TestDir + "/_size_read_test.txt";
+        AssertThat(file::write_new(path, "abcdefgh"), 8);
+        file input{ path, file::READONLY };
+        char ch = 0;
+        AssertThat(input.read(&ch, 1), 1);
+    #if __linux__ && !RPP_ANDROID // a seek drops the stdio read buffer, and the seek back refills it with a read()
+        auto read_calls = []() -> int64
+        {
+            const std::string io = file::read_all_text("/proc/thread-self/io");
+            return rpp::strview{io}.skip_after("syscr:").trim().to_int64();
+        };
+        const int64 before = read_calls();
+        const int64 overhead = read_calls() - before;
+        const int64 baseline = read_calls();
+        AssertThat(input.size(), 8);
+        AssertThat(input.sizel(), int64(8));
+        AssertThat(read_calls() - baseline, overhead);
+    #else
+        AssertThat(input.size(), 8);
+        AssertThat(input.sizel(), int64(8));
+    #endif
+        AssertThat(input.read(&ch, 1), 1);
+        AssertThat(ch, 'b');
+        AssertThat(input.tell(), 2);
+    }
+
+#if !RPP_ANDROID && !TARGET_OS_IPHONE // fstat() serves every size query there, and it misses a buffered write
+    TestCase(size_of_a_writable_file_counts_a_buffered_write)
+    {
+        Assert(create_folder(TestDir));
+        file output{ TestDir + "/_size_write_test.txt", file::CREATENEW };
+        AssertThat(output.write("12345", 5), 5);
+        AssertThat(output.size(), 5);
+        AssertThat(output.sizel(), int64(5));
+    }
+#endif
 
     TestCase(create_delete_folder)
     {
