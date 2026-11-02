@@ -112,6 +112,7 @@ namespace rpp
     #if !RPP_POOL_TASK_USE_ATOMIC_SP
         std::atomic_int ref_count;
     #endif
+        rpp::semaphore_once_flag started; // a worker picked the task up, or a kill cancelled it
         rpp::semaphore_once_flag finished;
         std::string trace;
         std::exception_ptr error;
@@ -292,6 +293,9 @@ namespace rpp
         wait_result wait() const;
         wait_result wait(std::nothrow_t nothrow, std::exception_ptr* outErr = nullptr) const noexcept;
 
+        /// Waits until a worker picks this task up, or until a kill cancels it. A null handle returns at once
+        void wait_until_started() const noexcept;
+
     private:
         friend class pool_worker;
         friend struct ::test_threadpool;
@@ -363,7 +367,7 @@ namespace rpp
         // @return TRUE if run started successfully (task was not already running)
         [[nodiscard]] bool run_generic(task_delegate<void()>& newTask, pool_task_handle* out) noexcept;
 
-        // kill the task and wait for it to finish
+        // kill the task and wait for it to finish. A task of this worker gets timeout, and its runner keeps serving
         wait_result kill(int timeoutMillis = 0/*0=no timeout*/) noexcept;
 
     private:
@@ -415,6 +419,7 @@ namespace rpp
          * @see set_max_parallelism
          */
         explicit thread_pool(int max_parallelism);
+        /// Waits for every running task. A task must not submit to this pool while it is destroyed
         ~thread_pool() noexcept;
         NOCOPY_NOMOVE(thread_pool)
         

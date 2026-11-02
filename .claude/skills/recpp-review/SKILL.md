@@ -1,6 +1,6 @@
 ---
 name: recpp-review
-description: Review a ReCpp change against the project rules — proven regression tests, fast tests, cross-platform support, borrowed-pointer lifetime, 1-2 line comments, STE wording, compact 130-column style, and the four build gates. Runs in the recpp-reviewer subagent. Also invocable as /recpp-review.
+description: Review a ReCpp change against the project rules. It checks proven tests, speed, platform coverage, lifetimes, comments, STE wording, one statement per line and the build gates. Runs in the recpp-reviewer subagent. Also invocable as /recpp-review.
 ---
 
 # recpp-review
@@ -61,6 +61,8 @@ reverted is not a regression test. It is a case which happens to pass.
   touched. Or the premise the case rests on is false, so the assertion never
   depended on the fix at all.
 - Block a change whose diff moves a behavior no case reaches. Name the function.
+- A check through the API under test can share its bug. Add a second check through an
+  independent path, such as the raw bytes under `bit_array::isSet()`.
 
 ### R2. Tests stay fast
 
@@ -68,6 +70,8 @@ The whole suite runs 512 cases in about 4.3 seconds, and 5.5 seconds under TSAN.
 Protect that number.
 
 - A case over 100ms needs a reason in the review. A case over 500ms is a defect.
+- Make a slow case fast, and keep it in the default run. `TestCaseNoAutorun` is only for a case
+  which needs gigabytes of memory or a 32-bit target. Measure the hit rate after you shrink a race case.
 - Sleeps in this repo are 1ms to 10ms. `rpp::sleep_ms(50)` and above needs a
   reason. Never put a sleep inside a loop.
 - **A timeout the case expects to elapse is 5ms or 10ms.** That covers every
@@ -127,6 +131,10 @@ clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
   Yocto, and MIPSEL. Unicode paths are off on macOS, MIPSEL, Yocto, and Raspberry Pi.
 - No new third party dependency.
 - Includes come before imports. A header never contains an `import`.
+- A feature needs a case on each platform it runs on. A Linux-only case for a path which
+  Windows also takes is incomplete, so a FIFO case needs a named pipe twin on Windows.
+- Never turn a case off on one platform without a written reason. A case which skips MSVC
+  is a suspect until the reason is in the code.
 
 ### R4. A comment is one line, and two lines at most
 
@@ -198,14 +206,35 @@ change before you judge it.
 - Do not fold explicit repeated code into a template helper which the compiler may not inline. Verbose and
   explicit code beats an extra layer, as in the `binary_stream` byte writes.
 - `auto` only when the initializer already names the type.
+- No cast or conversion which the expression does not need, such as `std::string{name}` beside a `std::string`.
 - Never wrap right after `=`. Keep `type name = expression` on one line.
+- Use the ReCpp tool which exists. `rpp::unlock_guard` replaces an `unlock()` and `lock()` pair,
+  the `RPP_BUILTIN_*` macros replace a libc call, and `strview` replaces `std::string::find`.
+  Search `src/rpp/` before you write a helper.
+- A destructor tears down what it owns explicitly, at the line it chooses, as `workers.clear()`
+  in `~thread_pool()`. Do not leave that order to the implicit member destructors.
+- A function which returns -1 as an expected result returns a signed type, such as `int64`.
+- Write a size in its unit, and name it: `constexpr int max_capacity = 512 * 1024 * 1024;`,
+  not `1 << 30`.
+- A public macro exists on every compiler. A macro which MSVC lacks is a wart in the API.
+- Do not add a fallback for an old or rare API, such as `std::ostream` output, unless the
+  owner asks for it.
 
-### R7. Reduce vertical height
+### R7. One statement per line, then a short file
 
-Scrolling is the bottleneck. The column limit is 130.
+A packed line costs the reader more than the scroll it saves. Readable lines come
+first, and a short file comes second. The column limit is 130.
 
 - One statement per line, but no padding. Keep a single blank line between
   functions, and none after an opening brace.
+- Never fold a block of statements onto one line, as in `if (x) { a(); return b; }`.
+- A lambda with two statements or more spans several lines.
+- A `for` header only iterates. Never read input or do the work in it, as in
+  `for (int n; (n = read(buf, size)) > 0;) len += n;`. Write the read as a statement.
+- An assignment never sits inside a condition or a ternary. A ternary picks a value,
+  so `return p ? (buffer = p) : nullptr;` becomes an `if` and a `return`.
+- One declaration per line. `cpu_set_t all, one;` takes two lines.
+- Report each packed line as WARN, and fix it in the same change.
 - A single statement `if` needs no braces. `readability-braces-around-statements`
   is off on purpose.
 - Do not put one argument per line when the call fits on one line.
@@ -429,6 +458,29 @@ instantiates a large template, and the binary grows with every call site.
 - A file may keep a listed header only to time `rpp::TimePoint` against a second clock, or to test a
   named compiler bug. A trailing comment on the include says which.
 - An include which nothing in the file uses is a defect, whatever its size.
+
+### R17. A change never makes a path slower
+
+ReCpp exists to be lighter and faster than `std::`, so a slower path is a defect even when
+the result is right.
+
+- Never add an allocation or a copy which the code did not make before. Two callers which
+  share a read loop share a helper which takes the growth strategy, as `read_until_eof()`
+  does for `read_all()` and `read_text()`. Never build a `std::string` and copy it again.
+- A cleanup which makes a path slower, or hides what it does, is a defect. Keep the explicit
+  code, as in `vec.cpp` and the `binary_stream` byte writes.
+- Order a condition cheap first. Test a plain flag before a thread id, a system call or a
+  lock, as in `if (!destroying && std::this_thread::get_id() == th.get_id())`.
+- Guard a call on a hot path with the cheap check its caller can make, such as the `e` or
+  `E` test before `parse_exponent()`.
+- A Debug build counts. Copy a few bytes with `RPP_BUILTIN_MEMCPY` or direct writes, and
+  search with `RPP_BUILTIN_MEMCHR`. Never call libc for a small copy.
+- glibc is not the only target. Measure a speed claim on MSVC and in a Debug build too.
+- A file-static helper on a hot path in a `.cpp` is `FINLINE`.
+- Choose a buffer size by measurement. Try the next size up, and keep the smaller one when
+  the larger gains nothing. The comment says why, without the number.
+- Do not slow the common path to guard an absurd argument, such as a range of `INT_MAX`
+  elements. Document the limit instead.
 
 ## Report format
 

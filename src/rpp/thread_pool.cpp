@@ -97,10 +97,17 @@ namespace rpp
         return result;
     }
 
+    void pool_task_handle::wait_until_started() const noexcept
+    {
+        if (auto strong = get())
+            strong->started.wait();
+    }
+
     void pool_task_handle::signal_finish_and_cleanup() noexcept
     {
         if (auto strong = take()) // takes ownership and nulls this handle
         {
+            strong->started.notify_all(); // a cancelled task never started, and its waiters wake here
             strong->finished.notify_all();
             // cleanup (decref) at the end of this scope:
         }
@@ -115,7 +122,7 @@ namespace rpp
     }
 
     pool_worker::pool_worker(float max_idle_seconds)
-        : max_idle_timeout(rpp::Duration::from_millis(int(max_idle_seconds*1000)))
+        : max_idle_timeout(rpp::seconds_f(max_idle_seconds))
     {
         // @note thread must start AFTER mutexes, flags, etc. are initialized, or we'll have a nasty race condition
         th = std::thread{[this] { run(); }};
@@ -127,13 +134,16 @@ namespace rpp
             auto lock = new_task_flag.spin_lock();
             destroying = true;
         }
-        kill(0/*0=no timeout*/);
+        if (std::this_thread::get_id() == th.get_id()) // exit() on the runner thread, which cannot wait for itself
+            th.detach();
+        else
+            kill(0/*0=no timeout*/);
     }
 
     void pool_worker::max_idle_time(float max_idle_seconds) noexcept
     {
         auto lock = new_task_flag.spin_lock();
-        max_idle_timeout = rpp::Duration::from_millis(int(max_idle_seconds*1000));
+        max_idle_timeout = rpp::seconds_f(max_idle_seconds);
     }
 
     bool pool_worker::run_range(int start, int end, const action<int, int>& newTask, pool_task_handle* out) noexcept
@@ -234,6 +244,9 @@ namespace rpp
 
     wait_result pool_worker::kill(int timeoutMillis) noexcept
     {
+        // a task cannot kill its own runner, which would wait for itself or detach under the destructor
+        if (std::this_thread::get_id() == th.get_id())
+            return wait_result::timeout;
         if (killed) {
             return join_or_detach(wait_result::finished);
         }
@@ -248,8 +261,9 @@ namespace rpp
             task_to_wait = current_task; // copy the handle to wait on after we release the lock
         });
 
-        // wait for runner to finish current task before joining the thread
-        wait_result result = task_to_wait.wait(rpp::Duration::from_millis(timeoutMillis), std::nothrow);
+        // 0 waits without a timeout, because a detached runner would outlive this worker, see BUGS.md C39
+        if (timeoutMillis <= 0) return join_or_detach(task_to_wait.wait(std::nothrow));
+        wait_result result = task_to_wait.wait(rpp::millis(timeoutMillis), std::nothrow);
         return join_or_detach(result);
     }
 
@@ -309,6 +323,15 @@ namespace rpp
                     if (!wait_for_new_job(lock)) {
                         TaskDebug("%s wait_for_new_job stopped (%s)", name, killed ? "killed" : "timeout");
                         killed = true;
+                        range_task = {}; // a task accepted before the kill never runs, so clear it and wake its waiters
+                        generic = std::move(generic_task);
+                        // its captures may lock this worker, and its unsignaled task keeps every submit out meanwhile
+                        if (generic)
+                        {
+                            rpp::unlock_guard unlocked { lock };
+                            generic.reset();
+                        }
+                        current_task.signal_finish_and_cleanup();
                         return;
                     }
                     TaskDebug("%s wait_for_new_job elapsed: %.3fms", name, t.elapsed_millis());
@@ -316,6 +339,8 @@ namespace rpp
                     range = range_task;
                     range_task = {};
                     generic = std::move(generic_task); // this should swap()
+                    if (auto strong = current_task.get())
+                        strong->started.notify_all();
                 }
                 InTaskDebug(rpp::Timer task_timer);
                 if (range)
@@ -428,9 +453,13 @@ namespace rpp
 
     thread_pool::~thread_pool() noexcept
     {
-        // defined destructor to prevent aggressive inlining and to manually control task destruction
-        std::lock_guard lock{TasksMutex};
-        Workers.clear();
+        // the workers wait for their tasks after the unlock, because a running task may still call active_tasks()
+        std::vector<worker_ptr> workers;
+        {
+            std::lock_guard lock{TasksMutex};
+            workers.swap(Workers);
+        }
+        workers.clear();
     }
     
     void thread_pool::set_max_parallelism(int max_parallelism) noexcept

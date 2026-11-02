@@ -14,6 +14,13 @@
 #include <fcntl.h> // fcntl, FD_CLOEXEC, _O_TEXT
 #if _MSC_VER
     #include <io.h> // _pipe, dup2
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN 1
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX 1
+    #endif
+    #include <windows.h> // CreateNamedPipeA
 #else
     #include <unistd.h> // pipe, dup2
     #include <csignal> // sigaction
@@ -859,6 +866,95 @@ TestImpl(test_file_io)
         AssertThat(std::string{getenv("HOME")}, "/tmp/rpp_home");
         if (home) setenv("HOME", saved.c_str(), 1);
         else unsetenv("HOME");
+    }
+#endif
+
+#if __linux__
+    // a /proc file reports size 0, so read_all() must read it to EOF
+    TestCase(read_all_reads_a_proc_file_to_the_end)
+    {
+        load_buffer buf = file::read_all("/proc/self/status");
+        AssertGreater(buf.size(), 0);
+        AssertTrue(strview(buf.data(), buf.size()).starts_with("Name:"));
+        AssertTrue(buf.data() && buf.data()[buf.size()] == '\0');
+        // a short input fills only the stack chunk, so its string takes the exact size, not a whole chunk
+        const std::string stat = file::read_all_text("/proc/self/stat");
+        AssertGreater(stat.size(), size_t(0));
+        AssertLess(stat.capacity(), size_t(1024));
+    }
+#endif
+
+    // an empty input takes the read-to-EOF path, which must not allocate before the first byte arrives
+    TestCase(reading_an_empty_file_allocates_nothing)
+    {
+        Assert(create_folder(TestDir));
+        const std::string empty = path_combine(TestDir, "empty.txt");
+        Assert(file::write_new(empty, "") == 0);
+        AssertTrue(file::read_all(empty).data() == nullptr);
+        AssertLess(file::read_all_text(empty).capacity(), size_t(64));
+    }
+
+#if !_WIN32 && !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
+    // a FIFO has no size, so read_all() and read_text() must grow past the first chunk
+    TestCase(read_all_reads_a_fifo_longer_than_one_chunk)
+    {
+        Assert(create_folder(TestDir));
+        const std::string fifo = path_combine(TestDir, "fifo");
+        AssertThat(mkfifo(fifo.c_str(), 0600), 0);
+        std::string payload(10000, 'x');
+        auto feed = [&] { return std::thread{[&] {
+            int fd = ::open(fifo.c_str(), O_WRONLY);
+            (void)!::write(fd, payload.data(), payload.size());
+            ::close(fd);
+        }}; };
+        std::thread writer = feed();
+        load_buffer buf = file::read_all(fifo);
+        writer.join();
+        AssertThat(std::string(buf.data(), size_t(buf.size())), payload);
+        writer = feed();
+        AssertThat(file::read_all_text(fifo), payload);
+        writer.join();
+        // an input which ends at the end of the first chunk takes no second chunk
+        payload.resize(4096);
+        writer = feed();
+        std::string text = file::read_all_text(fifo);
+        writer.join();
+        AssertThat(text, payload);
+        AssertLess(text.capacity(), size_t(8192));
+    }
+#endif
+
+#if _MSC_VER
+    // a named pipe has no position, so read_all() and read_text() must read it to EOF past the first chunk
+    TestCase(read_all_reads_a_named_pipe_longer_than_one_chunk)
+    {
+        const char* pipe_name = "\\\\.\\pipe\\rpp_read_all_test";
+        std::string payload(10000, 'x');
+        auto feed = [&] {
+            HANDLE pipe = CreateNamedPipeA(pipe_name, PIPE_ACCESS_OUTBOUND, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 65536, 65536, 0, nullptr);
+            AssertNotEqual(pipe, INVALID_HANDLE_VALUE);
+            return std::thread{[&payload, pipe] {
+                (void)ConnectNamedPipe(pipe, nullptr); // false with ERROR_PIPE_CONNECTED when the reader came first
+                DWORD written = 0;
+                (void)WriteFile(pipe, payload.data(), DWORD(payload.size()), &written, nullptr);
+                (void)FlushFileBuffers(pipe); // returns after the reader took every byte
+                CloseHandle(pipe);
+            }};
+        };
+        std::thread writer = feed();
+        load_buffer buf = file::read_all(pipe_name);
+        writer.join();
+        AssertThat(std::string(buf.data(), size_t(buf.size())), payload);
+        writer = feed();
+        AssertThat(file::read_all_text(pipe_name), payload);
+        writer.join();
+        // an input which ends at the end of the first chunk takes no second chunk
+        payload.resize(4096);
+        writer = feed();
+        std::string text = file::read_all_text(pipe_name);
+        writer.join();
+        AssertThat(text, payload);
+        AssertLess(text.capacity(), size_t(8192));
     }
 #endif
 

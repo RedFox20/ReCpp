@@ -2,6 +2,7 @@
 #include "strview.h"
 #include "debugging.h"
 #include <cerrno> // EINTR
+#include <climits> // INT_MAX
 #include <cstdlib> // malloc
 #include <cstdio> // fopen
 #include <cstdarg> // va_list
@@ -258,18 +259,83 @@ namespace rpp /* ReCpp */
         return (int)fread(buffer, 1, (size_t)bytesToRead, (FILE*)Handle);
     #endif
     }
+    /// Reads a file which reports size 0, such as /proc or a pipe, to EOF. grow(n) returns n bytes which keep
+    /// the bytes read, or null. @returns -1 when grow fails or the input outgrows max_capacity, so nothing is cut off
+    template<class GrowFunc> static int read_until_eof(file& input, GrowFunc&& grow)
+    {
+        constexpr int max_capacity = INT_MAX; // read() and load_buffer count bytes in an int
+        int len = 0;
+        auto fill = [&](char* buffer, int capacity) -> bool { // true when the buffer is full and more may follow
+            while (len < capacity)
+            {
+                int bytes_read = input.read(buffer + len, capacity - len);
+                if (bytes_read <= 0) // EOF or a read error
+                    return false;
+                len += bytes_read;
+            }
+            return true;
+        };
+        char first[4 * 1024]; // a short input stays here, then takes one allocation of its exact size
+        bool full = fill(first, int(sizeof(first)));
+        if (len == 0)
+            return 0;
+        int capacity = len;
+        char* buffer = grow(capacity);
+        if (!buffer)
+            return -1;
+        RPP_BUILTIN_MEMCPY(buffer, first, size_t(len));
+        while (full)
+        {
+            int extra = input.read(first, int(sizeof(first))); // an input which ends at the capacity takes no larger buffer
+            if (extra <= 0)
+                return len;
+            if (capacity == max_capacity)
+            {
+                LogError("file::read_until_eof input is larger than %d bytes", max_capacity);
+                return -1;
+            }
+            capacity = capacity <= max_capacity / 2 ? capacity * 2 : max_capacity;
+            buffer = grow(capacity);
+            if (!buffer)
+                return -1;
+            RPP_BUILTIN_MEMCPY(buffer + len, first, size_t(extra)); // the grown capacity holds len plus one chunk
+            len += extra;
+            full = fill(buffer, capacity);
+        }
+        return len;
+    }
     load_buffer file::read_all() noexcept
     {
         int fileSize = size();
-        if (fileSize > 0)
+    #if _MSC_VER || TARGET_OS_IPHONE // size() of a pipe gives only its buffered bytes, but tell() fails on it
+        bool to_eof = fileSize <= 0 || tell() < 0;
+    #else // a /proc file reports size 0, and a pipe gives size 0 or -1
+        bool to_eof = fileSize <= 0;
+    #endif
+        if (to_eof)
         {
-            // allocate +1 bytes for null terminator; this is for legacy API-s
-            if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
+            char* buffer = nullptr;
+            auto grow = [&](int n) -> char* {
+                char* p = static_cast<char*>(realloc(buffer, size_t(n) + 1u)); // +1 keeps room for the null terminator
+                if (p)
+                    buffer = p;
+                return p;
+            };
+            int len = read_until_eof(*this, grow);
+            if (len <= 0)
             {
-                int bytesRead = read(buffer, fileSize);
-                buffer[bytesRead] = '\0';
-                return load_buffer{ buffer, bytesRead };
+                free(buffer);
+                return load_buffer{ nullptr, 0 };
             }
+            buffer[len] = '\0';
+            return load_buffer{ buffer, len };
+        }
+        // allocate +1 bytes for the null terminator, which legacy APIs expect
+        if (auto* buffer = static_cast<char*>(malloc(size_t(fileSize) + 1u)))
+        {
+            int bytesRead = read(buffer, fileSize);
+            buffer[bytesRead] = '\0';
+            return load_buffer{ buffer, bytesRead };
         }
         return load_buffer{ nullptr, 0 };
     }
@@ -279,10 +345,16 @@ namespace rpp /* ReCpp */
         int pos   = tell();
         int count = size() - pos;
         try {
-            if (count <= 0) // a /proc file or a pipe reports size 0, so read to EOF
+            if (count <= 0 || pos < 0) // a /proc file reports size 0, and a pipe has no position
             {
-                char buf[4096]; // a bigger chunk reads a pipe no faster, because the writer sets the pace
-                for (int n; (n = read(buf, sizeof(buf))) > 0;) out.append(buf, size_t(n));
+                auto grow = [&](int n) {
+                    out.resize(size_t(n));
+                    return out.data();
+                };
+                int len = read_until_eof(*this, grow);
+                if (len < 0)
+                    return {};
+                out.resize(size_t(len));
                 return out;
             }
             out.resize(size_t(count));

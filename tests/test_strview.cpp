@@ -200,6 +200,17 @@ TestImpl(test_strview)
         AssertThat(rpp::strview{"120.55abcdefgh"}.to_float(), 120.55f);
         AssertThat(rpp::strview{"-120.55abcdefgh"}.to_float(), -120.55f);
     }
+    TestCase(chomp_first_on_an_empty_view_keeps_it_empty)
+    {
+        rpp::strview s{"a", 1};
+        AssertThat(s.chomp_first().len, 0);
+        AssertThat(s.chomp_first().len, 0);
+    #if RPP_ENABLE_UNICODE
+        rpp::ustrview u{u"a", 1};
+        AssertThat(u.chomp_first().len, 0);
+        AssertThat(u.chomp_first().len, 0);
+    #endif
+    }
     TestCase(parse_double_exponent)
     {
         AssertThat(rpp::strview{"1.0e+003"}.to_double(), 1000.0);

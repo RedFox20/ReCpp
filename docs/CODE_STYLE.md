@@ -29,6 +29,52 @@ const bool future_was_ready_during_cleanup =
 When an initializer is too long, wrap inside its argument list or another natural
 expression boundary. Keep `type name = expression` on the first line.
 
+## One statement per line
+
+A packed line hides a branch, a side effect or a loop body from a reader who scans.
+The owner flagged each shape below in review, so R7 reports them.
+
+```cpp
+// bad: a block folded onto one line
+if (len > 0) { buffer[len] = '\0'; return load_buffer{ buffer, len }; }
+
+// good
+if (len <= 0)
+{
+    free(buffer);
+    return load_buffer{ nullptr, 0 };
+}
+buffer[len] = '\0';
+return load_buffer{ buffer, len };
+```
+
+```cpp
+// bad: the read and the work hide in the for header
+for (int n; len < capacity && (n = input.read(buffer + len, capacity - len)) > 0;) len += n;
+
+// good: the header iterates, and the body reads
+while (len < capacity)
+{
+    int bytes_read = input.read(buffer + len, capacity - len);
+    if (bytes_read <= 0) // EOF or a read error
+        return len;
+    len += bytes_read;
+}
+```
+
+```cpp
+// bad: an assignment inside a ternary, and a lambda on one line
+auto grow = [&](int n) { char* p = (char*)realloc(buffer, n); return p ? (buffer = p) : nullptr; };
+
+// good
+auto grow = [&](int n) -> char* {
+    char* p = static_cast<char*>(realloc(buffer, size_t(n)));
+    if (p)
+        buffer = p;
+    return p;
+};
+```
+
 ## Two peer branches take `if` and `else`
 
 A guard clause rejects input and leaves. Two branches which both do work are peers,

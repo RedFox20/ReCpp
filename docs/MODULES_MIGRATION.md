@@ -119,7 +119,7 @@ only it can offer, the vector overload an explicit `rpp::sort<T>(v)` names, and 
 `element_range` overload whose by-value parameter lets a const view sort its mutable
 elements. Asking which module should carry a name is worth doing per layer.
 
-**Open questions:** `BUGS.md` B2, B5, B9, B10, B15, B16, B28 and B36. B8 keeps three workarounds open,
+**Open questions:** `BUGS.md` B2, B5, B9, B15, B16, B28 and B36. B8 keeps three workarounds open,
 and each one goes away when a newer gcc reads the module back. B6 closed as C25, so the TSAN jobs no
 longer fail on the exception refcount race.
 
