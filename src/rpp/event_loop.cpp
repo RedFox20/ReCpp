@@ -296,13 +296,20 @@ namespace rpp
     {
         for (;;)
         {
+            // queued work needs no wait, so it skips time_to_next_waiter(). A socket waiter still goes through the poll
+            const bool no_sockets = socket_waiters.empty();
+            if (no_sockets && resume_queue.try_pop(event))
+            {
+                fire_due_waiters();
+                return true;
+            }
             const rpp::Duration left = deadline - current_time(frame);
             const rpp::Duration next = time_to_next_waiter();
             const rpp::Duration wait = next < left ? next : left;
             bool got = false;
             if (wait <= rpp::Duration::zero())
-                got = resume_queue.try_pop(event);
-            else if (socket_waiters.empty())
+                got = !no_sockets && resume_queue.try_pop(event); // without a socket, the pop above found the queue empty
+            else if (no_sockets)
                 got = wait_pop_until(event, frame.now() + wait, frame);
             else
                 got = poll_sockets_until(event, frame.now() + wait, frame);
