@@ -107,6 +107,7 @@ namespace rpp
         #if _MSC_VER
         #  pragma warning(disable:4201)
         #endif
+        // the IPv4 and IPv6 fields share storage, so a caller uses ipv4_octet() and with_ipv4_octet() instead
         union {
             union {
                 unsigned long Addr4; // IPv4 Address in NETWORK byte order (!)
@@ -148,8 +149,18 @@ namespace rpp
         /** @returns IPv4 address as a 32-bit integer */
         uint32_t ipv4_address() const noexcept { return Addr4; }
 
-        /** @returns IPv4 octet `index` 0..3 in the written order, so octet 3 of 192.168.1.10 is 10 */
-        uint8_t ipv4_octet(int index) const noexcept { return Addr4Parts[index]; }
+        /** @returns IPv4 octet `index` 0..3 in the written order, so octet 3 of 192.168.1.10 is 10. 0 for an IPv6 address */
+        uint8_t ipv4_octet(int index) const noexcept { return is_ipv4() && uint32_t(index) < 4 ? Addr4Parts[index] : 0; }
+
+        /** @returns a copy with IPv4 octet `index` 0..3 set to `value`, or an empty raw_address for an IPv6 address */
+        raw_address with_ipv4_octet(int index, uint8_t value) const noexcept
+        {
+            if (!is_ipv4() || uint32_t(index) >= 4)
+                return raw_address{};
+            raw_address copy = *this;
+            copy.Addr4Parts[index] = value;
+            return copy;
+        }
 
         /** Resets this raw_address to a default state */
         void reset() noexcept;

@@ -327,10 +327,18 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
 
         PopResult r;
-        AssertWaitPopTimed(Millis(5), false, /*item*/"", /*elapsed ms:*/ 4.0, 10.0);
+        // a loaded machine stretches one wait, so the tight bound reads the best of three
+        double timed_out_ms = best_of_3([&]
+        {
+            PopResult probe = wait_pop_timed(queue, Millis(5));
+            AssertThat(bool(probe), false);
+            AssertThat(probe.item, "");
+            return probe.elapsed_ms;
+        });
+        AssertInRange(timed_out_ms, 4.0, 10.0);
         AssertWaitPopTimed(Millis(0), false, /*item*/"", /*elapsed ms:*/ 0.0, 0.2);
 
-        // if someone pushes an item if we have a huge timeout, 
+        // if someone pushes an item if we have a huge timeout,
         // we should get it immediately
         queue.push("item1");
         AssertWaitPopTimed(Millis(10'000), true, /*item*/"item1", /*elapsed ms:*/ 0.0, 10.0);

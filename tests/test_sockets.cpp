@@ -131,6 +131,23 @@ TestImpl(test_sockets)
         AssertEqual(b.str(), "192.168.1.20");
     }
 
+    TestCase(ipv4_octets_of_an_ipv6_or_empty_address_read_nothing)
+    {
+        raw_address a { 172, 16, 223, 10 };
+        AssertEqual(a.with_ipv4_octet(3, 19).str(), "172.16.223.19");
+        AssertEqual(a.str(), "172.16.223.10");
+        AssertTrue(a.with_ipv4_octet(4, 19).is_empty());
+
+        raw_address v6 { AF_IPv6, "fe80::1" };
+        AssertTrue(v6.is_ipv6());
+        AssertEqual(v6.ipv4_octet(0), 0);
+        AssertTrue(v6.with_ipv4_octet(0, 1).is_empty());
+
+        raw_address empty;
+        AssertEqual(empty.ipv4_octet(3), 0);
+        AssertTrue(empty.with_ipv4_octet(3, 1).is_empty());
+    }
+
     TestCase(init_ipv6)
     {
         ipaddress6 a;
@@ -283,6 +300,21 @@ TestImpl(test_sockets)
         #endif
             // AssertTrue(iface.gateway.has_address()); // disabled because virtual interfaces don't have a gateway
         }
+    }
+
+    TestCase(get_interfaces_time_per_call)
+    {
+        rpp::Timer t;
+        const size_t count = ipinterface::get_interfaces(AF_IPv4).size();
+        const double first_ms = t.elapsed_millis();
+        const double warm_ms = best_of_3([]
+        {
+            rpp::Timer w;
+            (void)ipinterface::get_interfaces(AF_IPv4);
+            return w.elapsed_millis();
+        });
+        print_info("get_interfaces(AF_IPv4): %zu interfaces, first call %.3f ms, best of 3 %.3f ms\n", count, first_ms, warm_ms);
+        AssertGreater(count, 0u);
     }
 
     TestCase(list_interfaces_ipv6)

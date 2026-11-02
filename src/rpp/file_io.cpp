@@ -647,17 +647,32 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+    // fclose() flushes the stdio buffer, so a full disk fails a small write only there
+    static int write_and_close(file& f, const void* buffer, int bytesToWrite) noexcept
+    {
+        if (!f.good())
+            return -1;
+        int written = f.write(buffer, bytesToWrite);
+    #if !_MSC_VER // WriteFile() keeps no buffer in the process
+        FILE* handle = (FILE*)f.Handle;
+        f.Handle = nullptr;
+        if (fclose(handle) != 0)
+            return -1;
+    #endif
+        return written;
+    }
+
     int file::write_new(strview filename, const void* buffer, int bytesToWrite) noexcept
     {
         file f { filename, mode::CREATENEW };
-        return f.write(buffer, bytesToWrite);
+        return write_and_close(f, buffer, bytesToWrite);
     }
-    
+
 #if RPP_ENABLE_UNICODE
     int file::write_new(ustrview filename, const void* buffer, int bytesToWrite) noexcept
     {
         file f { filename, mode::CREATENEW };
-        return f.write(buffer, bytesToWrite);
+        return write_and_close(f, buffer, bytesToWrite);
     }
 #endif // RPP_ENABLE_UNICODE
 

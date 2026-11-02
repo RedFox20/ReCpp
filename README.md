@@ -1041,8 +1041,8 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 |-------|-------------|
 | [`load_buffer`](src/rpp/file_io.h#L31) | RAII buffer for loading file contents into memory |
 | [`file`](src/rpp/file_io.h#L94) | Random-access file with read, write, seek, and truncate |
-| [`file_lock`](src/rpp/file_io.h#L473) | Exclusive OS file lock, which the OS releases when the process ends |
-| [`buffer_parser`](src/rpp/file_io.h#L517) | Generic file-backed parser (line, bracket, keyval variants) |
+| [`file_lock`](src/rpp/file_io.h#L515) | Exclusive OS file lock, which the OS releases when the process ends |
+| [`buffer_parser`](src/rpp/file_io.h#L559) | Generic file-backed parser (line, bracket, keyval variants) |
 
 ### file::mode Enum
 
@@ -1080,10 +1080,10 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 | [`write(const void* buffer, int bytesToWrite)`](src/rpp/file_io.h#L252) | Write bytes from buffer |
 | [`writef(const char* format, ...)`](src/rpp/file_io.h#L284) | Printf-style write |
 | [`writeln(strview str)`](src/rpp/file_io.h#L289) | Write line with newline |
-| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L421) | Seek to filepos |
-| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L422) | Seek to 64-bit filepos |
-| [`tell()`](src/rpp/file_io.h#L427) | Tell file position |
-| [`tell64()`](src/rpp/file_io.h#L432) | Tell 64-bit file position |
+| [`seek(int filepos, int seekmode)`](src/rpp/file_io.h#L463) | Seek to filepos |
+| [`seekl(int64 filepos, int seekmode)`](src/rpp/file_io.h#L464) | Seek to 64-bit filepos |
+| [`tell()`](src/rpp/file_io.h#L469) | Tell file position |
+| [`tell64()`](src/rpp/file_io.h#L474) | Tell 64-bit file position |
 | [`flush()`](src/rpp/file_io.h#L357) | Flush buffered writes |
 | [`sync()`](src/rpp/file_io.h#L364) | Flush buffered writes and wait for the storage device |
 | [`truncate(int64 size)`](src/rpp/file_io.h#L341) | Truncate file to size |
@@ -1091,9 +1091,9 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 | [`truncate_end(int64 bytes)`](src/rpp/file_io.h#L335) | Remove bytes from end |
 | [`preallocate(int64 size)`](src/rpp/file_io.h#L350) | Preallocate file space |
 | [`save_as(const char* newPath)`](src/rpp/file_io.h#L209) | Copy contents to a new file |
-| [`time_created()`](src/rpp/file_io.h#L442) | File creation time |
-| [`time_accessed()`](src/rpp/file_io.h#L447) | Last access time |
-| [`time_modified()`](src/rpp/file_io.h#L452) | Last modification time |
+| [`time_created()`](src/rpp/file_io.h#L484) | File creation time |
+| [`time_accessed()`](src/rpp/file_io.h#L489) | Last access time |
+| [`time_modified()`](src/rpp/file_io.h#L494) | Last modification time |
 
 ### file Static Methods
 
@@ -1104,17 +1104,19 @@ Cross-platform file I/O with RAII file handles. Provides efficient file reading,
 | [`file::read_all_text(strview filename)`](src/rpp/file_io.h#L230) | Read entire file as `std::string` |
 | [`file::read_all_text(ustrview filename)`](src/rpp/file_io.h#L235) | Read entire file as `std::string` |
 | [`file::read_stdin_text()`](src/rpp/file_io.h#L242) | Read stdin to EOF in binary mode as `std::string`, also from a pipe |
-| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L377) | Create/overwrite file with data |
-| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L391) | Create/overwrite file with data |
+| [`file::write_new(strview filename, const void* data, int size)`](src/rpp/file_io.h#L377) | Creates or overwrites the file, and returns the bytes written or -1 when the open or the flush fails |
+| [`file::write_new(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L391) | Creates or overwrites the file, and returns the bytes written or -1 when the open or the flush fails |
+| [`file::write_all(strview filename, const void* data, int size)`](src/rpp/file_io.h#L417) | Creates or overwrites the file, and returns true when it holds every byte |
+| [`file::write_all(ustrview filename, const void* data, int size)`](src/rpp/file_io.h#L432) | Creates or overwrites the file, and returns true when it holds every byte |
 
 ### file_lock Methods
 
 | Method | Description |
 |--------|-------------|
-| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L489) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed. A `fork()` child without `exec()` shares the lock |
-| [`file_lock::try_lock(ustrview filename)`](src/rpp/file_io.h#L491) | Same as above, with an UTF-16 path |
-| [`is_locked()`](src/rpp/file_io.h#L495) / [`operator bool()`](src/rpp/file_io.h#L496) | True if this object holds the lock |
-| [`unlock()`](src/rpp/file_io.h#L499) | Release the lock and close the file. The destructor calls it |
+| [`file_lock::try_lock(strview filename)`](src/rpp/file_io.h#L531) | Create the file if needed and lock it without a wait. An empty lock means another handle holds it, or the open failed. A `fork()` child without `exec()` shares the lock |
+| [`file_lock::try_lock(ustrview filename)`](src/rpp/file_io.h#L533) | Same as above, with an UTF-16 path |
+| [`is_locked()`](src/rpp/file_io.h#L537) / [`operator bool()`](src/rpp/file_io.h#L538) | True if this object holds the lock |
+| [`unlock()`](src/rpp/file_io.h#L541) | Release the lock and close the file. The destructor calls it |
 
 ```cpp
 // one instance per home folder: stop if another process holds the lock
@@ -2356,64 +2358,65 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | Class | Description |
 |-------|-------------|
 | [`raw_address`](src/rpp/sockets.h#L101) | IP address without port (IPv4/IPv6) |
-| [`ipaddress`](src/rpp/sockets.h#L219) | IP address + port, constructible from `"ip:port"` strings |
-| [`ipaddress4`](src/rpp/sockets.h#L373) | IPv4 convenience wrapper |
-| [`ipaddress6`](src/rpp/sockets.h#L408) | IPv6 convenience wrapper |
-| [`ipinterface`](src/rpp/sockets.h#L440) | Network interface info (name, addr, netmask, broadcast, gateway) |
-| [`socket`](src/rpp/sockets.h#L485) | Full TCP/UDP socket with send, recv, select, etc. |
-| [`socket_poller`](src/rpp/sockets.h#L1480) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
+| [`ipaddress`](src/rpp/sockets.h#L230) | IP address + port, constructible from `"ip:port"` strings |
+| [`ipaddress4`](src/rpp/sockets.h#L384) | IPv4 convenience wrapper |
+| [`ipaddress6`](src/rpp/sockets.h#L419) | IPv6 convenience wrapper |
+| [`ipinterface`](src/rpp/sockets.h#L451) | Network interface info (name, addr, netmask, broadcast, gateway) |
+| [`socket`](src/rpp/sockets.h#L496) | Full TCP/UDP socket with send, recv, select, etc. |
+| [`socket_poller`](src/rpp/sockets.h#L1491) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
 
 ### raw_address Methods
 
 | Method | Description |
 |--------|-------------|
-| [`raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d)`](src/rpp/sockets.h#L129) | An IPv4 address from its octets, such as `raw_address{192, 168, 1, 10}` |
-| [`ipv4_octet(int index)`](src/rpp/sockets.h#L152) | IPv4 octet 0 to 3 in the written order |
+| [`raw_address(uint8_t a, uint8_t b, uint8_t c, uint8_t d)`](src/rpp/sockets.h#L130) | An IPv4 address from its octets, such as `raw_address{192, 168, 1, 10}` |
+| [`ipv4_octet(int index)`](src/rpp/sockets.h#L153) | Returns IPv4 octet 0 to 3 in the written order, or 0 for an IPv6 address |
+| [`with_ipv4_octet(int index, uint8_t value)`](src/rpp/sockets.h#L156) | Returns a copy with one IPv4 octet replaced, or an empty address for IPv6 |
 
 ### socket Methods
 
 | Method | Description |
 |--------|-------------|
-| [`close()`](src/rpp/sockets.h#L562) | Close the socket |
-| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L673) | Send data |
-| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L793) | Receive data |
-| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L707) | UDP send to address |
-| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L823) | UDP receive with source address |
-| [`flush()`](src/rpp/sockets.h#L743) | Flush pending data |
-| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L816) | Peek at incoming data without consuming |
-| [`skip(int bytes)`](src/rpp/sockets.h#L766) | Skip incoming bytes |
-| [`available()`](src/rpp/sockets.h#L777) | Bytes available to read |
-| [`select(int millis)`](src/rpp/sockets.h#L1180) | Wait for socket readability |
-| [`good()`](src/rpp/sockets.h#L581) / [`bad()`](src/rpp/sockets.h#L583) | Socket state |
-| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1017) | Enable/disable Nagle's algorithm |
-| [`set_dscp(int dscp)`](src/rpp/sockets.h#L1035) | Set the DSCP of every packet the socket sends. Windows ignores IP_TOS, so it returns false there |
-| [`get_dscp()`](src/rpp/sockets.h#L1038) | Get the DSCP of the packets the socket sends, or -1 on error and on Windows |
-| [`send_arp_request(const raw_address& target)`](src/rpp/sockets.h#L1464) | Broadcast an ARP request for `target` from a make_arp() socket. A request for address() announces this host |
+| [`close()`](src/rpp/sockets.h#L573) | Close the socket |
+| [`send(const void* data, int numBytes)`](src/rpp/sockets.h#L684) | Send data |
+| [`recv(void* buf, int maxBytes)`](src/rpp/sockets.h#L804) | Receive data |
+| [`sendto(const ipaddress& addr, const void* data, int numBytes)`](src/rpp/sockets.h#L718) | UDP send to address |
+| [`recvfrom(ipaddress& addr, void* buf, int maxBytes)`](src/rpp/sockets.h#L834) | UDP receive with source address |
+| [`flush()`](src/rpp/sockets.h#L754) | Flush pending data |
+| [`peek(void* buf, int maxBytes)`](src/rpp/sockets.h#L827) | Peek at incoming data without consuming |
+| [`skip(int bytes)`](src/rpp/sockets.h#L777) | Skip incoming bytes |
+| [`available()`](src/rpp/sockets.h#L788) | Bytes available to read |
+| [`select(int millis)`](src/rpp/sockets.h#L1191) | Wait for socket readability |
+| [`good()`](src/rpp/sockets.h#L592) / [`bad()`](src/rpp/sockets.h#L594) | Socket state |
+| [`set_nagle(bool enable)`](src/rpp/sockets.h#L1028) | Enable/disable Nagle's algorithm |
+| [`set_dscp(int dscp)`](src/rpp/sockets.h#L1046) | Set the DSCP of every packet the socket sends. Windows ignores IP_TOS, so it returns false there |
+| [`get_dscp()`](src/rpp/sockets.h#L1049) | Get the DSCP of the packets the socket sends, or -1 on error and on Windows |
+| [`send_arp_request(const raw_address& target)`](src/rpp/sockets.h#L1475) | Broadcast an ARP request for `target` from a make_arp() socket. A request for address() announces this host |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1285) | Create a listening server socket |
-| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1294) | Create a listening server socket |
-| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1338) | Accept an incoming connection |
-| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1360) | Connect to an address |
-| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1414) | Connect by hostname and port |
-| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1379) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
-| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1386) | Read the result of connect_start() once the socket is writable. True when connected |
-| [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1348) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
-| [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1397) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
-| [`socket::make_arp(iface, opt)`](src/rpp/sockets.h#L1456) | Open a Linux packet socket for the ARP frames of an interface. It needs CAP_NET_RAW, and its close is slow |
-| [`poll_entry`](src/rpp/sockets.h#L1258) | One socket in a poll set, with its own flags and its own ready result |
-| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1495) | Add a socket to the next poll. Returns its index for ready() |
-| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1509) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
-| [`socket_poller::wake()`](src/rpp/sockets.h#L1520) | End a poll in progress from any thread, a no-op when no poll is armed |
-| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1499) | True when the entry fired in the last poll. An error or a hangup fires too |
-| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1501) | True when wake() can end a poll. Without it a caller polls in short slices |
-| [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1273) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1296) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1305) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1349) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1371) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1425) | Connect by hostname and port |
+| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1390) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
+| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1397) | Read the result of connect_start() once the socket is writable. True when connected |
+| [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1359) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
+| [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1408) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
+| [`socket::make_arp(iface, opt)`](src/rpp/sockets.h#L1467) | Open a Linux packet socket for the ARP frames of an interface. It needs CAP_NET_RAW, and its close is slow |
+| [`poll_entry`](src/rpp/sockets.h#L1269) | One socket in a poll set, with its own flags and its own ready result |
+| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1506) | Add a socket to the next poll. Returns its index for ready() |
+| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1520) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
+| [`socket_poller::wake()`](src/rpp/sockets.h#L1531) | End a poll in progress from any thread, a no-op when no poll is armed |
+| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1510) | True when the entry fired in the last poll. An error or a hangup fires too |
+| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1512) | True when wake() can end a poll. Without it a caller polls in short slices |
+| [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1284) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
 | [`protocol_info`](src/rpp/sockets.h#L86) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1531) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1537) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1542) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1548) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 
