@@ -5,6 +5,7 @@
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <rpp/timepoint.h> // rpp::sleep_ms, rpp::TimePoint
+#include <rpp/timer.h> // rpp::Timer
 #include <rpp/threads.h> // rpp::yield
 #include <atomic> // std::atomic_bool
 #include <cerrno> // EINTR
@@ -735,6 +736,14 @@ TestImpl(test_file_io)
         AssertThat(fullpaths2.size(), 1u);
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
 
+        // TEST: list_files dir_fullpath_recursive from a relative root, which the top call resolves once
+        std::vector<std::string> fullpaths4 = list_files("folder", ".txt", rpp::dir_fullpath_recursive);
+        AssertThat(fullpaths4.size(), 3u);
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/test1.txt")));
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/path/test2.txt")));
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/path/test3.txt")));
+        AssertThat(list_files("missing", ".txt", rpp::dir_fullpath_recursive).size(), 0u);
+
         // TEST: list_files dir_fullpath_recursive
         std::vector<std::string> fullpaths3 = list_files("", ".txt", rpp::dir_fullpath_recursive);
         print_paths("fullpaths3", fullpaths3);
@@ -762,6 +771,36 @@ TestImpl(test_file_io)
 
         Assert(rpp::change_dir(originalDir));
         Assert(delete_folder(TestDir+"/", delete_mode::recursive));
+    }
+
+    // a full-path listing resolves its deep root once, so it costs about as much as a listing which prefixes the same root
+    TestCase(recursive_full_path_listing_resolves_its_root_once)
+    {
+        Assert(create_folder(TestDir));
+        const std::string base = full_path(TestDir); // the listing which prefixes the root takes it as given
+        AssertNotEqual(base, std::string{});
+        const std::string root = base + "/a/b/c/d/e/f/g/h/i/j/k/l/root";
+        constexpr int NUM_DIRS = 100;
+        for (int i = 0; i < NUM_DIRS; ++i)
+            Assert(create_folder(path_combine(root, "child" + std::to_string(i))));
+        size_t relative_count = 0;
+        size_t full_count = 0;
+        const double relative = best_of_3([&]
+        {
+            rpp::Timer timer;
+            relative_count = list_dirs(root, rpp::dir_relpath_combine_recursive).size();
+            return timer.elapsed_micros();
+        });
+        const double full = best_of_3([&]
+        {
+            rpp::Timer timer;
+            full_count = list_dirs(root, rpp::dir_fullpath_recursive).size();
+            return timer.elapsed_micros();
+        });
+        AssertThat(relative_count, size_t(NUM_DIRS));
+        AssertThat(full_count, size_t(NUM_DIRS));
+        AssertLess(full, relative * 2.0);
+        Assert(delete_folder(TestDir, delete_mode::recursive));
     }
 
 #if RPP_ENABLE_UNICODE
