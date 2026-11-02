@@ -8,6 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include "sort.h"
+#include "type_traits.h" // has_contains_memb
 #include <stdexcept>
 
 namespace rpp
@@ -333,7 +334,7 @@ namespace rpp
 
     template<class C, class T> bool contains(const C& container, const T& item)
     {
-        if constexpr (requires { container.contains(item); }) // strview::find() returns null, never end()
+        if constexpr (has_contains_memb<C, T>) // strview::find() returns null, never end()
             return container.contains(item);
         else
             return container.find(item) != container.end();

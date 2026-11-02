@@ -118,6 +118,7 @@ namespace rpp
 
         void clear() noexcept;
         void reserve(int count) noexcept;
+        /// Sets the length to count, which must not be negative, and writes the null terminator
         void resize(int count) noexcept;
 
         /** @brief Append a string to this buffer */
