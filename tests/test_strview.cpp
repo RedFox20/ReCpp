@@ -211,6 +211,18 @@ TestImpl(test_strview)
         AssertThat(u.chomp_first().len, 0);
     #endif
     }
+    TestCase(skip_until_never_matches_past_the_end_of_the_view)
+    {
+        const char text[] = "abc intra";
+        rpp::strview s{text, 5}; // the bytes after the view complete the substring
+        AssertThat(s.skip_until("intra").len, 0);
+        rpp::strview t{text, 5};
+        AssertThat(t.skip_after("intra").len, 0);
+        rpp::strview whole{text};
+        AssertThat(whole.skip_until("intra"), "intra");
+        rpp::strview literal{"abc i"}; // ASAN reports a read past the end of this literal
+        AssertThat(literal.skip_until("intra-refresh-cycle=").len, 0);
+    }
     TestCase(parse_double_exponent)
     {
         AssertThat(rpp::strview{"1.0e+003"}.to_double(), 1000.0);

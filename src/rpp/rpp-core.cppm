@@ -71,6 +71,7 @@ export namespace rpp {
     using rpp::has_to_string_memb;
     using rpp::has_get_memb;
     using rpp::has_set_memb;
+    using rpp::has_contains_memb;
     using rpp::is_iterable;
     using rpp::is_stringlike;
     using rpp::is_container;

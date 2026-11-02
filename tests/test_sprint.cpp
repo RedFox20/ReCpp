@@ -129,6 +129,25 @@ TestImpl(test_sprint)
         AssertEqual(buf2.view(), bigs);
     }
 
+    TestCase(string_buffer_resize_keeps_the_inline_buffer)
+    {
+        const std::string text(500, 'x');
+        const rpp::strview head{ text.data(), 20 };
+        string_buffer sb{ text };
+        sb.resize(500);
+        AssertThat(sb.cap, string_buffer::SIZE);
+        sb.resize(20);
+        AssertThat(sb.cap, string_buffer::SIZE);
+        AssertThat(sb.c_str()[20], '\0');
+        AssertThat(sb.view(), head);
+        sb.resize(string_buffer::SIZE); // the terminator no longer fits the inline buffer
+        AssertGreater(sb.cap, string_buffer::SIZE);
+        AssertThat(sb.size(), string_buffer::SIZE);
+        AssertThat(sb.c_str()[string_buffer::SIZE], '\0');
+        const rpp::strview grown_head{ sb.data(), 20 };
+        AssertThat(grown_head, head);
+    }
+
     TestCase(string_buf_move)
     {
         string_buffer bigbuf;

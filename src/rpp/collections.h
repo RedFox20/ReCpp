@@ -8,6 +8,7 @@
 #include <deque>
 #include <unordered_map>
 #include "sort.h"
+#include "type_traits.h" // has_contains_memb
 #include <stdexcept>
 
 namespace rpp
@@ -333,7 +334,10 @@ namespace rpp
 
     template<class C, class T> bool contains(const C& container, const T& item)
     {
-        return container.find(item) != container.end();
+        if constexpr (has_contains_memb<C, T>) // strview::find() returns null, never end()
+            return container.contains(item);
+        else
+            return container.find(item) != container.end();
     }
 
     template<class T> std::vector<T>& append(std::vector<T>& v, const std::vector<T>& other)
@@ -388,6 +392,12 @@ namespace rpp
     {
         for (const T& elem : v) if (predicate(elem)) return &elem;
         return nullptr;
+    }
+
+    /// Returns a pointer to the first element which matches the predicate, or null
+    template<class T, class Pred> T* find_if(std::vector<T>& v, const Pred& predicate) noexcept
+    {
+        return find_if(range(v), predicate);
     }
 
     template<class T, class Pred> const T* find_if(const std::vector<T>& v, const Pred& predicate) noexcept
