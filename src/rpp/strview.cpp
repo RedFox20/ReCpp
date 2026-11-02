@@ -474,6 +474,8 @@ namespace rpp
         char ch = *substr; // starting char of the sequence
         while (s < e) {
             if (const char* p = static_cast<const char*>(memchr(s, ch, e - s))) {
+                if (e - p < sublen) // the rest of the view cannot hold substr, and a later start holds even less
+                    break;
                 if (memcmp(p, substr, size_t(sublen)) == 0) { // match found
                     str = p; len = int(e - p);
                     return *this;
