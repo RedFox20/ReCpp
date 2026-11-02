@@ -63,7 +63,7 @@ namespace rpp
     template <typename T>
     class deferred;
 
-    namespace detail
+    namespace coro
     {
         // Final-suspend awaiter shared by every task/deferred promise: hands control to the awaiting
         // coroutine via symmetric transfer (no thread hop, no spawn). Works on any promise that
@@ -199,29 +199,29 @@ namespace rpp
                 return std::noop_coroutine();
             }
 
-            typename Promise::value_type await_resume() { return detail::take_result<typename Promise::value_type>(handle); }
+            typename Promise::value_type await_resume() { return coro::take_result<typename Promise::value_type>(handle); }
         };
-    } // namespace detail
+    } // namespace coro
 
     /** @brief Eager coroutine task: starts at construction. `co_await` resumes the caller on the loop. */
     template <typename T>
-    class [[nodiscard]] task : public detail::task_base<detail::task_promise<T, false, task<T>>, false>
+    class [[nodiscard]] task : public coro::task_base<coro::task_promise<T, false, task<T>>, false>
     {
-        using base = detail::task_base<detail::task_promise<T, false, task<T>>, false>;
+        using base = coro::task_base<coro::task_promise<T, false, task<T>>, false>;
 
     public:
-        using promise_type = detail::task_promise<T, false, task<T>>;
+        using promise_type = coro::task_promise<T, false, task<T>>;
         using base::base;
     };
 
     /** @brief Lazy coroutine task: starts only when first awaited (or via start()). Same API as task. */
     template <typename T>
-    class [[nodiscard]] deferred : public detail::task_base<detail::task_promise<T, true, deferred<T>>, true>
+    class [[nodiscard]] deferred : public coro::task_base<coro::task_promise<T, true, deferred<T>>, true>
     {
-        using base = detail::task_base<detail::task_promise<T, true, deferred<T>>, true>;
+        using base = coro::task_base<coro::task_promise<T, true, deferred<T>>, true>;
 
     public:
-        using promise_type = detail::task_promise<T, true, deferred<T>>;
+        using promise_type = coro::task_promise<T, true, deferred<T>>;
         using base::base;
 
         /// @brief Starts a not-yet-started deferred task (resumes it from its initial suspend), so a

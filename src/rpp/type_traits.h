@@ -10,7 +10,7 @@ namespace rpp
 {
     // ------------------------------------------------------------------------------------ //
 
-    namespace detail
+    namespace detect
     {
         template< class... >
         using void_t = void;
@@ -24,10 +24,10 @@ namespace rpp
 
     // the traits below are concepts. This stays for a consumer which brings its own alias
     template<template<class...> class Operation, typename... Arguments>
-    using is_detected = detail::is_detected<detail::void_t<>, Operation, Arguments...>;
+    using is_detected = detect::is_detected<detect::void_t<>, Operation, Arguments...>;
 
     template<template<class...> class Operation, typename... Arguments>
-    inline constexpr bool is_detected_v = detail::is_detected<detail::void_t<>, Operation, Arguments...>::value;
+    inline constexpr bool is_detected_v = detect::is_detected<detect::void_t<>, Operation, Arguments...>::value;
 
 #if !RPP_BARE_METAL
     /// True when `std::to_string(T)` compiles

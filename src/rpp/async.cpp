@@ -7,7 +7,7 @@
 #include "thread_pool.h" // rpp::parallel_task_detached
 #include <utility> // std::exchange
 
-namespace rpp::detail
+namespace rpp::fut
 {
     // each result a step publishes nests the next step one level deeper, so a longer chain continues after the stack unwinds
     static constexpr int MAX_NESTED_STEPS = 32;

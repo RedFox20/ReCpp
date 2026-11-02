@@ -46,20 +46,23 @@ def _is_private(name: str) -> bool:
     return name.startswith('__') and name not in _MACRO_HELPERS
 
 
-def _is_detail_ns(ns: str) -> bool:
+# the implementation namespace of each subsystem: async.h, task.h, mutex.h and type_traits.h
+IMPL_NAMESPACES = frozenset({'fut', 'coro', 'locks', 'detect'})
+
+def _is_impl_ns(ns: str) -> bool:
     """True for an implementation namespace, which no module surface carries.
 
     The entities stay reachable through the global module fragment, so a public template
     which names one still instantiates in an importer.
     """
-    return 'detail' in ns.split('::')
+    return any(part in IMPL_NAMESPACES for part in ns.split('::'))
 
 
 def _skip(ns: str, kind: str, name: str) -> bool:
     """True for a declaration no using-declaration can name, or which stays private."""
     # a deduction guide spells as `<deduction guide for X>`, which no using-declaration names
     return kind in SKIP_KINDS or name.startswith('<') or _is_private(name) \
-        or (ns and not ns.startswith('rpp')) or _is_detail_ns(ns)
+        or (ns and not ns.startswith('rpp')) or _is_impl_ns(ns)
 
 
 # a private helper no importer needs. Empty, because every module gives its public names
@@ -708,10 +711,11 @@ def selftest() -> list:
             bad.append(f'rpp.{group} reopens {ns} without the inline qualifier')
     # an implementation namespace reaches an importer through the fragment, never the surface
     for group in GROUP_HEADERS:
-        if 'detail' in group_export_block(group):
-            bad.append(f'rpp.{group} exports a detail namespace')
-    if not _is_detail_ns('rpp::detail') or _is_detail_ns('rpp::detailed'):
-        bad.append('the detail namespace test matches the wrong names')
+        block = group_export_block(group)
+        if any(re.search(rf'rpp::{ns}\b', block) for ns in IMPL_NAMESPACES):
+            bad.append(f'rpp.{group} exports an implementation namespace')
+    if not _is_impl_ns('rpp::fut') or _is_impl_ns('rpp::future') or _is_impl_ns('rpp::coro_operators'):
+        bad.append('the implementation namespace test matches the wrong names')
 
     # the pool fills the memo the serial pass reads, so a worker which answers differently
     # would change a generated module and no other case would see it

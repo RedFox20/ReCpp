@@ -400,7 +400,7 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_TSAN`](src/rpp/config.h#L112) | `1` if ThreadSanitizer is enabled |
 | [`RPP_UBSAN`](src/rpp/config.h#L119) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
 | [`RPP_SANITIZERS`](src/rpp/config.h#L129) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
-| [`RPP_TSAN_ANNOTATE(call)`](src/rpp/mutex.h#L14) | Expands to `call` when ThreadSanitizer is enabled, and to nothing otherwise |
+| [`RPP_TSAN_ANNOTATE(call)`](src/rpp/mutex.h#L17) | Expands to `call` when ThreadSanitizer is enabled, and to nothing otherwise |
 
 ### Platform & Architecture
 
@@ -2078,20 +2078,26 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L101) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, `std::mutex` elsewhere |
-| [`futex_mutex`](src/rpp/mutex.h#L38) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
-| [`recursive_mutex`](src/rpp/mutex.h#L122) | Recursive mutex variant |
-| [`unlock_guard<Mutex>`](src/rpp/mutex.h#L264) | RAII unlock guard: unlocks on construction, relocks on destruction |
-| [`synchronized<T>`](src/rpp/mutex.h#L534) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`mutex`](src/rpp/mutex.h#L104) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, a `pthread_mutex_t` elsewhere |
+| [`futex_mutex`](src/rpp/mutex.h#L41) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
+| [`recursive_mutex`](src/rpp/mutex.h#L125) | Recursive mutex variant, a recursive `pthread_mutex_t` on POSIX |
+| [`unique_lock<Mutex>`](src/rpp/mutex.h#L331) | Holds a mutex like `std::unique_lock`, with `rpp::defer_lock` and `rpp::adopt_lock` |
+| [`defer_lock_t`](src/rpp/mutex.h#L321) | Tag type for a `unique_lock` which does not take the mutex yet |
+| [`adopt_lock_t`](src/rpp/mutex.h#L323) | Tag type for a lock which adopts a mutex this thread already holds |
+| [`defer_lock`](src/rpp/mutex.h#L325) | The `defer_lock_t` value |
+| [`adopt_lock`](src/rpp/mutex.h#L327) | The `adopt_lock_t` value |
+| [`lock_guard<Mutex>`](src/rpp/mutex.h#L404) | Holds a mutex for its whole scope, like `std::lock_guard` |
+| [`unlock_guard<Lock>`](src/rpp/mutex.h#L420) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
+| [`synchronized<T>`](src/rpp/mutex.h#L686) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L288) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L324) | Spin-lock with timeout |
-| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L214) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L366) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L440) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L476) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L217) | Indicates platform provides native critical_section mutex |
+| [`SyncableType`](src/rpp/mutex.h#L518) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
 call, and has a trivial destructor, so a static instance is safe before and after `main()`. In a TSAN build each
@@ -2099,19 +2105,19 @@ lock and unlock annotates itself, so TSAN reports a lock-order inversion as it d
 
 | Method | Description |
 |--------|-------------|
-| [`try_lock()`](src/rpp/mutex.h#L61) | Takes the lock without a wait, and returns false when another thread holds it |
-| [`lock()`](src/rpp/mutex.h#L70) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
-| [`lock_contended()`](src/rpp/mutex.h#L79) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
-| [`unlock()`](src/rpp/mutex.h#L88) | Releases the lock, and wakes one sleeping thread when the lock was contended |
+| [`try_lock()`](src/rpp/mutex.h#L64) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/mutex.h#L73) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
+| [`lock_contended()`](src/rpp/mutex.h#L82) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/mutex.h#L91) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under `futex_mutex`, the condition variable and the semaphore flags.
 
 | Function | Description |
 |----------|-------------|
-| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L25) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
-| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L28) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
-| [`wake_one(const void* addr)`](src/rpp/mutex.h#L31) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
-| [`wake_all(const void* addr)`](src/rpp/mutex.h#L34) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L28) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L31) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/mutex.h#L34) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/mutex.h#L37) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
 
 ### Example: Basic Mutex and Spin Lock
 
@@ -2285,8 +2291,8 @@ initDone.wait(); // still returns immediately
 Condition variable which takes `rpp::Duration` and `rpp::TimePoint` only. A wait sleeps in the kernel on one 32-bit
 word, through a futex on Linux and Android, and `WaitOnAddress()` on Windows. The Windows wait raises the timer
 resolution, so a timeout keeps 1ms granularity instead of the ~15.6ms default tick. It works with any lock which has
-`lock()` and `unlock()`, and takes 8 bytes. With `std::unique_lock<rpp::futex_mutex>`, which `rpp::mutex` is on Linux
-and Android, the wait relocks the mutex as contended. A thread which sleeps on the mutex then wakes at the
+`lock()` and `unlock()`, and takes 8 bytes. With `rpp::unique_lock` or `std::unique_lock` of `rpp::futex_mutex`, which
+`rpp::mutex` is on Linux and Android, the wait relocks the mutex as contended. A thread which sleeps on the mutex then wakes at the
 next unlock.
 
 | Class | Description |
@@ -2296,10 +2302,10 @@ next unlock.
 
 | Method | Description |
 |--------|-------------|
-| [`notify_one()`](src/rpp/condition_variable.h#L121) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
-| [`notify_all()`](src/rpp/condition_variable.h#L128) | Wakes all waiting threads |
-| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L155) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
-| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L168) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+| [`notify_one()`](src/rpp/condition_variable.h#L122) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
+| [`notify_all()`](src/rpp/condition_variable.h#L129) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L156) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L169) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
 
 `rpp::cvar`, the word wait under the condition variable, lives in [rpp/mutex.h](#rppmutexh).
 

@@ -6,7 +6,10 @@
 #include "threads.h" // rpp::yield
 #include "timepoint.h" // rpp::Duration
 #include <atomic>
-#include <mutex> // lock_guard etc
+#include <mutex> // std::unique_lock, which the lock_t of each type still names
+#if !_MSC_VER && !RPP_FREERTOS && !RPP_CORTEX_M_ARCH
+#  include <pthread.h>
+#endif
 
 /// @brief expands to `call` in a TSAN build, so a futex lock can tell TSAN about itself
 #if RPP_TSAN
@@ -243,38 +246,187 @@ namespace rpp
     using recursive_mutex = critical_section;
 
 #define RPP_HAS_CRITICAL_SECTION_MUTEX 1
-#elif __linux__
-    /// The platform mutex, a futex_mutex on Linux and Android
-    using mutex = rpp::futex_mutex;
-    using recursive_mutex = std::recursive_mutex;
 #else
-    // the Apple and Emscripten parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
-    using mutex = std::mutex;
-    using recursive_mutex = std::recursive_mutex;
+    namespace locks // only POSIX declares these, so the module surface names them through mutex and recursive_mutex
+    {
+        /// A mutex on a pthread_mutex_t, where no futex_mutex fits
+        class pthread_mutex
+        {
+            pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+        public:
+            pthread_mutex() noexcept = default;
+            ~pthread_mutex() noexcept { pthread_mutex_destroy(&mtx); }
+            pthread_mutex(const pthread_mutex&) = delete;
+            pthread_mutex& operator=(const pthread_mutex&) = delete;
+
+            /// @returns true when this thread took the lock, false when another thread holds it
+            bool try_lock() noexcept { return pthread_mutex_trylock(&mtx) == 0; }
+            /// Takes the lock, and sleeps while another thread holds it
+            void lock() noexcept { pthread_mutex_lock(&mtx); }
+            /// Releases the lock. Only the thread which took the lock can release it
+            void unlock() noexcept { pthread_mutex_unlock(&mtx); }
+            /// @returns the pthread_mutex_t
+            pthread_mutex_t* native_handle() noexcept { return &mtx; }
+        };
+
+        /// A recursive mutex on a pthread_mutex_t: the thread which holds it can take it again
+        class pthread_recursive_mutex
+        {
+        #if defined(PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP) // glibc and bionic, so a static instance needs no constructor
+            pthread_mutex_t mtx = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+        public:
+            pthread_recursive_mutex() noexcept = default;
+        #else
+            pthread_mutex_t mtx;
+        public:
+            pthread_recursive_mutex() noexcept
+            {
+                pthread_mutexattr_t attr;
+                pthread_mutexattr_init(&attr);
+                pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+                pthread_mutex_init(&mtx, &attr);
+                pthread_mutexattr_destroy(&attr);
+            }
+        #endif
+            ~pthread_recursive_mutex() noexcept { pthread_mutex_destroy(&mtx); }
+            pthread_recursive_mutex(const pthread_recursive_mutex&) = delete;
+            pthread_recursive_mutex& operator=(const pthread_recursive_mutex&) = delete;
+
+            /// @returns true when this thread took the lock or already holds it
+            bool try_lock() noexcept { return pthread_mutex_trylock(&mtx) == 0; }
+            /// Takes the lock once more, and sleeps while another thread holds it
+            void lock() noexcept { pthread_mutex_lock(&mtx); }
+            /// Releases one level of the lock
+            void unlock() noexcept { pthread_mutex_unlock(&mtx); }
+            /// @returns the pthread_mutex_t
+            pthread_mutex_t* native_handle() noexcept { return &mtx; }
+        };
+    }
+
+    #if __linux__
+        /// The platform mutex, a futex_mutex on Linux and Android
+        using mutex = rpp::futex_mutex;
+    #else
+        // the Apple and Emscripten parking lot wakes every thread of a bucket, so a futex_mutex unlock would too
+        using mutex = rpp::locks::pthread_mutex;
+    #endif
+    using recursive_mutex = rpp::locks::pthread_recursive_mutex;
 #endif
 
 #ifndef RPP_HAS_CRITICAL_SECTION_MUTEX
     #define RPP_HAS_CRITICAL_SECTION_MUTEX 0
 #endif
 
+    /// Tag for a unique_lock which does not take the mutex yet
+    struct defer_lock_t { explicit defer_lock_t() = default; };
+    /// Tag for a lock which adopts a mutex this thread already holds
+    struct adopt_lock_t { explicit adopt_lock_t() = default; };
+    /// Passes defer_lock_t to a unique_lock constructor
+    inline constexpr rpp::defer_lock_t defer_lock = rpp::defer_lock_t{};
+    /// Passes adopt_lock_t to a unique_lock or lock_guard constructor
+    inline constexpr rpp::adopt_lock_t adopt_lock = rpp::adopt_lock_t{};
+
+    /// Holds a mutex until it dies, like std::unique_lock, and can unlock and relock it before that
+    template<class Mutex>
+    class unique_lock
+    {
+        Mutex* mtx = nullptr;
+        bool owns = false;
+    public:
+        using mutex_type = Mutex;
+
+        unique_lock() noexcept = default;
+        explicit unique_lock(Mutex& m) : mtx{&m}
+        {
+            m.lock();
+            owns = true;
+        }
+        unique_lock(Mutex& m, rpp::defer_lock_t) noexcept : mtx{&m} {}
+        unique_lock(Mutex& m, rpp::adopt_lock_t) noexcept : mtx{&m}, owns{true} {}
+        unique_lock(unique_lock&& other) noexcept : mtx{other.mtx}, owns{other.owns}
+        {
+            other.mtx = nullptr;
+            other.owns = false;
+        }
+        unique_lock& operator=(unique_lock&& other) noexcept
+        {
+            if (owns)
+                mtx->unlock();
+            mtx = other.mtx;
+            owns = other.owns;
+            other.mtx = nullptr;
+            other.owns = false;
+            return *this;
+        }
+        ~unique_lock() noexcept
+        {
+            if (owns)
+                mtx->unlock();
+        }
+        unique_lock(const unique_lock&) = delete;
+        unique_lock& operator=(const unique_lock&) = delete;
+
+        /// Takes the mutex
+        void lock()
+        {
+            mtx->lock();
+            owns = true;
+        }
+        /// @returns true when this lock took the mutex
+        bool try_lock()
+        {
+            owns = mtx->try_lock();
+            return owns;
+        }
+        /// Releases the mutex
+        void unlock()
+        {
+            mtx->unlock();
+            owns = false;
+        }
+        /// Detaches the mutex and leaves it in its state. @returns the mutex
+        Mutex* release() noexcept
+        {
+            Mutex* m = mtx;
+            mtx = nullptr;
+            owns = false;
+            return m;
+        }
+        /// @returns the mutex, or nullptr after release()
+        Mutex* mutex() const noexcept { return mtx; }
+        /// @returns true while this lock holds the mutex
+        bool owns_lock() const noexcept { return owns; }
+        explicit operator bool() const noexcept { return owns; }
+    };
+
+    /// Holds a mutex for its whole scope, like std::lock_guard
+    template<class Mutex>
+    class lock_guard
+    {
+        Mutex& mtx;
+    public:
+        using mutex_type = Mutex;
+        explicit lock_guard(Mutex& m) : mtx{m} { m.lock(); }
+        lock_guard(Mutex& m, rpp::adopt_lock_t) noexcept : mtx{m} {}
+        ~lock_guard() noexcept { mtx.unlock(); }
+        lock_guard(const lock_guard&) = delete;
+        lock_guard& operator=(const lock_guard&) = delete;
+    };
+
     /**
-     * @brief Unlock Guard: RAII unlocks and then relocks on scope exit.
+     * @brief Unlocks a held rpp::unique_lock or std::unique_lock, and relocks it at scope exit.
      */
-    template <class Mutex>
+    template <class Lock>
     struct unlock_guard final
     {
-        std::unique_lock<Mutex>& mtx;
-        explicit unlock_guard(std::unique_lock<Mutex>& mtx) : mtx{mtx}
+        Lock& held;
+        explicit unlock_guard(Lock& lock) : held{lock}
         {
-            mtx.unlock();
+            held.unlock();
         }
-        ~unlock_guard() noexcept /* terminates */
-        {                        // MSVC++ defined
-            // relock mutex or terminate()
-            // condition_variable_any wait functions are required to terminate if
-            // the mutex cannot be relocked;
-            // we slam into noexcept here for easier user debugging.
-            mtx.lock();
+        ~unlock_guard() noexcept // a failed relock terminates, as a condition_variable_any wait does
+        {
+            held.lock();
         }
     };
 
@@ -340,7 +492,7 @@ namespace rpp
         return std::unique_lock<Mutex>{m, std::adopt_lock};
     }
 
-    namespace detail
+    namespace locks
     {
         // the guard binds a `std::decay_t<T>&`, so an accessor returns exactly that. This one
         // rule covers a prvalue, a cv lvalue and an array lvalue, which all decay to something else
@@ -367,10 +519,10 @@ namespace rpp
         // spin_lock takes the mutex by reference and writes `!m.try_lock()`
         { t.get_mutex().lock() };
         { t.get_mutex().unlock() };
-        { t.get_mutex().try_lock() } -> detail::BoolTestable;
-        requires detail::is_plain_lvalue_ref<decltype(t.get_mutex())>;
+        { t.get_mutex().try_lock() } -> locks::BoolTestable;
+        requires locks::is_plain_lvalue_ref<decltype(t.get_mutex())>;
         { t.get_ref() };
-        requires detail::is_plain_lvalue_ref<decltype(t.get_ref())>;
+        requires locks::is_plain_lvalue_ref<decltype(t.get_ref())>;
     };
 
     // SyncableType cannot constrain this: synchronizable names synchronize_guard<SyncType>
@@ -400,11 +552,11 @@ namespace rpp
         // NOTE: Do not allow overwriting accessors, because all writes need to go 
         //       through synchronize_guard::operator=() which detects SyncType::set() method.
         //       However existing value can be modified via operator->()
-        value_type* operator->() noexcept { return detail::addressof(instance->get_ref()); }
+        value_type* operator->() noexcept { return locks::addressof(instance->get_ref()); }
 
         // For const refs, all read accessors are allowed
         // WARNING: do not const_cast these, it will cause undefined behavior
-        const value_type* operator->() const noexcept { return detail::addressof(instance->get_ref()); }
+        const value_type* operator->() const noexcept { return locks::addressof(instance->get_ref()); }
         const value_type& operator*() const noexcept { return instance->get_ref(); }
         const value_type& get() const noexcept { return instance->get_ref(); }
         operator const value_type&() const noexcept { return instance->get_ref(); }

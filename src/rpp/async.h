@@ -54,7 +54,7 @@ namespace rpp
         requires IsFunction<F> && NotFuture<decltype(f())>;
     };
 
-    namespace detail
+    namespace fut
     {
         /// A step which runs once, after the result it follows arrives
         struct continuation
@@ -234,7 +234,7 @@ namespace rpp
     class promise
     {
     protected:
-        detail::future_state<T>* state = new detail::future_state<T>{};
+        fut::future_state<T>* state = new fut::future_state<T>{};
         bool inline_next = false; // a caller may publish under a lock, so only a pool step runs the next step inline
 
     public:
@@ -244,7 +244,7 @@ namespace rpp
         /// Shares the state, so each copy can publish the result or give the one future
         promise(const promise& p) noexcept : state{p.state}, inline_next{p.inline_next}
         {
-            if (state) state->refs.fetch_add(detail::future_state<T>::PROMISE_REF, std::memory_order_relaxed);
+            if (state) state->refs.fetch_add(fut::future_state<T>::PROMISE_REF, std::memory_order_relaxed);
         }
 
         /// Abandons the state this promise holds, as the destructor does, then takes the state of `p`
@@ -283,14 +283,14 @@ namespace rpp
         /// Stores the exception which get() rethrows, and wakes the waiter. Throws std::logic_error as set_value() does
         void set_exception(std::exception_ptr e)
         {
-            detail::future_state<T>& s = claim();
+            fut::future_state<T>& s = claim();
             s.error = std::exchange(e, nullptr); // libc++ 18 copies an exception_ptr on a move, see BUGS.md C32
             s.finish(inline_next);
         }
 
     protected:
         // two threads may race to publish, so only the one which claims the state stores the result
-        detail::future_state<T>& claim()
+        fut::future_state<T>& claim()
         {
             if (!state || !state->claim()) throw std::logic_error{"rpp::promise already published its result, or it moved"};
             return *state;
@@ -300,7 +300,7 @@ namespace rpp
         template<class... Args>
         void store(Args&&... args)
         {
-            detail::future_state<T>& s = claim();
+            fut::future_state<T>& s = claim();
             try { s.value.emplace(std::forward<Args>(args)...); }
             catch (...) { s.unclaim(); throw; }
         }
@@ -310,7 +310,7 @@ namespace rpp
 
         void abandon() noexcept
         {
-            detail::future_state<T>* s = std::exchange(state, nullptr);
+            fut::future_state<T>* s = std::exchange(state, nullptr);
             if (!s) return;
             if (s->claimed()) { s->release(s->PROMISE_REF); return; } // a publisher came, so no copy publishes
             if (s->drop_copy()) return; // another copy remains, so the last one publishes
@@ -325,7 +325,7 @@ namespace rpp
     };
 
 
-    namespace detail
+    namespace fut
     {
         /// The promise of a step. On a pool step, it runs the next step inline when it publishes
         template<class T>
@@ -501,15 +501,15 @@ namespace rpp
     template<class T>
     class NODISCARD RPP_CORO_RETURN_TYPE future
     {
-        detail::future_state<T>* state = nullptr;
+        fut::future_state<T>* state = nullptr;
 
         friend class promise<T>;
         template<class> friend class future;
-        explicit future(detail::future_state<T>* s) noexcept : state{s} {}
+        explicit future(fut::future_state<T>* s) noexcept : state{s} {}
 
     public:
         using value_type = T;
-        using promise_type = detail::coro_promise<T>;
+        using promise_type = fut::coro_promise<T>;
 
         future() noexcept = default;
         future(future&& f) noexcept : state{std::exchange(f.state, nullptr)} {}
@@ -535,14 +535,14 @@ namespace rpp
         /// Blocks until the result arrives. Throws std::logic_error on an invalid future
         void wait() const
         {
-            detail::future_state<T>& s = checked();
+            fut::future_state<T>& s = checked();
             if (s.must_block()) s.done.wait();
         }
 
         /// @returns wait_result::finished when the result arrives before the timeout
         wait_result wait_for(rpp::Duration timeout) const
         {
-            detail::future_state<T>& s = checked();
+            fut::future_state<T>& s = checked();
             if (!s.must_block()) return wait_result::finished;
             return s.done.wait(timeout) == rpp::semaphore::notified ? wait_result::finished : wait_result::timeout;
         }
@@ -591,17 +591,17 @@ namespace rpp
          */
         template<typename Task, typename... Handlers> requires (!IsEventLoop<Task>)
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
-        auto then(Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
+        auto then(Task task, Handlers... handlers) noexcept -> future<fut::next_t<T, Task>>
         {
-            return add_step<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); });
+            return add_step<fut::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); });
         }
 
         /// Continues with `task` on the thread of `loop`, as the other then() does on the pool. `loop` must outlive the chain
         template<IsEventLoop Loop, typename Task, typename... Handlers>
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND
-        auto then(Loop& loop RPP_LIFETIMEBOUND, Task task, Handlers... handlers) noexcept -> future<detail::next_t<T, Task>>
+        auto then(Loop& loop RPP_LIFETIMEBOUND, Task task, Handlers... handlers) noexcept -> future<fut::next_t<T, Task>>
         {
-            return add_step<detail::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); }, loop);
+            return add_step<fut::next_t<T, Task>>([&] { return recovering(std::move(task), std::move(handlers)...); }, loop);
         }
 
         /// Follows this future with `next`, and parks no thread. @returns a future which receives the result of `next`
@@ -669,7 +669,7 @@ namespace rpp
         bool await_suspend(rpp::coro_handle<> cont) noexcept
         {
             if (!valid()) return false; // resumes at once, so await_resume throws
-            detail::continuation* resume = detail::make_continuation([cont] { cont.resume(); });
+            fut::continuation* resume = fut::make_continuation([cont] { cont.resume(); });
             if (state->attach(resume)) return true; // the publisher resumes `cont`, maybe before this line returns
             delete resume;
             return false; // the result arrived meanwhile
@@ -681,7 +681,7 @@ namespace rpp
     private:
         friend class event_loop; // attaches a continuation which resumes on the loop thread
 
-        detail::future_state<T>& checked() const
+        fut::future_state<T>& checked() const
         {
             if (!state) throw std::logic_error{"rpp::future is invalid, so it has no result"};
             return *state;
@@ -698,11 +698,11 @@ namespace rpp
         template<typename Task, typename... Handlers>
         static auto recovering(Task&& task, Handlers&&... handlers)
         {
-            using R = detail::next_t<T, Task>;
+            using R = fut::next_t<T, Task>;
             return [task=std::forward<Task>(task), ...handlers=std::forward<Handlers>(handlers)](future& f) mutable -> R
             {
                 try { return f.forward_to(task); }
-                catch (...) { return detail::handle<R>(std::current_exception(), handlers...); }
+                catch (...) { return fut::handle<R>(std::current_exception(), handlers...); }
             };
         }
 
@@ -713,7 +713,7 @@ namespace rpp
             return [task=std::forward<Task>(task), ...handlers=std::forward<Handlers>(handlers)](future& f) mutable
             {
                 try { (void)f.forward_to(task); }
-                catch (...) { detail::handle_or_log(std::current_exception(), handlers...); }
+                catch (...) { fut::handle_or_log(std::current_exception(), handlers...); }
             };
         }
 
@@ -722,10 +722,10 @@ namespace rpp
         template<class R, class Make, class... Loop>
         RPP_CORO_WRAPPER RPP_CORO_DISABLE_LIFETIMEBOUND future<R> add_step(Make make, Loop&... loop) noexcept
         {
-            detail::step_promise<R> p { sizeof...(Loop) == 0 }; // a loop step starts the next step as a pool task
+            fut::step_promise<R> p { sizeof...(Loop) == 0 }; // a loop step starts the next step as a pool task
             future<R> next = p.get_future();
-            detail::future_state<T>* s = state;
-            detail::start_after(s, detail::make_step(std::move(*this), std::move(p), make, loop...));
+            fut::future_state<T>* s = state;
+            fut::start_after(s, fut::make_step(std::move(*this), std::move(p), make, loop...));
             return next;
         }
 
@@ -733,9 +733,9 @@ namespace rpp
         template<class U>
         RPP_CORO_WRAPPER future<U> forward_after(future<U>&& next, bool stop_on_error) noexcept
         {
-            detail::step_promise<U> p;
+            fut::step_promise<U> p;
             future<U> result = p.get_future();
-            detail::future_state<T>* s = state;
+            fut::future_state<T>* s = state;
             auto step = [f=std::move(*this), n=std::move(next), p=std::move(p), stop_on_error]() mutable noexcept
             {
                 std::exception_ptr error; // publishes after the catch ends, see BUGS.md C32
@@ -743,8 +743,8 @@ namespace rpp
                 catch (...) { if (stop_on_error) error = std::current_exception(); }
                 if (!error)
                 {
-                    detail::future_state<U>* ns = n.state; // a result of `n` which is already out publishes on this pool step
-                    detail::start_after(ns, detail::make_step(std::move(n), std::move(p), [] {
+                    fut::future_state<U>* ns = n.state; // a result of `n` which is already out publishes on this pool step
+                    fut::start_after(ns, fut::make_step(std::move(n), std::move(p), [] {
                         return [](future<U>& in) -> U { return in.get(); };
                     }), true);
                 }
@@ -754,7 +754,7 @@ namespace rpp
                     p.set_exception(std::exchange(error, nullptr));
                 }
             };
-            detail::start_after(s, detail::make_continuation(std::move(step)));
+            fut::start_after(s, fut::make_continuation(std::move(step)));
             return result;
         }
 
@@ -785,10 +785,10 @@ namespace rpp
     RPP_CORO_WRAPPER auto async(Task task) noexcept -> future<task_return_t<Task>>
     {
         using R = task_return_t<Task>;
-        detail::step_promise<R> p;
+        fut::step_promise<R> p;
         future<R> f = p.get_future();
-        detail::make_step(detail::no_input{}, std::move(p), [&] {
-            return [task=std::move(task)](detail::no_input&) mutable -> R { return task(); };
+        fut::make_step(fut::no_input{}, std::move(p), [&] {
+            return [task=std::move(task)](fut::no_input&) mutable -> R { return task(); };
         })->start(false);
         return f;
     }
@@ -837,7 +837,7 @@ namespace rpp
             f.wait();
     }
 
-    namespace detail
+    namespace fut
     {
         /// Collects every future, then rethrows the first exception, so the vector keeps no valid future
         template<class T, class Collect>
@@ -859,14 +859,14 @@ namespace rpp
     {
         std::vector<T> all;
         all.reserve(futures.size());
-        detail::collect_all(futures, [&](future<T>& f) { all.emplace_back(f.get()); });
+        fut::collect_all(futures, [&](future<T>& f) { all.emplace_back(f.get()); });
         return all;
     }
 
     /// Blocks until every future finishes. Collects every future, then rethrows the first exception
     inline void get_all(std::vector<future<void>>& futures)
     {
-        detail::collect_all(futures, [](future<void>& f) { f.get(); });
+        fut::collect_all(futures, [](future<void>& f) { f.get(); });
     }
 
     /// Launches every task before collecting its result. Collects every future before rethrowing an exception
