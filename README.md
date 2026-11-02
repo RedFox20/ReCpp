@@ -5087,9 +5087,9 @@ C++20 concepts, and the detection idiom for a caller which brings its own expres
 | [`has_get_memb<T>`](src/rpp/type_traits.h#L44) | True if `T::get()` exists |
 | [`has_set_memb<T, U>`](src/rpp/type_traits.h#L47) | True if `T::set(U)` exists |
 | [`has_contains_memb<C, T>`](src/rpp/type_traits.h#L50) | True if `C::contains(T)` exists |
-| [`is_iterable<T>`](src/rpp/type_traits.h#L53) | True if T supports range-for |
-| [`is_container<T>`](src/rpp/type_traits.h#L59) | True if T is a container with `size()` |
-| [`is_stringlike<T>`](src/rpp/type_traits.h#L56) | True if T is string-like |
+| [`is_iterable<T>`](src/rpp/type_traits.h#L56) | True if T supports range-for |
+| [`is_container<T>`](src/rpp/type_traits.h#L62) | True if T is a container with `size()` |
+| [`is_stringlike<T>`](src/rpp/type_traits.h#L59) | True if T is string-like |
 | [`Operation`](src/rpp/type_traits.h#L26) | The expression alias a caller passes to `is_detected` |
 
 ---

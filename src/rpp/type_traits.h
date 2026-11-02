@@ -47,7 +47,10 @@ namespace rpp
     template<class T, class U> concept has_set_memb = requires { std::declval<T>().set(std::declval<U>()); };
 
     /// True when `C::contains(T)` compiles
-    template<class C, class T> concept has_contains_memb = requires(const C& container, const T& item) { container.contains(item); };
+    template<class C, class T> concept has_contains_memb = requires(const C& container, const T& item)
+    {
+        container.contains(item);
+    };
 
     /// True when T supports range-for
     template<class T> concept is_iterable = requires { std::declval<T>().begin(); std::declval<T>().end(); };
