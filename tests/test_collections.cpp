@@ -1,5 +1,6 @@
 #include <rpp/collections.h>
 #include <rpp/stack_trace.h>
+#include <rpp/strview.h>
 #include <rpp/tests.h>
 #include <string> // std::string
 using namespace rpp;
@@ -289,6 +290,15 @@ TestImpl(test_collections)
         AssertThat(contains(v, "3"), true);
     }
 
+    TestCase(strview_contains_finds_only_what_the_view_holds)
+    {
+        const rpp::strview sv = "abc";
+        AssertThat(contains(sv, 'b'), true);
+        AssertThat(contains(sv, 'x'), false);
+        AssertThat(contains(sv, "bc"), true);
+        AssertThat(contains(sv, "xyz"), false);
+    }
+
     TestCase(vector_append)
     {
         std::vector<std::string> a { "1"s, "2"s };
@@ -337,6 +347,8 @@ TestImpl(test_collections)
         AssertThat(find_if(range(v), [](const std::string& s) { return s == "x"s; }), nullptr);
         AssertThat(find_if(range(v), [](const std::string& s) { return s == "1"s; }), &v[0]  ); // NOLINT(readability-*)
         AssertThat(find_if(range(v), [](const std::string& s) { return s == "2"s; }), &v[1]  ); // NOLINT(readability-*)
+        std::string* found = find_if(v, [](const std::string& s) { return s == "3"s; }); // a non-const vector gives T*
+        AssertThat(found, &v[3]);
     }
 
     TestCase(vector_find_last_if)

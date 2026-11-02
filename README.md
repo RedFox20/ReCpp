@@ -3820,14 +3820,15 @@ Container utilities, non-owning ranges, and ergonomic algorithms.
 | [`erase_item(vector, item)`](src/rpp/collections.h#L211) | Erase first matching item |
 | [`erase_back_swap(vector, i)`](src/rpp/collections.h#L262) | O(1) erase by swapping with last element |
 | [`contains(container, item)`](src/rpp/collections.h#L334) | Check membership |
-| [`find(vector, item)`](src/rpp/collections.h#L349) | Find element (returns iterator) |
-| [`find_smallest(range, selector)`](src/rpp/collections.h#L430) | Find minimum by selector |
-| [`find_largest(range, selector)`](src/rpp/collections.h#L452) | Find maximum by selector |
-| [`any_of(vector, predicate)`](src/rpp/collections.h#L470) | True if any element matches predicate |
-| [`all_of(vector, predicate)`](src/rpp/collections.h#L479) | True if all elements match predicate |
-| [`none_of(vector, predicate)`](src/rpp/collections.h#L488) | True if no elements match predicate |
-| [`sum_all(vector)`](src/rpp/collections.h#L498) | Sum all elements |
-| [`append(vector, other)`](src/rpp/collections.h#L339) | Append one vector to another |
+| [`find(vector, item)`](src/rpp/collections.h#L352) | Find element (returns iterator) |
+| [`find_if(vector, predicate)`](src/rpp/collections.h#L397) | Returns a pointer to the first element which matches the predicate, or null |
+| [`find_smallest(range, selector)`](src/rpp/collections.h#L439) | Find minimum by selector |
+| [`find_largest(range, selector)`](src/rpp/collections.h#L461) | Find maximum by selector |
+| [`any_of(vector, predicate)`](src/rpp/collections.h#L479) | True if any element matches predicate |
+| [`all_of(vector, predicate)`](src/rpp/collections.h#L488) | True if all elements match predicate |
+| [`none_of(vector, predicate)`](src/rpp/collections.h#L497) | True if no elements match predicate |
+| [`sum_all(vector)`](src/rpp/collections.h#L507) | Sum all elements |
+| [`append(vector, other)`](src/rpp/collections.h#L342) | Append one vector to another |
 
 ### Example: element_range & index_range
 
