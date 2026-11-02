@@ -453,6 +453,82 @@ TestImpl(test_mutex)
         AssertThat(try_lock_on_another_thread(), true);
     }
 
+    template<class Mutex>
+    static bool taken_by_another_thread(Mutex& m)
+    {
+        bool taken = false;
+        std::thread([&] {
+            taken = m.try_lock();
+            if (taken) m.unlock();
+        }).join();
+        return taken;
+    }
+
+    TestCase(recursive_mutex_lets_its_holder_lock_again)
+    {
+    #if defined(PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP) // a static instance runs no constructor, as std::recursive_mutex did
+        static constinit rpp::recursive_mutex m;
+    #else
+        rpp::recursive_mutex m;
+    #endif
+        m.lock();
+        AssertThat(m.try_lock(), true);
+        AssertThat(taken_by_another_thread(m), false);
+        m.unlock();
+        AssertThat(taken_by_another_thread(m), false);
+        m.unlock();
+        AssertThat(taken_by_another_thread(m), true);
+    }
+
+    TestCase(unique_lock_defers_moves_unlocks_and_releases)
+    {
+        rpp::mutex m;
+        rpp::unique_lock<rpp::mutex> deferred { m, rpp::defer_lock };
+        AssertThat(deferred.owns_lock(), false);
+        AssertThat(deferred.try_lock(), true);
+        rpp::unique_lock<rpp::mutex> held = std::move(deferred);
+        AssertThat(held.owns_lock(), true);
+        AssertThat(deferred.mutex() == nullptr, true);
+        {
+            rpp::unlock_guard unlocked { held };
+            AssertThat(taken_by_another_thread(m), true);
+        }
+        AssertThat(held.owns_lock(), true);
+        AssertThat(taken_by_another_thread(m), false);
+
+        rpp::mutex other;
+        rpp::unique_lock<rpp::mutex> target { other };
+        target = std::move(held);
+        AssertThat(taken_by_another_thread(other), true);
+        AssertThat(taken_by_another_thread(m), false);
+        AssertThat(target.owns_lock(), true);
+        AssertThat(held.owns_lock(), false);
+        AssertThat(held.mutex() == nullptr, true);
+        AssertThat(target.release() == &m, true);
+        {
+            rpp::unique_lock<rpp::mutex> adopted { m, rpp::adopt_lock };
+            AssertThat(adopted.owns_lock(), true);
+        }
+        AssertThat(taken_by_another_thread(m), true);
+    }
+
+    TestCase(lock_guard_holds_the_mutex_for_its_scope)
+    {
+        rpp::mutex m;
+        {
+            rpp::lock_guard guard { m };
+            AssertThat(taken_by_another_thread(m), false);
+        }
+        AssertThat(taken_by_another_thread(m), true);
+
+        m.lock();
+        {
+            rpp::lock_guard adopted { m, rpp::adopt_lock };
+            AssertThat(taken_by_another_thread(m), false);
+        }
+        AssertThat(taken_by_another_thread(m), true);
+    }
+
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
     {
         rpp::mutex m;
@@ -693,7 +769,8 @@ TestImpl(test_mutex)
         for (int count : s->count) AssertThat(count, 4'000);
     }
 
-    // a bounded queue sleeps on both sides, and every wait relocks the mutex under contention
+    // a bounded queue sleeps on both sides, and every wait relocks the mutex under contention.
+    // The producers hold a std::unique_lock and the consumers an rpp::unique_lock, so both relock paths run
     TestCase(a_bounded_queue_hands_every_item_to_one_consumer)
     {
         struct queue
@@ -707,15 +784,16 @@ TestImpl(test_mutex)
         thread_group workers { 8, s, [](queue& q, int t) {
             for (int i = 0; i < 1'000; ++i)
             {
-                std::unique_lock lock { q.m };
                 if (t < 4)
                 {
+                    std::unique_lock lock { q.m };
                     q.not_full.wait(lock, [&] { return q.items.size() < 8; });
                     q.items.push_back(i);
                     q.not_empty.notify_one();
                 }
                 else
                 {
+                    rpp::unique_lock lock { q.m };
                     q.not_empty.wait(lock, [&] { return !q.items.empty(); });
                     q.sum += q.items.front();
                     q.items.pop_front();

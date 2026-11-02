@@ -414,29 +414,37 @@ TestImpl(test_condition_variable)
     }
 
     // the relock marks the word contended, so the next unlock wakes a locker which still sleeps
+    // the waiter holds a WaiterLock, so each unique_lock type proves its own relock path
+    template<class WaiterLock>
+    static rpp::uint32 word_after_a_wait(bool timed)
+    {
+        rpp::condition_variable cv;
+        rpp::futex_mutex m;
+        int waiting = 0;
+        rpp::uint32 word_after_wait = 0;
+        std::thread waiter([&] {
+            WaiterLock lock { m };
+            ++waiting;
+            if (timed)
+                (void)cv.wait_for(lock, rpp::seconds(1)); // a hang guard, the notify below releases it
+            else
+                cv.wait(lock);
+            word_after_wait = word_of(m);
+        });
+        std::unique_lock lock { m };
+        lock_once_waiting(lock, waiting, 1);
+        lock.unlock();
+        cv.notify_one(); // after the unlock, so the waiter relocks a free mutex
+        waiter.join();
+        return word_after_wait;
+    }
+
     TestCase(a_wait_relocks_a_futex_mutex_as_contended)
     {
         for (bool timed : { false, true })
         {
-            rpp::condition_variable cv;
-            rpp::futex_mutex m;
-            int waiting = 0;
-            rpp::uint32 word_after_wait = 0;
-            std::thread waiter([&] {
-                std::unique_lock lock { m };
-                ++waiting;
-                if (timed)
-                    (void)cv.wait_for(lock, rpp::seconds(1)); // a hang guard, the notify below releases it
-                else
-                    cv.wait(lock);
-                word_after_wait = word_of(m);
-            });
-            std::unique_lock lock { m };
-            lock_once_waiting(lock, waiting, 1);
-            lock.unlock();
-            cv.notify_one(); // after the unlock, so the waiter relocks a free mutex
-            waiter.join();
-            AssertThat(word_after_wait, 2u);
+            AssertThat(word_after_a_wait<std::unique_lock<rpp::futex_mutex>>(timed), 2u);
+            AssertThat(word_after_a_wait<rpp::unique_lock<rpp::futex_mutex>>(timed), 2u);
         }
     }
 };

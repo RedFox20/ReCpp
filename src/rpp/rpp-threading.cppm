@@ -23,6 +23,12 @@ export namespace rpp {
     using rpp::futex_mutex;
     using rpp::mutex;
     using rpp::recursive_mutex;
+    using rpp::defer_lock_t;
+    using rpp::adopt_lock_t;
+    using rpp::defer_lock;
+    using rpp::adopt_lock;
+    using rpp::unique_lock;
+    using rpp::lock_guard;
     using rpp::unlock_guard;
     using rpp::spin_lock;
     using rpp::spin_lock_for;

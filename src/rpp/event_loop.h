@@ -748,7 +748,7 @@ namespace rpp
             bool await_ready() const noexcept { return false; }
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                struct resume_on_loop final : detail::continuation
+                struct resume_on_loop final : fut::continuation
                 {
                     event_loop& loop;
                     rpp::coro_handle<> cont;
@@ -766,7 +766,7 @@ namespace rpp
                 };
                 loop.num_background_suspended.fetch_add(1, std::memory_order_acq_rel);
                 // A pending state owns this continuation. start() deletes it before the loop can resume the coroutine.
-                detail::start_after(fut.state, new resume_on_loop{loop, cont});
+                fut::start_after(fut.state, new resume_on_loop{loop, cont});
             }
             T await_resume() { return fut.get(); }
         };
