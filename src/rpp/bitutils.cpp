@@ -209,12 +209,19 @@ namespace rpp
 
         const uint32_t bitsToCopy = rpp::min(numBits, maxBits - startBit);
 
-        // fast path
-        if (startBit % 8 == 0 && bitsToCopy % 8 == 0)
+        // an aligned start copies whole bytes, then masks the partial last byte
+        if (startBit % 8 == 0)
         {
             const uint32_t startByte = startBit / 8;
-            const uint32_t numBytes = bitsToCopy / 8;
-            return copyNegated(startByte, dest, numBytes);
+            const uint32_t wholeBytes = bitsToCopy / 8;
+            const uint32_t tailBits = bitsToCopy % 8;
+            copyNegated(startByte, dest, wholeBytes);
+            if (tailBits == 0)
+                return wholeBytes;
+            const uint8_t mask = uint8_t((1u << tailBits) - 1u);
+            const uint8_t negated = uint8_t(~data[startByte + wholeBytes] & mask);
+            dest[wholeBytes] = uint8_t((dest[wholeBytes] & ~mask) | negated);
+            return wholeBytes + 1;
         }
 
         // bitwise copy
