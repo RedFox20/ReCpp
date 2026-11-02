@@ -1145,18 +1145,15 @@ namespace rpp /* ReCpp */
     static NOINLINE void traverse_dir(T queryRoot, T relPath, bool dirs, bool files,
                                       list_dir_flags flags, const DirTraverseFunc& func) noexcept
     {
-        typename T::string_t currentDir;
-        if (flags & dir_fullpath)
+        typename T::string_t resolvedRoot;
+        if ((flags & dir_fullpath) && relPath.empty()) // the top call resolves the root, and the recursion reuses it
         {
-            typename T::string_t fullpath = full_path(queryRoot.empty() ? constants<T>::dot_sv : queryRoot);
-            if (fullpath.empty()) // dir does not exist
+            resolvedRoot = full_path(queryRoot.empty() ? constants<T>::dot_sv : queryRoot);
+            if (resolvedRoot.empty()) // dir does not exist
                 return;
-            currentDir = path_combine(fullpath, relPath);
+            queryRoot = resolvedRoot;
         }
-        else
-        {
-            currentDir = path_combine(queryRoot, relPath);
-        }
+        typename T::string_t currentDir = path_combine(queryRoot, relPath);
 
         for (directory_entry<T> e : directory_iter<T>{ currentDir })
         {

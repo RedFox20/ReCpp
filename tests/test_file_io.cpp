@@ -5,6 +5,7 @@
 #include <rpp/debugging.h>
 #include <rpp/tests.h>
 #include <rpp/timepoint.h> // rpp::sleep_ms, rpp::TimePoint
+#include <rpp/timer.h> // rpp::Timer
 #include <rpp/threads.h> // rpp::yield
 #include <atomic> // std::atomic_bool
 #include <cerrno> // EINTR
@@ -27,6 +28,9 @@
     #include <pthread.h> // pthread_kill
     #include <sys/stat.h> // mkfifo
     #include <utime.h> // utime
+#endif
+#if __APPLE__
+    #include <TargetConditionals.h> // TARGET_OS_IPHONE
 #endif
 using namespace rpp;
 
@@ -385,6 +389,46 @@ TestImpl(test_file_io)
         f.close();
     }
 
+    TestCase(size_of_a_read_only_file_keeps_its_read_buffer)
+    {
+        Assert(create_folder(TestDir));
+        const std::string path = TestDir + "/_size_read_test.txt";
+        AssertThat(file::write_new(path, "abcdefgh"), 8);
+        file input{ path, file::READONLY };
+        char ch = 0;
+        AssertThat(input.read(&ch, 1), 1);
+    #if __linux__ && !RPP_ANDROID // a seek drops the stdio read buffer, and the seek back refills it with a read()
+        auto read_calls = []() -> int64
+        {
+            const std::string io = file::read_all_text("/proc/thread-self/io");
+            return rpp::strview{io}.skip_after("syscr:").trim().to_int64();
+        };
+        const int64 before = read_calls();
+        const int64 overhead = read_calls() - before;
+        const int64 baseline = read_calls();
+        AssertThat(input.size(), 8);
+        AssertThat(input.sizel(), int64(8));
+        AssertThat(read_calls() - baseline, overhead);
+    #else
+        AssertThat(input.size(), 8);
+        AssertThat(input.sizel(), int64(8));
+    #endif
+        AssertThat(input.read(&ch, 1), 1);
+        AssertThat(ch, 'b');
+        AssertThat(input.tell(), 2);
+    }
+
+#if !RPP_ANDROID && !TARGET_OS_IPHONE // fstat() serves every size query there, and it misses a buffered write
+    TestCase(size_of_a_writable_file_counts_a_buffered_write)
+    {
+        Assert(create_folder(TestDir));
+        file output{ TestDir + "/_size_write_test.txt", file::CREATENEW };
+        AssertThat(output.write("12345", 5), 5);
+        AssertThat(output.size(), 5);
+        AssertThat(output.sizel(), int64(5));
+    }
+#endif
+
     TestCase(create_delete_folder)
     {
         AssertFalse(create_folder("")); // this is most likely a programming error, so give false
@@ -735,6 +779,14 @@ TestImpl(test_file_io)
         AssertThat(fullpaths2.size(), 1u);
         Assert(contains(fullpaths2, path_combine(fullpath,"folder/test1.txt")));
 
+        // TEST: list_files dir_fullpath_recursive from a relative root, which the top call resolves once
+        std::vector<std::string> fullpaths4 = list_files("folder", ".txt", rpp::dir_fullpath_recursive);
+        AssertThat(fullpaths4.size(), 3u);
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/test1.txt")));
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/path/test2.txt")));
+        Assert(contains(fullpaths4, path_combine(fullpath,"folder/path/test3.txt")));
+        AssertThat(list_files("missing", ".txt", rpp::dir_fullpath_recursive).size(), 0u);
+
         // TEST: list_files dir_fullpath_recursive
         std::vector<std::string> fullpaths3 = list_files("", ".txt", rpp::dir_fullpath_recursive);
         print_paths("fullpaths3", fullpaths3);
@@ -762,6 +814,36 @@ TestImpl(test_file_io)
 
         Assert(rpp::change_dir(originalDir));
         Assert(delete_folder(TestDir+"/", delete_mode::recursive));
+    }
+
+    // a full-path listing resolves its deep root once, so it costs about as much as a listing which prefixes the same root
+    TestCase(recursive_full_path_listing_resolves_its_root_once)
+    {
+        Assert(create_folder(TestDir));
+        const std::string base = full_path(TestDir); // the listing which prefixes the root takes it as given
+        AssertNotEqual(base, std::string{});
+        const std::string root = base + "/a/b/c/d/e/f/g/h/i/j/k/l/root";
+        constexpr int NUM_DIRS = 100;
+        for (int i = 0; i < NUM_DIRS; ++i)
+            Assert(create_folder(path_combine(root, "child" + std::to_string(i))));
+        size_t relative_count = 0;
+        size_t full_count = 0;
+        const double relative = best_of_3([&]
+        {
+            rpp::Timer timer;
+            relative_count = list_dirs(root, rpp::dir_relpath_combine_recursive).size();
+            return timer.elapsed_micros();
+        });
+        const double full = best_of_3([&]
+        {
+            rpp::Timer timer;
+            full_count = list_dirs(root, rpp::dir_fullpath_recursive).size();
+            return timer.elapsed_micros();
+        });
+        AssertThat(relative_count, size_t(NUM_DIRS));
+        AssertThat(full_count, size_t(NUM_DIRS));
+        AssertLess(full, relative * 2.0);
+        Assert(delete_folder(TestDir, delete_mode::recursive));
     }
 
 #if RPP_ENABLE_UNICODE

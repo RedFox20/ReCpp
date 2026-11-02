@@ -1201,6 +1201,76 @@ TestImpl(test_event_loop)
         AssertThat(done.load(), true);
     }
 
+    // a drain of queued posts skips time_to_next_waiter(), so it costs about half as much as the same number of empty polls
+    TestCase(queued_posts_skip_the_timer_scan_of_an_empty_poll)
+    {
+        constexpr int NUM_TIMERS = 100;
+        constexpr int NUM_POLLS = 100;
+        for (int i = 0; i < NUM_TIMERS; ++i)
+        {
+            loop->fork([this]() -> rpp::event_task
+            {
+                co_await loop->delay(rpp::seconds(3600));
+            });
+        }
+        int ran = 0;
+        const double drain = best_of_3([&]
+        {
+            for (int i = 0; i < NUM_POLLS; ++i)
+                loop->post([&ran] { ++ran; });
+            rpp::Timer timer;
+            for (int i = 0; i < NUM_POLLS; ++i)
+                loop->run_once(rpp::Duration::zero());
+            return timer.elapsed_micros();
+        });
+        const double empty = best_of_3([&]
+        {
+            rpp::Timer timer;
+            for (int i = 0; i < NUM_POLLS; ++i)
+                loop->run_once(rpp::Duration::zero());
+            return timer.elapsed_micros();
+        });
+        AssertThat(ran, 3 * NUM_POLLS);
+        AssertLess(drain, empty * 0.75);
+        clock.warp_forward(rpp::seconds(3600));
+        idle();
+    }
+
+    // a post which reposts itself keeps the queue full, so only the queue-first path runs, and it must fire a due delay()
+    TestCase(queued_posts_never_starve_a_due_delay)
+    {
+        int fired = 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            loop->fork([&]() -> rpp::event_task
+            {
+                co_await loop->delay(rpp::seconds(3600));
+                ++fired;
+            });
+        }
+        struct reposter
+        {
+            rpp::event_loop* loop;
+            int* count;
+            void operator()() const
+            {
+                ++*count;
+                if (*count < 500)
+                    loop->post(reposter{ *this });
+            }
+        };
+        int reposts = 0;
+        loop->post(reposter{ loop.get(), &reposts });
+        loop->run_once(rpp::Duration::zero());
+        AssertThat(fired, 0);
+        clock.warp_forward(rpp::seconds(3600));
+        for (int i = 0; i < 100 && fired < 3; ++i)
+            loop->run_once(rpp::Duration::zero());
+        AssertThat(fired, 3);
+        AssertLess(reposts, 500); // the chain still runs, so the queue was never empty
+        idle(); // the chain ends at its cap here, because a queued post points at `reposts`
+    }
+
     // ─── wait_on_all honors its timeout on a warped clock ───────
     // wait_on_all builds its deadline from the loop clock it polls with. A deadline
     // from a different clock expires at once and gives a background task no grace.

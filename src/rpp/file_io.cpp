@@ -209,18 +209,25 @@ namespace rpp /* ReCpp */
         if (!Handle) return 0;
     #if _MSC_VER
         return GetFileSize(reinterpret_cast<HANDLE>(Handle), nullptr);
-    #elif RPP_ANDROID || TARGET_OS_IPHONE
+    #else
         struct stat s;
+    #if !RPP_ANDROID && !TARGET_OS_IPHONE
+        // fstat() misses a buffered write and the size of a device, but the seek drops the read buffer
+        const bool regular_readonly = Mode == READONLY && fstat(fileno((FILE*)Handle), &s) == 0 && S_ISREG(s.st_mode);
+        if (!regular_readonly)
+        {
+            int pos = tell();
+            int size = const_cast<file*>(this)->seek(0, SEEK_END);
+            const_cast<file*>(this)->seek(pos, SEEK_SET);
+            return size;
+        }
+    #else
         if (fstat(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "fstat error: [%s]\n", strerror(errno));
             return 0;
         }
+    #endif
         return (int)s.st_size;
-    #else // Linux version is more complicated. It won't report correct size unless file is flushed:
-        int pos = tell();
-        int size = const_cast<file*>(this)->seek(0, SEEK_END);
-        const_cast<file*>(this)->seek(pos, SEEK_SET);
-        return size;
     #endif
     }
     int64 file::sizel() const noexcept
@@ -233,18 +240,25 @@ namespace rpp /* ReCpp */
             return 0ull;
         }
         return static_cast<int64>(size.QuadPart);
-    #elif RPP_ANDROID || __APPLE__
+    #else
         struct stat64 s;
+    #if !RPP_ANDROID && !TARGET_OS_IPHONE
+        // fstat() misses a buffered write and the size of a device, but the seek drops the read buffer
+        const bool regular_readonly = Mode == READONLY && _fstat64(fileno((FILE*)Handle), &s) == 0 && S_ISREG(s.st_mode);
+        if (!regular_readonly)
+        {
+            int64 pos = tell64();
+            int64 size = const_cast<file*>(this)->seekl(0LL, SEEK_END);
+            const_cast<file*>(this)->seekl(pos, SEEK_SET);
+            return size;
+        }
+    #else
         if (_fstat64(fileno((FILE*)Handle), &s)) {
             //fprintf(stderr, "_fstat64 error: [%s]\n", strerror(errno));
             return 0ull;
         }
+    #endif
         return (int64)s.st_size;
-    #else // Linux version is more complicated. It won't report correct size unless file is flushed:
-        int64 pos = tell64();
-        int64 size = const_cast<file*>(this)->seekl(0LL, SEEK_END);
-        const_cast<file*>(this)->seekl(pos, SEEK_SET);
-        return size;
     #endif
     }
     // ReSharper disable once CppMemberFunctionMayBeConst

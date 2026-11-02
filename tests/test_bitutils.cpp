@@ -1,5 +1,9 @@
 #include <rpp/bitutils.h>
+#include <rpp/minmax.h> // rpp::min
 #include <rpp/tests.h>
+#include <rpp/timer.h> // rpp::Timer
+#include <cstring> // memcmp, memset
+#include <vector> // std::vector
 
 TestImpl(test_bitutils)
 {
@@ -293,5 +297,54 @@ TestImpl(test_bitutils)
         const uint8_t buf[1] = { 0xFF };
         rpp::bit_array bits{buf, 1, 3};
         AssertThat(bits.getByte(0), uint8_t(0x07));
+    }
+
+    // the expected bits come from the raw source bytes, so the check shares no code with bit_array
+    TestCase(bitarray_copyNegatedBits_matches_a_per_bit_copy_and_keeps_the_other_bits)
+    {
+        const uint8_t src[8] = { 0x5A, 0xC3, 0x0F, 0xF0, 0x81, 0x7E, 0x33, 0xCC };
+        const uint32_t numBits = 61; // the source ends inside its last byte
+        rpp::bit_array bits{ src, sizeof(src), numBits };
+        for (uint32_t start = 0; start < numBits + 5; ++start)
+        {
+            for (uint32_t count = 0; count < 70; ++count)
+            {
+                uint8_t expected[10];
+                uint8_t actual[10];
+                memset(expected, 0xA5, sizeof(expected));
+                memset(actual, 0xA5, sizeof(actual));
+                const uint32_t copied = start < numBits ? rpp::min(count, numBits - start) : 0;
+                for (uint32_t i = 0; i < copied; ++i)
+                {
+                    const uint32_t bit = start + i;
+                    const uint8_t negated = uint8_t(~src[bit / 8] >> (bit % 8)) & 1u;
+                    const uint8_t mask = uint8_t(1u << (i % 8));
+                    expected[i / 8] = uint8_t((expected[i / 8] & ~mask) | (negated ? mask : 0u));
+                }
+                AssertThat(bits.copyNegatedBits(start, actual, count), (copied + 7) / 8);
+                AssertThat(memcmp(expected, actual, sizeof(actual)), 0);
+            }
+        }
+    }
+
+    // an aligned copy with a partial last byte copies whole bytes, so it costs about as much as copyNegated()
+    TestCase(bitarray_copyNegatedBits_with_a_partial_last_byte_takes_the_bulk_copy)
+    {
+        const uint32_t numBytes = 64 * 1024;
+        rpp::bit_array bits{ numBytes * 8 + 3 };
+        std::vector<uint8_t> dest(numBytes + 1);
+        const double whole = best_of_3([&]
+        {
+            rpp::Timer timer;
+            bits.copyNegated(0, dest.data(), numBytes);
+            return timer.elapsed_micros();
+        });
+        const double partial = best_of_3([&]
+        {
+            rpp::Timer timer;
+            bits.copyNegatedBits(0, dest.data(), bits.sizeBits());
+            return timer.elapsed_micros();
+        });
+        AssertLess(partial, whole * 4.0);
     }
 };
