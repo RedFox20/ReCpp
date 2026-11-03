@@ -23,6 +23,7 @@
     #endif
     #include <windows.h> // CreateProcessA
 #elif !__EMSCRIPTEN__
+    #include <cerrno> // errno, ENOEXEC
     #include <sys/wait.h> // waitpid
     #include <unistd.h> // fork, execle, alarm
     extern char** environ; // NOLINT(readability-redundant-declaration) macOS does not declare it in unistd.h
@@ -519,7 +520,7 @@ TestImpl(test_threadpool)
         {
             alarm(1); // a hang guard, which only a child that hangs in exit() reaches
             execle(exe.c_str(), exe.c_str(), case_filter, nullptr, child_env);
-            _exit(127);
+            _exit(errno == ENOEXEC ? 126 : 127); // ENOEXEC: the host kernel cannot run this binary format
         }
         int status = 0;
         if (child < 0 || waitpid(child, &status, 0) != child || !WIFEXITED(status))
@@ -531,7 +532,13 @@ TestImpl(test_threadpool)
     // exit() destroys the statics, and the global pool must not wait there for a task, see BUGS.md C40
     TestCase(exit_does_not_wait_for_a_running_global_task)
     {
-        AssertThat(run_case_in_a_child("test_threadpool.global_task_still_runs_at_exit"), 0);
+        const int exit_code = run_case_in_a_child("test_threadpool.global_task_still_runs_at_exit");
+        if (exit_code == 126) // qemu-user without binfmt_misc cannot start an aarch64 child
+        {
+            print_warning("SKIP: the child process did not start\n");
+            return;
+        }
+        AssertThat(exit_code, 0);
     }
 
     // the child process of exit_does_not_wait_for_a_running_global_task
