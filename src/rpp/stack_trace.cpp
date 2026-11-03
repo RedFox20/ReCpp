@@ -387,7 +387,7 @@ namespace rpp
         if (it == moduleDies.end())
         {
             static rpp::mutex sync;
-            std::lock_guard guard {sync};
+            rpp::lock_guard guard {sync};
             map = &moduleDies[mod];
             map->init(mod);
         }
@@ -424,7 +424,7 @@ namespace rpp
         CallstackEntry cse { (uint64_t)addr };
 
         // libdw/libelf are not thread-safe; serialize all dwfl/dwarf calls
-        std::lock_guard guard { dwfl_sync };
+        rpp::lock_guard guard { dwfl_sync };
 
         if (Dwfl_Module* mod = dwfl_addrmodule(dwfl, cse.addr))
         {
@@ -956,7 +956,7 @@ namespace rpp
     {
         HANDLE process = GetCurrentProcess();
         // DbgHelp.dll is single-threaded, so we need to synchronize here
-        std::lock_guard lock { DbgHelpMutex };
+        rpp::lock_guard lock { DbgHelpMutex };
         return get_address_info(process, addr);
     }
 
@@ -967,7 +967,7 @@ namespace rpp
         if (message) fmt.writeln(message.c_str(), message.size());
 
         // DbgHelp.dll is single-threaded, so we need to synchronize here
-        std::lock_guard lock { DbgHelpMutex };
+        rpp::lock_guard lock { DbgHelpMutex };
 
         for (size_t i = 0; i < depth; ++i)
         {
@@ -1018,7 +1018,7 @@ namespace rpp
             static bool modulesLoaded;
             if (!modulesLoaded)
             {
-                std::lock_guard lock { DbgHelpMutex };
+                rpp::lock_guard lock { DbgHelpMutex };
                 if (!modulesLoaded)
                 {
                     if (!SymInit(process))
@@ -1143,7 +1143,7 @@ namespace rpp
         size_t count;
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
-            std::lock_guard lock { DbgHelpMutex };
+            rpp::lock_guard lock { DbgHelpMutex };
             count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
         }
         // copy the callstack to a vector
@@ -1160,7 +1160,7 @@ namespace rpp
         size_t count;
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
-            std::lock_guard lock { DbgHelpMutex };
+            rpp::lock_guard lock { DbgHelpMutex };
             count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);
         }
         return (int)count;
@@ -1212,7 +1212,7 @@ namespace rpp
         uint64_t callstack[CALLSTACK_MAX_DEPTH];
         {
             // DbgHelp.dll is single-threaded, so we need to synchronize here
-            std::lock_guard lock { DbgHelpMutex };
+            rpp::lock_guard lock { DbgHelpMutex };
 
             // walk the stack
             size_t count = walk_callstack(tc, callstack, maxDepth, entriesToSkip);

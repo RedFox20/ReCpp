@@ -250,7 +250,7 @@ namespace rpp
         }
         void append_message(int type, const char* msg, int len)
         {
-            std::lock_guard lock { mutex };
+            rpp::lock_guard lock{ mutex };
             message m;
             m.start_index = message_buf.size(); // we start at current stringbuf pos
             m.len = (uint16_t)len;
@@ -412,7 +412,7 @@ namespace rpp
         fail->file = rpp::strview{file};
         fail->line = line;
         {
-            std::lock_guard lock {*impl->current_results->mutex};
+            rpp::lock_guard lock{*impl->current_results->mutex};
             impl->current_results->asserts_failed++;
             impl->current_results->failures.push_back(fail);
         }

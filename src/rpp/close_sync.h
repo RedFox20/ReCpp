@@ -11,7 +11,7 @@
 namespace rpp
 {
     using readonly_lock  = std::shared_lock<std::shared_mutex>;
-    using exclusive_lock = std::unique_lock<std::shared_mutex>;
+    using exclusive_lock = rpp::unique_lock<std::shared_mutex>;
 
     /**
      * This helper attempts to ease the problem of async programming where the owning

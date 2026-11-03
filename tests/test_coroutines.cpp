@@ -26,13 +26,13 @@ TestImpl(test_coroutines)
     template<class T>
     void set_locked(T& out, const T& value)
     {
-        std::lock_guard lock{m};
+        rpp::lock_guard lock{m};
         out = value;
     }
     template<class T>
     T get_locked(const T& value)
     {
-        std::lock_guard lock{m};
+        rpp::lock_guard lock{m};
         return value;
     }
 
@@ -158,7 +158,7 @@ TestImpl(test_coroutines)
             std::vector<int>& results;
             const int id;
             ~destructor_recorder() noexcept {
-                std::lock_guard lock{m};
+                rpp::lock_guard lock{m};
                 results.push_back(id); // NOLINT(bugprone-exception-escape)
             }
         };
@@ -171,7 +171,7 @@ TestImpl(test_coroutines)
         };
         print_warning("dtor sequence #1 elapsed: %.2fms\n", t1.elapsed_millis());
         {
-            std::lock_guard lock { m };
+            rpp::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 1u);
             if (!destructor_ids.empty()) AssertThat(destructor_ids[0], 1);
         }
@@ -187,7 +187,7 @@ TestImpl(test_coroutines)
         print_warning("dtor sequence #2 elapsed: %.2fms\n", t2.elapsed_millis());
         AssertThat(fstr, "test"s);
         {
-            std::lock_guard lock { m };
+            rpp::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 2u);
             if (destructor_ids.size() >= 2) AssertThat(destructor_ids[1], 2);
         }
@@ -200,7 +200,7 @@ TestImpl(test_coroutines)
         };
         print_warning("dtor sequence #3 elapsed: %.2fms\n", t3.elapsed_millis());
         {
-            std::lock_guard lock { m };
+            rpp::lock_guard lock { m };
             AssertThat(destructor_ids.size(), 3u);
             if (destructor_ids.size() >= 3) AssertThat(destructor_ids[2], 3);
         }

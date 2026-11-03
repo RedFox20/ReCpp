@@ -239,19 +239,19 @@ TestImpl(test_event_loop)
         uint64 loop_thread = rpp::get_thread_id();
         void record()
         {
-            std::lock_guard lock{m};
+            rpp::lock_guard lock{m};
             resume_thread_ids.push_back(rpp::get_thread_id());
         }
         bool all_on_loop_thread()
         {
-            std::lock_guard lock{m};
+            rpp::lock_guard lock{m};
             for (auto id : resume_thread_ids)
                 if (id != loop_thread) return false;
             return true;
         }
         size_t count()
         {
-            std::lock_guard lock{m};
+            rpp::lock_guard lock{m};
             return resume_thread_ids.size();
         }
     };
@@ -320,7 +320,7 @@ TestImpl(test_event_loop)
         auto record = [&](int id)
         {
             assert_on_main_thread();
-            std::lock_guard lock{order_m};
+            rpp::lock_guard lock{order_m};
             resume_order.push_back(id);
         };
 

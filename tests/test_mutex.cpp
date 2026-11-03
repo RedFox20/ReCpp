@@ -529,6 +529,23 @@ TestImpl(test_mutex)
         AssertThat(taken_by_another_thread(m), true);
     }
 
+    TestCase(dual_lock_guard_holds_both_mutexes_and_locks_one_mutex_once)
+    {
+        rpp::mutex a, b;
+        {
+            rpp::dual_lock_guard both { b, a };
+            AssertThat(taken_by_another_thread(a), false);
+            AssertThat(taken_by_another_thread(b), false);
+        }
+        AssertThat(taken_by_another_thread(a), true);
+        AssertThat(taken_by_another_thread(b), true);
+        {
+            rpp::dual_lock_guard same { a, a };
+            AssertThat(taken_by_another_thread(a), false);
+        }
+        AssertThat(taken_by_another_thread(a), true);
+    }
+
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
     {
         rpp::mutex m;
@@ -620,7 +637,7 @@ TestImpl(test_mutex)
     // A spin_lock_for() which times out falls back to lock().
     static void spin_lock_and_enter(guarded_counter& s, int i) noexcept
     {
-        if (std::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
+        if (rpp::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
             s.enter();
         else
             lock_and_enter(s, i);

@@ -6,7 +6,8 @@
 #include "threads.h" // rpp::yield
 #include "timepoint.h" // rpp::Duration
 #include <atomic>
-#include <mutex> // std::unique_lock, which the lock_t of each type still names
+#include <initializer_list> // synchronize_guard::operator=
+#include <utility> // std::swap
 #if !_MSC_VER && !RPP_FREERTOS && !RPP_CORTEX_M_ARCH
 #  include <pthread.h>
 #endif
@@ -145,9 +146,6 @@ namespace rpp
 
             void* native_handle() const noexcept { return mtx; }
         };
-    #else // USE_CUSTOM_WINDOWS_MUTEX
-        using mutex = std::mutex;
-        using recursive_mutex = std::recursive_mutex;
     #endif // USE_CUSTOM_WINDOWS_MUTEX
 
 #elif RPP_FREERTOS
@@ -413,6 +411,29 @@ namespace rpp
         lock_guard& operator=(const lock_guard&) = delete;
     };
 
+    /// Holds two mutexes for its scope. It takes them in address order, so two threads which lock one pair never deadlock
+    template<class Mutex>
+    class dual_lock_guard
+    {
+        Mutex& first;
+        Mutex& second;
+    public:
+        dual_lock_guard(Mutex& a, Mutex& b) : first{&a < &b ? a : b}, second{&a < &b ? b : a}
+        {
+            first.lock();
+            if (&second != &first)
+                second.lock();
+        }
+        ~dual_lock_guard() noexcept
+        {
+            if (&second != &first)
+                second.unlock();
+            first.unlock();
+        }
+        dual_lock_guard(const dual_lock_guard&) = delete;
+        dual_lock_guard& operator=(const dual_lock_guard&) = delete;
+    };
+
     /**
      * @brief Unlocks a held rpp::unique_lock or std::unique_lock, and relocks it at scope exit.
      */
@@ -437,7 +458,7 @@ namespace rpp
      * @returns Owned Lock if successful, Deferred Lock if lock was not acquired (suspended lock threw exception)
      */
     template<class Mutex>
-    inline std::unique_lock<Mutex> spin_lock(Mutex& m) noexcept
+    inline rpp::unique_lock<Mutex> spin_lock(Mutex& m) noexcept
     {
         if (!m.try_lock()) // spin until we can lock the mutex
         {
@@ -447,7 +468,7 @@ namespace rpp
                 yield();
 
                 if (m.try_lock())
-                    return std::unique_lock<Mutex>{m, std::adopt_lock};
+                    return rpp::unique_lock<Mutex>{m, rpp::adopt_lock};
             }
             // suspend until we can lock the mutex
             #if RPP_BARE_METAL
@@ -459,11 +480,11 @@ namespace rpp
                 } catch (...) {
                     // if we failed to lock, this is most likely a deadlock or the mutex is destroyed
                     // simply give up and return a deferred lock
-                    return std::unique_lock<Mutex>{m, std::defer_lock};
+                    return rpp::unique_lock<Mutex>{m, rpp::defer_lock};
                 }
             #endif
         }
-        return std::unique_lock<Mutex>{m, std::adopt_lock};
+        return rpp::unique_lock<Mutex>{m, rpp::adopt_lock};
     }
 
     /**
@@ -473,23 +494,23 @@ namespace rpp
      * @returns Owned Lock if successful, Deferred Lock if lock was not acquired (timeout)
      */
     template<class Mutex>
-    inline std::unique_lock<Mutex> spin_lock_for(Mutex& m, rpp::Duration timeout) noexcept
+    inline rpp::unique_lock<Mutex> spin_lock_for(Mutex& m, rpp::Duration timeout) noexcept
     {
         if (!m.try_lock()) // spin until we can lock the mutex
         {
             if (timeout <= rpp::Duration::zero())
-                return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
+                return rpp::unique_lock<Mutex>{m, rpp::defer_lock}; // no timeout, just return deferred lock
 
             rpp::TimePoint start = rpp::TimePoint::monotonic_now();
             do {
                 rpp::sleep_us(50); // yielding here will improve perf massively
-                if (m.try_lock()) return std::unique_lock<Mutex>{m, std::adopt_lock};
+                if (m.try_lock()) return rpp::unique_lock<Mutex>{m, rpp::adopt_lock};
             }
             while ((rpp::TimePoint::monotonic_now() - start) < timeout);
 
-            return std::unique_lock<Mutex>{m, std::defer_lock}; // no timeout, just return deferred lock
+            return rpp::unique_lock<Mutex>{m, rpp::defer_lock}; // no timeout, just return deferred lock
         }
-        return std::unique_lock<Mutex>{m, std::adopt_lock};
+        return rpp::unique_lock<Mutex>{m, rpp::adopt_lock};
     }
 
     namespace locks
@@ -536,7 +557,7 @@ namespace rpp
         using value_type = std::decay_t< decltype(std::declval<SyncType&>().get_ref()) >;
         using mutex_type = std::decay_t< decltype(std::declval<SyncType&>().get_mutex()) >;
     private:
-        std::unique_lock<mutex_type> mtx_lock;
+        rpp::unique_lock<mutex_type> mtx_lock;
         SyncType* instance;
     public:
         explicit synchronize_guard(SyncType* s) noexcept
@@ -544,7 +565,7 @@ namespace rpp
             , instance{s}
         { }
 
-        std::unique_lock<mutex_type>& get_lock() noexcept { return mtx_lock; }
+        rpp::unique_lock<mutex_type>& get_lock() noexcept { return mtx_lock; }
         bool owns_lock() const noexcept { return mtx_lock.owns_lock(); }
         void lock() { mtx_lock.lock(); }
         void unlock() { mtx_lock.unlock(); }

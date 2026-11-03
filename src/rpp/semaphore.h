@@ -55,7 +55,7 @@ namespace rpp
     {
     public:
         using mutex_t = rpp::mutex;
-        using lock_t = std::unique_lock<mutex_t>;
+        using lock_t = rpp::unique_lock<mutex_t>;
 
     protected:
         mutable mutex_t m;

@@ -437,7 +437,7 @@ namespace rpp
 
     void thread_pool::set_task_tracer(pool_trace_provider trace_provider)
     {
-        std::lock_guard lock{ TasksMutex };
+        rpp::lock_guard lock{ TasksMutex };
         TraceProvider = trace_provider;
     }
 
@@ -456,7 +456,7 @@ namespace rpp
         // the workers wait for their tasks after the unlock, because a running task may still call active_tasks()
         std::vector<worker_ptr> workers;
         {
-            std::lock_guard lock{TasksMutex};
+            rpp::lock_guard lock{TasksMutex};
             workers.swap(Workers);
         }
         workers.clear();
@@ -479,7 +479,7 @@ namespace rpp
 
     int thread_pool::active_tasks() noexcept
     {
-        std::lock_guard lock{TasksMutex};
+        rpp::lock_guard lock{TasksMutex};
         int active = 0;
         for (auto& task : Workers) 
             if (task->running()) ++active;
@@ -495,7 +495,7 @@ namespace rpp
             pool_task_handle busy { nullptr };
             bool parallel_for_active = false;
             {
-                std::lock_guard lock{TasksMutex};
+                rpp::lock_guard lock{TasksMutex};
                 for (worker_ptr& worker : Workers)
                 {
                     pool_task_handle task = worker->running_task();
@@ -523,7 +523,7 @@ namespace rpp
 
     int thread_pool::idle_tasks() noexcept
     {
-        std::lock_guard lock{TasksMutex};
+        rpp::lock_guard lock{TasksMutex};
         int idle = 0;
         for (auto& task : Workers)
             if (!task->running()) ++idle;
@@ -537,7 +537,7 @@ namespace rpp
 
     int thread_pool::clear_idle_tasks() noexcept
     {
-        std::lock_guard lock{TasksMutex};
+        rpp::lock_guard lock{TasksMutex};
         int cleared = 0;
         for (size_t i = 0; i < Workers.size();)
         {
@@ -554,7 +554,7 @@ namespace rpp
 
     void thread_pool::max_task_idle_time(float max_idle_seconds) noexcept
     {
-        std::lock_guard lock{TasksMutex};
+        rpp::lock_guard lock{TasksMutex};
         TaskMaxIdleTime = max_idle_seconds;
         for (auto& task : Workers)
             task->max_idle_time(TaskMaxIdleTime);
@@ -571,7 +571,7 @@ namespace rpp
                                   const action<int, int>& range_task) noexcept
     {
         {
-            std::lock_guard lock{TasksMutex};
+            rpp::lock_guard lock{TasksMutex};
             for (int i = (int)Workers.size() - 1; i >= 0; --i)
             {
                 auto& worker_ref = Workers[i];
@@ -732,7 +732,7 @@ namespace rpp
 
         // and finally throw them back into the pool
         {
-            std::lock_guard lock{TasksMutex};
+            rpp::lock_guard lock{TasksMutex};
             for (int i = 0; i < spawned; ++i)
             {
                 Workers.emplace_back(std::move(active[i].worker));
@@ -761,7 +761,7 @@ namespace rpp
     void thread_pool::start_generic_task(task_delegate<void()>&& generic_task, pool_task_handle* out) noexcept
     {
         task_delegate<void()> gen_task { std::move(generic_task) };
-        { std::lock_guard lock{TasksMutex};
+        { rpp::lock_guard lock{TasksMutex};
             for (worker_ptr& t : Workers)
             {
                 pool_worker* worker = t.get();
@@ -777,7 +777,7 @@ namespace rpp
         bool started = w->run_generic(gen_task, out);
         AssertTerminate(started, "brand new pool_task->run_generic() failed");
 
-        std::lock_guard lock{TasksMutex};
+        rpp::lock_guard lock{TasksMutex};
         Workers.emplace_back(std::move(w));
     }
     // NOLINTEND(clang-analyzer-cplusplus.Move)

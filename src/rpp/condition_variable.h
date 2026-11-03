@@ -15,7 +15,6 @@
 #include "debugging.h" // LogError
 #include "mutex.h" // rpp::cvar
 #include <atomic>
-#include <mutex> // std::unique_lock
 #include <type_traits> // std::is_same_v
 
 namespace rpp
@@ -64,8 +63,7 @@ namespace rpp
 
         // only the exact type, because another lock or a derived mutex can add its own work to lock() and unlock()
         template<class Lock>
-        static constexpr bool marks_contended = std::is_same_v<Lock, rpp::unique_lock<rpp::futex_mutex>>
-                                             || std::is_same_v<Lock, std::unique_lock<rpp::futex_mutex>>;
+        static constexpr bool marks_contended = std::is_same_v<Lock, rpp::unique_lock<rpp::futex_mutex>>;
 
         // a waiter reads seq before it registers, so a notify which counts it also changes the seq it sleeps on
         rpp::uint32 begin_wait() noexcept
