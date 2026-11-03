@@ -6,11 +6,14 @@
 #include <rpp/timer.h> // performance measurement
 #include <rpp/threads.h> // thread naming
 #include <rpp/paths.h> // rpp::module_path
+#include <rpp/strview.h> // rpp::strview
 #include <atomic>
 #include <cstdlib> // std::exit
 #include <memory> // shared_ptr
+#include <string> // std::string
 #include <thread>  // hardware_concurrency
 #include <unordered_set>
+#include <vector> // std::vector
 #if _MSC_VER
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN 1
@@ -21,7 +24,8 @@
     #include <windows.h> // CreateProcessA
 #elif !__EMSCRIPTEN__
     #include <sys/wait.h> // waitpid
-    #include <unistd.h> // fork, execl, alarm
+    #include <unistd.h> // fork, execle, alarm
+    extern char** environ; // NOLINT(readability-redundant-declaration) macOS does not declare it in unistd.h
 #endif
 #if __APPLE__
     #include <TargetConditionals.h> // TARGET_OS_IPHONE
@@ -495,11 +499,26 @@ TestImpl(test_threadpool)
         CloseHandle(process.hProcess);
         return int(exit_code);
     #else
+        char** child_env = environ;
+    #if RPP_TSAN
+        // TSAN sleeps in exit() while another thread runs, and the hang guard must not read that sleep as a hang
+        const char* options = getenv("TSAN_OPTIONS");
+        std::string tsan_options = std::string{"TSAN_OPTIONS="} + (options ? options : "") + ":atexit_sleep_ms=0";
+        std::vector<char*> env;
+        for (char** var = environ; *var; ++var)
+        {
+            if (!rpp::strview{*var}.starts_with("TSAN_OPTIONS="))
+                env.push_back(*var);
+        }
+        env.push_back(tsan_options.data());
+        env.push_back(nullptr);
+        child_env = env.data();
+    #endif
         const pid_t child = fork();
         if (child == 0)
         {
             alarm(1); // a hang guard, which only a child that hangs in exit() reaches
-            execl(exe.c_str(), exe.c_str(), case_filter, nullptr);
+            execle(exe.c_str(), exe.c_str(), case_filter, nullptr, child_env);
             _exit(127);
         }
         int status = 0;

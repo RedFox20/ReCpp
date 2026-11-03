@@ -71,7 +71,8 @@ Protect that number.
 
 - A case over 100ms needs a reason in the review. A case over 500ms is a defect.
 - Make a slow case fast, and keep it in the default run. `TestCaseNoAutorun` is only for a case
-  which needs gigabytes of memory or a 32-bit target. Measure the hit rate after you shrink a race case.
+  which needs gigabytes of memory or a 32-bit target,
+  or for the body of a child-process case. Measure the hit rate after you shrink a race case.
 - Sleeps in this repo are 1ms to 10ms. `rpp::sleep_ms(50)` and above needs a
   reason. Never put a sleep inside a loop.
 - **A timeout the case expects to elapse is 5ms or 10ms.** That covers every
@@ -485,6 +486,14 @@ the result is right.
 - Do not slow the common path to guard an absurd argument, such as a range of `INT_MAX`
   elements. Document the limit instead.
 
+### R18. The global pool is never destroyed
+
+README.md "Lifetime and Shutdown" holds the pool lifetime rules. BUGS.md C39 and C40 hold the two defects they stop.
+
+- Block a change which makes `thread_pool::global()` a static `thread_pool` object, or which destroys it at exit. `exit()` then waits for a running task.
+- Block a change which makes `~thread_pool()` or `~pool_worker()` detach a running worker. The worker then runs on a freed pool.
+- A shutdown change runs `exit_does_not_wait_for_a_running_global_task` and `pool_destructor_waits_for_the_running_task`.
+
 ## Report format
 
 Order the findings by severity. Keep one line per finding where possible.
@@ -501,7 +510,7 @@ Verdict: BLOCK, 3 findings
 ```
 
 - `CRITICAL` breaks R15. It comes first, and the verdict is BLOCK.
-- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, R14, or R16.
+- `BLOCK` breaks R1, R2, R3, R8, R9, R12, R13, R14, R16, or R18.
 - `WARN` breaks R4, R5, R6, or R7.
 - `NOTE` records a TSAN report or deferred work.
 - A clean review says `Verdict: PASS` and lists the gates.
