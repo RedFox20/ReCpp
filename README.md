@@ -2088,17 +2088,17 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 | [`adopt_lock`](src/rpp/mutex.h#L325) | The `adopt_lock_t` value |
 | [`lock_guard<Mutex>`](src/rpp/mutex.h#L402) | Holds a mutex for its whole scope, like `std::lock_guard` |
 | [`dual_lock_guard<Mutex>`](src/rpp/mutex.h#L416) | Holds two mutexes for its scope, and takes them in address order, so two threads never deadlock on one pair |
-| [`unlock_guard<Lock>`](src/rpp/mutex.h#L441) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
-| [`synchronized<T>`](src/rpp/mutex.h#L707) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`unlock_guard<Lock>`](src/rpp/mutex.h#L442) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
+| [`synchronized<T>`](src/rpp/mutex.h#L708) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L461) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L497) | Spin-lock with timeout |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L462) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L498) | Spin-lock with timeout |
 | [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L215) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L539) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`SyncableType`](src/rpp/mutex.h#L540) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
 call, and has a trivial destructor, so a static instance is safe before and after `main()`. In a TSAN build each

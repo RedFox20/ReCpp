@@ -420,9 +420,10 @@ namespace rpp
     public:
         dual_lock_guard(Mutex& a, Mutex& b) : first{&a < &b ? a : b}, second{&a < &b ? b : a}
         {
-            first.lock();
+            rpp::unique_lock<Mutex> held { first }; // unlocks first if second.lock() throws
             if (&second != &first)
                 second.lock();
+            held.release();
         }
         ~dual_lock_guard() noexcept
         {

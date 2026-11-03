@@ -566,6 +566,36 @@ TestImpl(test_mutex)
         AssertThat(taken[0] == &pair[0], true);
     }
 
+    struct throwing_mutex
+    {
+        bool throws = false;
+        bool locked = false;
+        void lock()
+        {
+            if (throws)
+                throw std::runtime_error{"lock failed"};
+            locked = true;
+        }
+        void unlock() noexcept { locked = false; }
+    };
+
+    TestCase(dual_lock_guard_releases_the_first_mutex_when_the_second_lock_throws)
+    {
+        throwing_mutex pair[2];
+        pair[1].throws = true;
+        bool thrown = false;
+        try
+        {
+            rpp::dual_lock_guard both { pair[0], pair[1] };
+        }
+        catch (const std::runtime_error&)
+        {
+            thrown = true;
+        }
+        AssertThat(thrown, true);
+        AssertThat(pair[0].locked, false);
+    }
+
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
     {
         rpp::mutex m;
