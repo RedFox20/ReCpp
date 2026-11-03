@@ -531,7 +531,8 @@ TestImpl(test_mutex)
 
     TestCase(dual_lock_guard_holds_both_mutexes_and_locks_one_mutex_once)
     {
-        rpp::mutex a, b;
+        rpp::mutex a;
+        rpp::mutex b;
         {
             rpp::dual_lock_guard both { b, a };
             AssertThat(taken_by_another_thread(a), false);
@@ -544,6 +545,25 @@ TestImpl(test_mutex)
             AssertThat(taken_by_another_thread(a), false);
         }
         AssertThat(taken_by_another_thread(a), true);
+    }
+
+    // logs each lock() call, so a case sees which mutex a guard takes first
+    struct order_mutex
+    {
+        std::vector<const order_mutex*>& taken;
+        void lock() { taken.push_back(this); }
+        void unlock() noexcept {}
+    };
+
+    TestCase(dual_lock_guard_takes_the_lower_address_first)
+    {
+        std::vector<const order_mutex*> taken;
+        order_mutex pair[2] = { { taken }, { taken } };
+        {
+            rpp::dual_lock_guard both { pair[1], pair[0] };
+        }
+        AssertThat(taken.size(), 2u);
+        AssertThat(taken[0] == &pair[0], true);
     }
 
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
