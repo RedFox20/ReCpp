@@ -49,12 +49,16 @@ one above it passes.
 4. **Edit prose with the Edit or Write tool, never through the shell.** A hook lints
    the text before it lands, and it cannot see a shell redirect. This covers
    markdown, comments, doxygen, and log strings.
-5. **Run the pre-review pass.** `recpp-pre-review` over every comment, doxygen
+5. **Run `/ultrasimplify` on the branch.** Use the regular run, never `--lite`.
+   Without the plugin, run it from the plugin cache, as its SKILL.md says. Ask
+   the owner about each `Objection:` before you polish that code. Apply what it
+   proves, and run the full suite again.
+6. **Run the pre-review pass.** `recpp-pre-review` over every comment, doxygen
    block, log string, and markdown line you added. Cut each one to the shortest
    form which still carries the why.
-6. **Never create a merge commit.** Rebase the branch onto master, and push it
+7. **Never create a merge commit.** Rebase the branch onto master, and push it
    with `--force-with-lease`.
-7. **Close each issue through the PR.** The PR body names `Fixes #n` once for each
+8. **Close each issue through the PR.** The PR body names `Fixes #n` once for each
    issue which the PR finishes, so the merge closes the issue. Never close it by hand.
 
 ## Review Feedback
