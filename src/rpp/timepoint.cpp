@@ -289,29 +289,19 @@ namespace rpp
             if (duration <= 0)
                 return;
 
-            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
+            // Round up to whole ticks and do not spin. A sub-tick wait needs a TIM peripheral.
+            // vTaskDelay(n) can return n-1 ticks later, so one more tick makes it at least the duration.
             constexpr int64 ns_per_tick = 1'000'000'000 / configTICK_RATE_HZ;
-            int64 ticks = duration / ns_per_tick;
-            int64 nanos = duration - (ticks * ns_per_tick);
+            int64 ticks = (duration + ns_per_tick - 1) / ns_per_tick + 1;
 
-            // Sleep for full ticks
-            if (ticks > 0)
-                vTaskDelay(static_cast<TickType_t>(ticks));
-
-            // Spin-wait for remaining nanoseconds
-            if (nanos > 0)
+            // A 16-bit TickType_t cannot hold every delay
+            constexpr TickType_t max_step = portMAX_DELAY - 1;
+            while (ticks > max_step)
             {
-                int64 start = freertos_get_time_ns();
-                int64 end = start + nanos;
-
-                if (end < start)
-                {
-                    // Sleep until timer wraps around
-                    while (freertos_get_time_ns() > start) {}
-                }
-
-                while (freertos_get_time_ns() < end) {}
+                vTaskDelay(max_step);
+                ticks -= max_step;
             }
+            vTaskDelay(static_cast<TickType_t>(ticks));
         }
 
     #elif RPP_STM32_HAL
