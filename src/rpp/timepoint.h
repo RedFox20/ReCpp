@@ -21,7 +21,7 @@ namespace rpp
     /** Let this thread sleep for provided MICROSECONDS */
     RPPAPI void sleep_us(unsigned int micros) noexcept;
 
-    /** Let this thread sleep for provided NANOSECONDS. FreeRTOS spins, so use sleep_ms() for long waits. */
+    /** Let this thread sleep for provided NANOSECONDS. FreeRTOS delays the full ticks and spins the rest. */
     RPPAPI void sleep_ns(int64 nanos) noexcept;
 
     struct Duration; // forward declaration

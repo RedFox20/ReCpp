@@ -284,22 +284,47 @@ namespace rpp
         #endif
         }
 
-        /** @brief Spin for a precise wait. sleep_ms() gives the CPU back instead. */
+        static constexpr int64 FREERTOS_NS_PER_TICK = 1'000'000'000 / configTICK_RATE_HZ;
+
+        static void freertos_delay_ticks(int64 ticks) noexcept
+        {
+            // A 16-bit TickType_t cannot hold every delay
+            constexpr TickType_t max_step = portMAX_DELAY - 1;
+            while (ticks > max_step)
+            {
+                vTaskDelay(max_step);
+                ticks -= max_step;
+            }
+            if (ticks > 0)
+                vTaskDelay(static_cast<TickType_t>(ticks));
+        }
+
         static void freertos_sleep_ns(int64 duration) noexcept
         {
             if (duration <= 0)
                 return;
 
-            int64 start = freertos_get_time_ns();
-            int64 end = start + duration;
+            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
+            int64 ticks = duration / FREERTOS_NS_PER_TICK;
+            int64 nanos = duration - (ticks * FREERTOS_NS_PER_TICK);
 
-            if (end < start)
+            // Sleep for full ticks
+            freertos_delay_ticks(ticks);
+
+            // Spin-wait for remaining nanoseconds
+            if (nanos > 0)
             {
-                // Sleep until timer wraps around
-                while (freertos_get_time_ns() > start) {}
-            }
+                int64 start = freertos_get_time_ns();
+                int64 end = start + nanos;
 
-            while (freertos_get_time_ns() < end) {}
+                if (end < start)
+                {
+                    // Sleep until timer wraps around
+                    while (freertos_get_time_ns() > start) {}
+                }
+
+                while (freertos_get_time_ns() < end) {}
+            }
         }
 
         static void freertos_sleep_ms(unsigned int millis) noexcept
@@ -308,17 +333,8 @@ namespace rpp
                 return;
 
             // Round up to whole ticks. vTaskDelay(n) can return n-1 ticks later, so add one tick.
-            constexpr int64 ns_per_tick = 1'000'000'000 / configTICK_RATE_HZ;
-            int64 ticks = (int64(millis) * 1'000'000 + ns_per_tick - 1) / ns_per_tick + 1;
-
-            // A 16-bit TickType_t cannot hold every delay
-            constexpr TickType_t max_step = portMAX_DELAY - 1;
-            while (ticks > max_step)
-            {
-                vTaskDelay(max_step);
-                ticks -= max_step;
-            }
-            vTaskDelay(static_cast<TickType_t>(ticks));
+            int64 duration = int64(millis) * 1'000'000;
+            freertos_delay_ticks((duration + FREERTOS_NS_PER_TICK - 1) / FREERTOS_NS_PER_TICK + 1);
         }
 
     #elif RPP_STM32_HAL
