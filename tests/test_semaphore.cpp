@@ -168,7 +168,7 @@ TestImpl(test_semaphore)
 
         std::thread producer([&] {
             for (size_t i = 0; i < MAX_DATA; ++i) {
-                { std::lock_guard lock { producer_mutex };
+                { rpp::lock_guard lock { producer_mutex };
                     producer_data.push_back("data_" + std::to_string(i));
                     producer_queue.push_back(producer_data.back());
                 }
@@ -185,7 +185,7 @@ TestImpl(test_semaphore)
                     AssertFailed("semaphore was not notified");
                     break;
                 }
-                std::lock_guard lock { producer_mutex };
+                rpp::lock_guard lock { producer_mutex };
                 consumer_data.emplace_back(std::move(producer_queue.front()));
                 producer_queue.pop_front();
             }
@@ -414,7 +414,7 @@ TestImpl(test_semaphore)
         rpp::semaphore sem;
         rpp::condition_variable cv;
         rpp::mutex m;
-        std::unique_lock lock { m };
+        rpp::unique_lock lock { m };
         AssertInRange(measure([&] { AssertThat(flag.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);
         AssertInRange(measure([&] { AssertThat(once.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);
         AssertInRange(measure([&] { AssertThat(sem.wait(millis(1)), rpp::semaphore::timeout); }), 0.5, 5.0);

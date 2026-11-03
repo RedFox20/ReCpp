@@ -10,7 +10,6 @@
 #include <stdexcept>              // ThrowErr throws std::runtime_error
 #include <string>
 #include <vector>
-#include <mutex>                  // std::unique_lock, which rpp::spin_lock returns
 #include <memory>                 // std::make_shared, which rpp::atomic_shared_ptr takes
 #include <type_traits>            // std::is_same_v, which pins an exported signature
 #include <atomic>                 // std::atomic_bool, which rpp::atomic_test_and_set takes
@@ -329,7 +328,7 @@ TestImpl(test_modules)
         rpp::mutex m;
         AssertThat(m.try_lock(), true);
         m.unlock();
-        std::unique_lock<rpp::mutex> held = rpp::spin_lock(m);
+        rpp::unique_lock<rpp::mutex> held = rpp::spin_lock(m);
         AssertThat(held.owns_lock(), true);
         rpp::futex_mutex fm;
         AssertThat(fm.try_lock(), true);
@@ -394,7 +393,7 @@ TestImpl(test_modules)
 
         rpp::condition_variable cv;
         rpp::mutex m;
-        std::unique_lock<rpp::mutex> lock { m };
+        rpp::unique_lock<rpp::mutex> lock { m };
         AssertThat(cv.wait_for(lock, rpp::millis(1)) == rpp::cv_status::timeout, true);
     }
 

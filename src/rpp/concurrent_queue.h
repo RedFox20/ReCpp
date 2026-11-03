@@ -52,7 +52,7 @@ namespace rpp
         using duration = rpp::Duration;
         using time_point = rpp::TimePoint;
         using mutex_t = rpp::mutex;
-        using lock_t = std::unique_lock<mutex_t>;
+        using lock_t = rpp::unique_lock<mutex_t>;
 
     private:
         mutable mutex_t Mutex;
@@ -75,7 +75,7 @@ namespace rpp
         concurrent_queue(concurrent_queue&& q) noexcept
         {
             // safely swap the states from q to default empty state
-            std::scoped_lock dual_lock { mutex(), q.mutex() };
+            rpp::dual_lock_guard dual_lock { mutex(), q.mutex() };
             std::swap(Head, q.Head);
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
@@ -97,7 +97,7 @@ namespace rpp
         concurrent_queue& operator=(concurrent_queue&& q) noexcept
         {
             // safely swap the states of both queues
-            std::scoped_lock dual_lock { mutex(), q.mutex() };
+            rpp::dual_lock_guard dual_lock { mutex(), q.mutex() };
             std::swap(Head, q.Head);
             std::swap(Tail, q.Tail);
             std::swap(ItemsStart, q.ItemsStart);
@@ -208,13 +208,13 @@ namespace rpp
         {
             // signal all waiters to exit by setting Destroying flag and notifying all
             {
-                std::lock_guard lock1 { mutex() };
+                rpp::lock_guard lock1 { mutex() };
                 Destroying.store(true, std::memory_order_release);
                 notify_all_unlocked();
             } // release lock so that blocking threads can wake up and see the Destroying flag
 
             // lock again before destroying items -- hopefully all waiters have exited by now
-            std::lock_guard lock2 { mutex() };
+            rpp::lock_guard lock2 { mutex() };
             clear_unlocked(/*force_destroy*/true);
         }
 

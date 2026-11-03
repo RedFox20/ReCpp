@@ -93,7 +93,7 @@ TestImpl(test_concurrent_queue)
         concurrent_queue<std::string> queue;
         std::string popped;
         {
-            std::unique_lock lock = queue.spin_lock();
+            rpp::unique_lock lock = queue.spin_lock();
             queue.push(lock, "item1");
             AssertThat(lock.owns_lock(), true); // size() would take the lock again, so it waits for the block to end
         }
@@ -110,7 +110,7 @@ TestImpl(test_concurrent_queue)
 
         std::vector<std::string> items;
         {
-            std::unique_lock lock = queue.spin_lock();
+            rpp::unique_lock lock = queue.spin_lock();
             for (const std::string& item : queue.iterator(lock))
                 items.push_back(item);
         }

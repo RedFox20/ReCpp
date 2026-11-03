@@ -514,7 +514,7 @@ namespace rpp
         static constexpr bool DEFAULT_NODELAY = true;
 
         using mutex_t = typename rpp::recursive_mutex;
-        using lock_t = std::unique_lock<mutex_t>;
+        using lock_t = rpp::unique_lock<mutex_t>;
 
     protected:
 

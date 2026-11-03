@@ -529,6 +529,73 @@ TestImpl(test_mutex)
         AssertThat(taken_by_another_thread(m), true);
     }
 
+    TestCase(dual_lock_guard_holds_both_mutexes_and_locks_one_mutex_once)
+    {
+        rpp::mutex a;
+        rpp::mutex b;
+        {
+            rpp::dual_lock_guard both { b, a };
+            AssertThat(taken_by_another_thread(a), false);
+            AssertThat(taken_by_another_thread(b), false);
+        }
+        AssertThat(taken_by_another_thread(a), true);
+        AssertThat(taken_by_another_thread(b), true);
+        {
+            rpp::dual_lock_guard same { a, a };
+            AssertThat(taken_by_another_thread(a), false);
+        }
+        AssertThat(taken_by_another_thread(a), true);
+    }
+
+    // logs each lock() call, so a case sees which mutex a guard takes first
+    struct order_mutex
+    {
+        std::vector<const order_mutex*>& taken;
+        void lock() { taken.push_back(this); }
+        void unlock() noexcept {}
+    };
+
+    TestCase(dual_lock_guard_takes_the_lower_address_first)
+    {
+        std::vector<const order_mutex*> taken;
+        order_mutex pair[2] = { { taken }, { taken } };
+        {
+            rpp::dual_lock_guard both { pair[1], pair[0] };
+        }
+        AssertThat(taken.size(), 2u);
+        AssertThat(taken[0] == &pair[0], true);
+    }
+
+    struct throwing_mutex
+    {
+        bool throws = false;
+        bool locked = false;
+        void lock()
+        {
+            if (throws)
+                throw std::runtime_error{"lock failed"};
+            locked = true;
+        }
+        void unlock() noexcept { locked = false; }
+    };
+
+    TestCase(dual_lock_guard_releases_the_first_mutex_when_the_second_lock_throws)
+    {
+        throwing_mutex pair[2];
+        pair[1].throws = true;
+        bool thrown = false;
+        try
+        {
+            rpp::dual_lock_guard both { pair[0], pair[1] };
+        }
+        catch (const std::runtime_error&)
+        {
+            thrown = true;
+        }
+        AssertThat(thrown, true);
+        AssertThat(pair[0].locked, false);
+    }
+
     TestCase(spin_lock_for_gives_up_on_a_held_mutex)
     {
         rpp::mutex m;
@@ -620,7 +687,7 @@ TestImpl(test_mutex)
     // A spin_lock_for() which times out falls back to lock().
     static void spin_lock_and_enter(guarded_counter& s, int i) noexcept
     {
-        if (std::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
+        if (rpp::unique_lock lock = rpp::spin_lock_for(s.m, rpp::millis(2)); lock.owns_lock())
             s.enter();
         else
             lock_and_enter(s, i);

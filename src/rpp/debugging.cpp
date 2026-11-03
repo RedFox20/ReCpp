@@ -213,7 +213,7 @@ RPPCAPI void LogEnableTimestamps(bool enable, int precision, bool time_of_day) n
 RPPCAPI void LogSetTimeOffset(rpp::int64 offset) noexcept
 {
 #if RPP_CORTEX_M_ARCH
-    std::lock_guard<rpp::critical_section> guard{LogMutex};
+    rpp::lock_guard<rpp::critical_section> guard{LogMutex};
     TimeOffset = offset;
 #else
     TimeOffset.store(offset, std::memory_order_release);
@@ -230,7 +230,7 @@ static int SafeFormat(char* errBuf, int N, const char* format, va_list ap) noexc
         rpp::TimePoint now = rpp::TimePoint::system_now();
     #if RPP_CORTEX_M_ARCH
         {
-            std::lock_guard<rpp::critical_section> guard{LogMutex};
+            rpp::lock_guard<rpp::critical_section> guard{LogMutex};
             now.duration.nsec += TimeOffset;
         }
     #else

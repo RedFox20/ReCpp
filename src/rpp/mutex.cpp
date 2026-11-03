@@ -2,6 +2,7 @@
 #if _MSC_VER && USE_CUSTOM_WINDOWS_MUTEX
     #define WIN32_LEAN_AND_MEAN
     #include <Windows.h>
+    #include <stdexcept> // std::runtime_error
     #include <type_traits> // std::is_trivially_destructible_v
 #endif
 #if RPP_FREERTOS

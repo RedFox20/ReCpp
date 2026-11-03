@@ -29,6 +29,7 @@ export namespace rpp {
     using rpp::adopt_lock;
     using rpp::unique_lock;
     using rpp::lock_guard;
+    using rpp::dual_lock_guard;
     using rpp::unlock_guard;
     using rpp::spin_lock;
     using rpp::spin_lock_for;

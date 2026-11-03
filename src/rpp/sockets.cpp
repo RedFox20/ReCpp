@@ -775,7 +775,7 @@ namespace rpp
     socket& socket::operator=(socket&& s) noexcept
     {
         // lock both mutexes, but do not swap them
-        std::scoped_lock lock { Mtx, s.Mtx };
+        rpp::dual_lock_guard lock { Mtx, s.Mtx };
         std::swap(Sock, s.Sock);
         std::swap(Addr, s.Addr);
         std::swap(LastErr, s.LastErr);
@@ -794,7 +794,7 @@ namespace rpp
 
     void socket::close() noexcept
     {
-        std::unique_lock lock { Mtx };
+        rpp::unique_lock lock { Mtx };
         int sock = os_handle_unsafe();
         if (sock != -1)
         {
@@ -822,7 +822,7 @@ namespace rpp
 
     int socket::release_noclose() noexcept
     {
-        std::lock_guard lock { Mtx };
+        rpp::lock_guard lock { Mtx };
         int sock = os_handle_unsafe();
         set_os_handle_unsafe(-1);
         return sock;
@@ -838,7 +838,7 @@ namespace rpp
             // Since we're running in a multithreaded environment, we MUST ignore it
             flags = MSG_NOSIGNAL;
         #endif
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         return handle_txres(::send(os_handle_unsafe(), (const char*)buffer, numBytes, flags));
     }
     int socket::send(const char* str)    noexcept { return send(str, (int)strlen(str)); }
@@ -854,7 +854,7 @@ namespace rpp
 
         saddr a = to_saddr(to);
         socklen_t len = sizeof(a);
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         return handle_txres(::sendto(os_handle_unsafe(), (const char*)buffer, numBytes, 0, &a.sa, len));
     }
     int socket::sendto(const ipaddress& to, const char* str)    noexcept { return sendto(to, str, (int)strlen(str)); }
@@ -863,7 +863,7 @@ namespace rpp
 
     void socket::flush() noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         flush_send_buf();
         flush_recv_buf();
     }
@@ -872,7 +872,7 @@ namespace rpp
     {
         if (type() == ST_Stream)
         {
-            std::unique_lock lock = rpp::spin_lock(Mtx);
+            rpp::unique_lock lock = rpp::spin_lock(Mtx);
             // flush write buffer (hack only available for TCP sockets)
             bool nagleEnabled = !is_nodelay();
             if (nagleEnabled)
@@ -883,7 +883,7 @@ namespace rpp
 
     void socket::flush_recv_buf() noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         if (type() == ST_Stream)
         {
             skip(available());
@@ -910,7 +910,7 @@ namespace rpp
         if (bytesToSkip <= 0)
             return 0;
 
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         int remaining = bytesToSkip;
         int skipped = 0;
         char dump[4096];
@@ -1005,7 +1005,7 @@ namespace rpp
     {
         if (maxBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
-        std::unique_lock lock { Mtx };
+        rpp::unique_lock lock { Mtx };
         int sock = os_handle_unsafe();
         // we can't keep the mutex locked if we're entering a blocking operation
         if (Blocking) lock.unlock();
@@ -1017,7 +1017,7 @@ namespace rpp
         if (numBytes <= 0) // important! ignore 0-byte I/O, handle_txres cant handle it
             return 0;
 
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         // if the socket is blocking, then MSG_PEEK can cause a blocking operation
         // which goes against rpp::socket::peek() API specification.
         // So we use poll() to detect whether the socket is readable first
@@ -1113,18 +1113,18 @@ namespace rpp
     // PUBLIC -- for external use if regular error API is not enough
     int socket::last_errno() const noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         int err = get_errno_unlocked();
         return err ? err : set_errno_unlocked(os_getsockerr());
     }
     void socket::set_errno(int err) const noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         LastErr = err;
     }
     int socket::get_errno() const noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         return LastErr;
     }
 
@@ -1158,7 +1158,7 @@ namespace rpp
 
     int socket::handle_errno(int err) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx); // mtx lock does not affect errno
+        rpp::unique_lock lock = rpp::spin_lock(Mtx); // mtx lock does not affect errno
         int errcode = set_errno_unlocked(err ? err : os_getsockerr());
         switch (errcode) {
             case 0: return 0; // no error
@@ -1341,20 +1341,20 @@ namespace rpp
     int socket::get_opt(int optlevel, int socketopt) const noexcept
     {
         int value = 0; socklen_t len = sizeof(int);
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         bool ok = getsockopt(os_handle_unsafe(), optlevel, socketopt, (char*)&value, &len) == 0;
         set_errno_unlocked(ok ? 0 : os_getsockerr());
         return ok ? value : -1;
     }
     int socket::set_opt(int optlevel, int socketopt, int value) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         bool ok = setsockopt(os_handle_unsafe(), optlevel, socketopt, (char*)&value, sizeof(int)) == 0;
         return set_errno_unlocked(ok ? 0 : os_getsockerr());
     }
     int socket::set_opt(int optlevel, int socketopt, void* value, int value_size) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         bool ok = setsockopt(os_handle_unsafe(), optlevel, socketopt, (char*)value, value_size) == 0;
         return set_errno_unlocked(ok ? 0 : os_getsockerr());
     }
@@ -1378,7 +1378,7 @@ namespace rpp
 
     int socket::get_ioctl(int iocmd, int& outValue) const noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         set_errno_unlocked(0);
     #if _WIN32 // on win32, ioctlsocket SETS FIONBIO, so we need this little helper
         if (iocmd == FIONBIO)
@@ -1403,7 +1403,7 @@ namespace rpp
 
     int socket::set_ioctl(int iocmd, int value) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         set_errno_unlocked(0);
     #if _WIN32
         u_long val = value;
@@ -1457,7 +1457,7 @@ namespace rpp
 
     bool socket::set_blocking(bool socketsBlock) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
     #if _WIN32
         u_long val = socketsBlock?0:1; // FIONBIO: !=0 nonblock, 0 block
         if (ioctlsocket(os_handle_unsafe(), FIONBIO, &val) == 0)
@@ -1482,7 +1482,7 @@ namespace rpp
 
     bool socket::is_blocking() const noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
     #if _WIN32
         return Blocking; // On Windows, there is no way to GET FIONBIO without setting it
     #else
@@ -1526,7 +1526,7 @@ namespace rpp
         set_errno(ESOCK(EOPNOTSUPP)); // only the qWAVE QoS API sets the DSCP on Windows
         return false;
     #else
-        std::unique_lock lock = rpp::spin_lock(Mtx); // the same handle for the family and the options
+        rpp::unique_lock lock = rpp::spin_lock(Mtx); // the same handle for the family and the options
         auto set_tos = [this, dscp](int level, int option)
         {
             const int tos = get_opt(level, option); // the DSCP takes the top 6 bits, the 2 ECN bits stay
@@ -1545,7 +1545,7 @@ namespace rpp
         set_errno(ESOCK(EOPNOTSUPP));
         return -1;
     #else
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         const bool ipv6 = ipaddress{os_handle_unsafe()}.Address.Family == AF_IPv6;
         const int tos = get_opt(ipv6 ? IPPROTO_IPV6 : IPPROTO_IP, ipv6 ? IPV6_TCLASS : IP_TOS);
         return tos < 0 ? -1 : tos >> 2;
@@ -1564,7 +1564,7 @@ namespace rpp
         #else
             int size_cmd = static_cast<int>(size);
         #endif
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         if (set_opt(SOL_SOCKET, command, size_cmd) != 0)
             return false;
         return get_opt(SOL_SOCKET, which) == static_cast<int>(size);
@@ -1595,7 +1595,7 @@ namespace rpp
         struct linger l;
         l.l_onoff = active ? 1 : 0;
         l.l_linger = seconds;
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         bool ok = setsockopt(os_handle_unsafe(), SOL_SOCKET, SO_LINGER, (char*)&l, sizeof(l)) == 0;
         set_errno_unlocked(ok ? 0 : os_getsockerr());
         return ok;
@@ -1621,7 +1621,7 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            std::unique_lock lock = rpp::spin_lock(Mtx);
+            rpp::unique_lock lock = rpp::spin_lock(Mtx);
             bool ok = getsockopt(os_handle_unsafe(), SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
             set_errno_unlocked(ok ? 0 : os_getsockerr());
             return to_ipproto(winf.iProtocol);
@@ -1640,7 +1640,7 @@ namespace rpp
         #ifdef _WIN32
             WSAPROTOCOL_INFOW winf = { 0 };
             int len = sizeof(winf);
-            std::unique_lock lock = rpp::spin_lock(Mtx);
+            rpp::unique_lock lock = rpp::spin_lock(Mtx);
             bool ok = getsockopt(os_handle_unsafe(), SOL_SOCKET, SO_PROTOCOL_INFOW, (char*)&winf, &len) == 0;
             set_errno_unlocked(ok ? 0 : os_getsockerr());
             return protocol_info {
@@ -1677,7 +1677,7 @@ namespace rpp
     {
         // try to lock, but don't deadlock if another thread is doing an atomic
         // recv on the socket.
-        std::unique_lock lock1 = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock1 = rpp::spin_lock(Mtx);
         int sock = os_handle_unsafe();
         rpp::socket_type stype = Type;
         rpp::socket_category cat = Category;
@@ -1727,7 +1727,7 @@ namespace rpp
                 char c;
                 // handle_txres() should take care of the status
                 // and set the Connected flag properly
-                std::unique_lock lock2 = rpp::spin_lock(Mtx);
+                rpp::unique_lock lock2 = rpp::spin_lock(Mtx);
                 handle_txres(::recv(sock, &c, 1, MSG_PEEK));
             }
             // if poll doesn't trigger, we rely on the Connected flag
@@ -1742,7 +1742,7 @@ namespace rpp
 
     bool socket::create(address_family af, ip_protocol ipp, socket_option opt) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         inwin32(InitWinSock());
         close();
 
@@ -1797,7 +1797,7 @@ namespace rpp
     bool socket::bind(const ipaddress& addr, socket_option opt) noexcept
     {
         auto sa = to_saddr(addr);
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
 
         if (opt & SO_ReuseAddr)
         {
@@ -1818,7 +1818,7 @@ namespace rpp
     {
         Assert(type() != socket_type::ST_Datagram, "Cannot use socket::listen() on UDP sockets");
 
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         if (::listen(os_handle_unsafe(), SOMAXCONN) == 0) // start listening for new clients
         {
             Category = SC_Listen;
@@ -2058,7 +2058,7 @@ namespace rpp
 
     bool socket::listen(const ipaddress& localAddr, ip_protocol ipp, socket_option opt) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
 
         // SO_ReuseAddr is handled by bind(), remove it from the options
         socket_option creationOpts = socket_option(opt & (~SO_ReuseAddr));
@@ -2101,7 +2101,7 @@ namespace rpp
 
         saddr saddr;
         socklen_t len = sizeof(saddr);
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         int handle = (int)::accept(os_handle_unsafe(), &saddr.sa, &len); // NOLINT(readability-redundant-casting)
         if (handle == -1)
         {
@@ -2127,7 +2127,7 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        std::unique_lock lock { Mtx };
+        rpp::unique_lock lock { Mtx };
 
         // disallow connecting to an unspecified address
         if (!remoteAddr.has_address())
@@ -2174,7 +2174,7 @@ namespace rpp
 
     bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        std::unique_lock lock { Mtx };
+        rpp::unique_lock lock { Mtx };
 
         // disallow connecting to an unspecified address
         if (!remoteAddr.has_address())
@@ -2219,7 +2219,7 @@ namespace rpp
 
     bool socket::connect_finish(socket_option opt) noexcept
     {
-        std::unique_lock lock { Mtx };
+        rpp::unique_lock lock { Mtx };
         int so_err = get_socket_level_error(); // the connect() manual puts the final status here
         if (so_err != 0)
         {
@@ -2269,7 +2269,7 @@ namespace rpp
 
     bool socket::bind_to_interface([[maybe_unused]] uint64_t network_handle) noexcept
     {
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         if (!good())
             return false;
 
@@ -2344,7 +2344,7 @@ namespace rpp
     bool socket::send_arp_request(const raw_address& target) noexcept
     {
     #if __linux__
-        std::unique_lock lock = rpp::spin_lock(Mtx);
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
         sockaddr_ll to{}; // the bound interface, with its index and its MAC
         socklen_t len = sizeof(to);
         if (getsockname(os_handle_unsafe(), (sockaddr*)&to, &len) != 0)

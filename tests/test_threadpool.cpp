@@ -160,11 +160,11 @@ TestImpl(test_threadpool)
         {
             (void)start; (void)end;
             rpp::sleep_ms(1);
-            { std::lock_guard lock{m};
+            { rpp::lock_guard lock{m};
                 ids.insert(rpp::get_thread_id());
             }
         });
-        std::lock_guard lock{m};
+        rpp::lock_guard lock{m};
         return (int)ids.size();
     }
 
