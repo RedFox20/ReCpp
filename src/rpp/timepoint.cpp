@@ -284,15 +284,32 @@ namespace rpp
         #endif
         }
 
+        /** @brief Spin for a precise wait. sleep_ms() gives the CPU back instead. */
         static void freertos_sleep_ns(int64 duration) noexcept
         {
             if (duration <= 0)
                 return;
 
-            // Round up to whole ticks and do not spin. A sub-tick wait needs a TIM peripheral.
-            // vTaskDelay(n) can return n-1 ticks later, so one more tick makes it at least the duration.
+            int64 start = freertos_get_time_ns();
+            int64 end = start + duration;
+
+            if (end < start)
+            {
+                // Sleep until timer wraps around
+                while (freertos_get_time_ns() > start) {}
+            }
+
+            while (freertos_get_time_ns() < end) {}
+        }
+
+        static void freertos_sleep_ms(unsigned int millis) noexcept
+        {
+            if (millis == 0)
+                return;
+
+            // Round up to whole ticks. vTaskDelay(n) can return n-1 ticks later, so add one tick.
             constexpr int64 ns_per_tick = 1'000'000'000 / configTICK_RATE_HZ;
-            int64 ticks = (duration + ns_per_tick - 1) / ns_per_tick + 1;
+            int64 ticks = (int64(millis) * 1'000'000 + ns_per_tick - 1) / ns_per_tick + 1;
 
             // A 16-bit TickType_t cannot hold every delay
             constexpr TickType_t max_step = portMAX_DELAY - 1;
@@ -351,7 +368,14 @@ namespace rpp
         #endif
     }
 
-    void sleep_ms(unsigned int millis) noexcept { sleep_ns(int64(millis) * 1'000'000); }
+    void sleep_ms(unsigned int millis) noexcept
+    {
+        #if RPP_FREERTOS
+            freertos_sleep_ms(millis);
+        #else
+            sleep_ns(int64(millis) * 1'000'000);
+        #endif
+    }
     void sleep_us(unsigned int micros) noexcept { sleep_ns(int64(micros) * 1'000); }
 
     void sleep_for(const Duration& d) noexcept
