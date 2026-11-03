@@ -252,8 +252,11 @@ namespace rpp
         }
 
         /** @brief Wait for a specified duration in nanoseconds. */
-        static void cortex_m_sleep_ns(unsigned int duration) noexcept
+        static void cortex_m_sleep_ns(int64 duration) noexcept
         {
+            if (duration <= 0)
+                return;
+
             int64 start = cortex_m_get_time_ns();
             int64 end = start + duration;
 
@@ -281,14 +284,19 @@ namespace rpp
         #endif
         }
 
-        static void freertos_sleep_ns(unsigned int duration) noexcept
+        static void freertos_sleep_ns(int64 duration) noexcept
         {
-            int ticks = duration / configTICK_RATE_HZ;
-            int nanos = duration - (ticks * configTICK_RATE_HZ);
+            if (duration <= 0)
+                return;
+
+            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
+            constexpr int64 ns_per_tick = 1'000'000'000 / configTICK_RATE_HZ;
+            int64 ticks = duration / ns_per_tick;
+            int64 nanos = duration - (ticks * ns_per_tick);
 
             // Sleep for full ticks
             if (ticks > 0)
-                vTaskDelay(ticks);
+                vTaskDelay(static_cast<TickType_t>(ticks));
 
             // Spin-wait for remaining nanoseconds
             if (nanos > 0)
