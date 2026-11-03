@@ -5,10 +5,31 @@
 #include <rpp/semaphore.h>
 #include <rpp/timer.h> // performance measurement
 #include <rpp/threads.h> // thread naming
+#include <rpp/paths.h> // rpp::module_path
+#include <rpp/strview.h> // rpp::strview
 #include <atomic>
+#include <cstdlib> // std::exit
 #include <memory> // shared_ptr
+#include <string> // std::string
 #include <thread>  // hardware_concurrency
 #include <unordered_set>
+#include <vector> // std::vector
+#if _MSC_VER
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN 1
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX 1
+    #endif
+    #include <windows.h> // CreateProcessA
+#elif !__EMSCRIPTEN__
+    #include <sys/wait.h> // waitpid
+    #include <unistd.h> // fork, execle, alarm
+    extern char** environ; // NOLINT(readability-redundant-declaration) macOS does not declare it in unistd.h
+#endif
+#if __APPLE__
+    #include <TargetConditionals.h> // TARGET_OS_IPHONE
+#endif
 using namespace rpp;
 
 namespace rpp
@@ -454,6 +475,75 @@ TestImpl(test_threadpool)
         AssertTrue(finished);
         releaser.join();
     }
+
+// these targets cannot start a child process, and qemu-user does not pass its Android sysroot to one
+#if !__EMSCRIPTEN__ && !TARGET_OS_IPHONE && !RPP_ANDROID
+    /// Runs one case of this binary in a child process. @returns its exit code, or -1 when it did not exit
+    static int run_case_in_a_child(const char* case_filter)
+    {
+        const std::string exe = rpp::module_path();
+    #if _MSC_VER
+        std::string command_line = "\"" + exe + "\" " + case_filter;
+        STARTUPINFOA startup { sizeof(startup) };
+        PROCESS_INFORMATION process {};
+        if (!CreateProcessA(exe.c_str(), command_line.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
+            return -1;
+        CloseHandle(process.hThread);
+        DWORD exit_code = 0;
+        // a hang guard, which only a child that hangs in exit() reaches
+        if (WaitForSingleObject(process.hProcess, 1000) == WAIT_OBJECT_0)
+            GetExitCodeProcess(process.hProcess, &exit_code);
+        else
+            exit_code = DWORD(-1);
+        TerminateProcess(process.hProcess, 1);
+        CloseHandle(process.hProcess);
+        return int(exit_code);
+    #else
+        char** child_env = environ;
+    #if RPP_TSAN
+        // TSAN sleeps in exit() while another thread runs, and the hang guard must not read that sleep as a hang
+        const char* options = getenv("TSAN_OPTIONS");
+        std::string tsan_options = std::string{"TSAN_OPTIONS="} + (options ? options : "") + ":atexit_sleep_ms=0";
+        std::vector<char*> env;
+        for (char** var = environ; *var; ++var)
+        {
+            if (!rpp::strview{*var}.starts_with("TSAN_OPTIONS="))
+                env.push_back(*var);
+        }
+        env.push_back(tsan_options.data());
+        env.push_back(nullptr);
+        child_env = env.data();
+    #endif
+        const pid_t child = fork();
+        if (child == 0)
+        {
+            alarm(1); // a hang guard, which only a child that hangs in exit() reaches
+            execle(exe.c_str(), exe.c_str(), case_filter, nullptr, child_env);
+            _exit(127);
+        }
+        int status = 0;
+        if (child < 0 || waitpid(child, &status, 0) != child || !WIFEXITED(status))
+            return -1;
+        return WEXITSTATUS(status);
+    #endif
+    }
+
+    // exit() destroys the statics, and the global pool must not wait there for a task, see BUGS.md C40
+    TestCase(exit_does_not_wait_for_a_running_global_task)
+    {
+        AssertThat(run_case_in_a_child("test_threadpool.global_task_still_runs_at_exit"), 0);
+    }
+
+    // the child process of exit_does_not_wait_for_a_running_global_task
+    TestCaseNoAutorun(global_task_still_runs_at_exit)
+    {
+        // never freed, because the task still waits on it after exit() destroys the statics
+        auto* never_released = new rpp::semaphore_once_flag{};
+        rpp::pool_task_handle task = rpp::parallel_task([never_released] { never_released->wait(); });
+        task.wait_until_started();
+        std::exit(0);
+    }
+#endif
 
     // a task accepted just before the destructor may never start, and its waiters must still wake
     TestCase(destroying_a_worker_releases_a_task_it_never_started)

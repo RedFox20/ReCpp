@@ -5,6 +5,7 @@
 #include <cassert>
 #include <csignal>
 #include <cmath> // round
+#include <new> // placement new
 #if __APPLE__ || __linux__
 # include <pthread.h>
 #endif
@@ -431,8 +432,10 @@ namespace rpp
 
     thread_pool& thread_pool::global()
     {
-        static thread_pool globalPool;
-        return globalPool;
+        // never destroyed, because exit() would wait for a task which runs past the statics, see BUGS.md C40
+        alignas(thread_pool) static unsigned char storage[sizeof(thread_pool)];
+        static thread_pool* globalPool = new (storage) thread_pool{};
+        return *globalPool;
     }
 
     void thread_pool::set_task_tracer(pool_trace_provider trace_provider)

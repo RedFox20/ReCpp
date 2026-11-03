@@ -744,6 +744,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 
 ## Closed
 
+### C40. `exit()` waited for a running task of the global pool
+The static global pool died in `exit()`, so a task which outlived the statics hung the process or ran on freed statics.
+`thread_pool::global()` now never destroys its pool, which `exit_does_not_wait_for_a_running_global_task` pins.
+
 ### C39. A pool worker ran its task on the pool which the destructor freed (was B10)
 `~pool_worker()` called `kill(0)`, which waited 0 ms for a running task and then detached the thread.
 `kill(0)` now waits without a timeout, outside `TasksMutex`, and a task never waits for itself, which eight `test_threadpool` cases pin.

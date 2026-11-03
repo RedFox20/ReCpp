@@ -409,7 +409,7 @@ namespace rpp
     public:
         using duration = pool_task_handle::duration;
 
-        // the default global thread pool
+        /// @returns the default global thread pool, which is never destroyed, so exit() does not wait for its tasks
         static thread_pool& global();
 
         thread_pool();

@@ -1993,6 +1993,15 @@ Thread pool with `parallel_for`, `parallel_foreach`, and async task support.
 | [`parallel_task(task)`](src/rpp/thread_pool.h#L626) | Run async task on the global pool |
 | [`action<TArgs...>`](src/rpp/thread_pool.h#L44) | Lightweight non-owning delegate for blocking call contexts |
 
+### Lifetime and Shutdown
+
+These rules keep a worker off freed memory and keep `exit()` from hanging.
+
+- A `thread_pool` which its owner destroys waits for each running task. A worker never runs on a freed pool, see BUGS.md C39.
+- `thread_pool::global()` is never destroyed. `exit()` does not wait for a global task, and the operating system ends the workers, see BUGS.md C40.
+- Never make the global pool a static `thread_pool` object, which `exit()` destroys. `exit()` would wait for a task which never ends, or which uses the statics that `exit()` destroyed.
+- A task which must finish before the process exits runs on a pool which its owner destroys, or its owner waits on its `pool_task_handle`.
+
 ### Example: parallel_for
 
 ```cpp
