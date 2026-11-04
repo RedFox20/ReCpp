@@ -1,6 +1,6 @@
 import mama
 from mama.utils.system import error, warning
-import os, sys, shlex, subprocess
+import os, sys, shlex, shutil, subprocess
 
 # mirrors RPP_MODULES_MIN_GCC in CMakeLists.txt. gcc-14 crashes an importer, see BUGS.md B28
 MODULES_MIN_GCC = (15, 0)
@@ -9,7 +9,7 @@ class ReCpp(mama.BuildTarget):
 
     def settings(self):
         # one raw string literal, because mama reads it without running this file. See AGENTS.md Versioning
-        self.version = '2.9.1'
+        self.version = '2.9.2'
         # if no preference, prefer gcc since its support is better in 2023
         self.prefer_gcc()
         if os.getenv('NO_NINJA'):
@@ -129,7 +129,8 @@ class ReCpp(mama.BuildTarget):
     TEST_TIMEOUT_SECONDS = 30
 
     def test(self, args):
-        if 'nogdb' in args:
+        # mama.gdb() cannot start a cross binary, so a Yocto build runs RppTests under qemu-user
+        if 'nogdb' in args or self.yocto_linux:
             args = args.replace('nogdb', '')
             self.run_tests_with_timeout(args)
         else:
@@ -140,15 +141,24 @@ class ReCpp(mama.BuildTarget):
         bin_dir = self.source_dir('bin')
         test_args = shlex.split(args)
         command = [self.source_dir('bin/RppTests')] + test_args
+        timeout = self.TEST_TIMEOUT_SECONDS
+        if self.yocto_linux:
+            if not shutil.which('qemu-aarch64'):
+                error('A Yocto test run needs qemu-aarch64. Install it with `sudo apt install qemu-user`.')
+                sys.exit(-1)
+            command = ['qemu-aarch64', '-L', self.yocto_linux.sysroot()] + command
+            timeout *= 3 # qemu-user emulates each instruction, so the suite runs slower
         # Repeat mode runs until failure, so a fixed timeout would stop a healthy run.
         is_repeat = '-r' in test_args or '--repeat' in test_args
-        timeout = None if is_repeat else self.TEST_TIMEOUT_SECONDS
+        timeout = None if is_repeat else timeout
         try:
             result = subprocess.run(command, cwd=bin_dir, timeout=timeout)
         except subprocess.TimeoutExpired:
-            error(f'RppTests timed out after {self.TEST_TIMEOUT_SECONDS}s: a test is hung. '
+            gdb_hint = 'Run it under `qemu-aarch64 -g <port>` and attach gdb-multiarch' if self.yocto_linux \
+                       else 'Run the same test without `nogdb` to attach GDB'
+            error(f'RppTests timed out after {timeout}s: a test is hung. '
                    'The last test name printed before this is the one that hung. '
-                   'Run the same test without `nogdb` to attach GDB and get the stack.')
+                  f'{gdb_hint} and get the stack.')
             sys.exit(-1)
         if result.returncode != 0:
             error(f'RppTests failed with exit code {result.returncode}')

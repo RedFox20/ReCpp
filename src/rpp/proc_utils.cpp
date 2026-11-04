@@ -76,12 +76,13 @@ namespace rpp
                 }
             }
         }
-        else
+        // a failed open leaves vsize at 0, and so does qemu-user, which writes zeros into /proc/self/stat
+        if (result.virtual_size == 0)
         {
             struct rusage usg {};
             getrusage(RUSAGE_SELF, &usg);
             result.physical_mem = static_cast<uint64>(usg.ru_maxrss) * 1024; // convert from KB to bytes
-            result.virtual_size = result.physical_mem; // fallback to physical mem if stat read fails
+            result.virtual_size = result.physical_mem; // fallback to physical mem if stat gives no vsize
         }
     #endif
         return result;
