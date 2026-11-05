@@ -284,30 +284,75 @@ namespace rpp
         #endif
         }
 
-        struct freertos_port
+        // vTaskDelay(n) wakes on the n-th tick boundary, so it ends n ticks minus the phase into the start tick
+
+        /** @returns The ticks to delay before the spin. It counts the phase, so a start late in a tick does not return early. */
+        static constexpr int64 tick_spin_delay(int64 duration, int64 phase, int64 ns_per_tick) noexcept
         {
-            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
-            static constexpr int64 NS_PER_TICK = 1'000'000'000 / configTICK_RATE_HZ;
-            static constexpr int64 MAX_DELAY = portMAX_DELAY - 1;
-            static int64 now_ns() noexcept { return freertos_get_time_ns(); }
-            static void delay(int64 ticks) noexcept { vTaskDelay(static_cast<TickType_t>(ticks)); }
-        };
+            return (duration + phase) / ns_per_tick;
+        }
+
+        /** @returns The ticks to delay without a spin: round up, and add one tick for the partial start tick. */
+        static constexpr int64 tick_round_up_delay(int64 duration, int64 ns_per_tick) noexcept
+        {
+            return duration <= 0 ? 0 : (duration + ns_per_tick - 1) / ns_per_tick + 1;
+        }
+
+        /** At each phase, the spin delay wakes less than one tick before the deadline, and the round-up wakes after it. */
+        static constexpr bool tick_delays_hold(int64 ns_per_tick) noexcept
+        {
+            const int64 phases[] = { 0, 1, ns_per_tick / 2, ns_per_tick - 1 };
+            const int64 durations[] = { 1, ns_per_tick - 1, ns_per_tick, ns_per_tick + 1, ns_per_tick * 3 / 2, 70'000 * ns_per_tick };
+            for (int64 phase : phases)
+            {
+                for (int64 duration : durations)
+                {
+                    int64 spin_woke = tick_spin_delay(duration, phase, ns_per_tick) * ns_per_tick - phase;
+                    if (spin_woke > duration || duration - spin_woke >= ns_per_tick)
+                        return false;
+                    if (tick_round_up_delay(duration, ns_per_tick) * ns_per_tick - phase < duration)
+                        return false;
+                }
+            }
+            return tick_round_up_delay(0, ns_per_tick) == 0 && tick_round_up_delay(-1, ns_per_tick) == 0;
+        }
+
+        // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
+        static constexpr int64 FREERTOS_NS_PER_TICK = 1'000'000'000 / configTICK_RATE_HZ;
+        static_assert(tick_delays_hold(FREERTOS_NS_PER_TICK), "the tick delays do not hold at configTICK_RATE_HZ");
+
+        static void freertos_delay_ticks(int64 ticks) noexcept
+        {
+            // A 16-bit TickType_t cannot hold every delay
+            constexpr TickType_t max_step = portMAX_DELAY - 1;
+            while (ticks > max_step)
+            {
+                vTaskDelay(max_step);
+                ticks -= max_step;
+            }
+            if (ticks > 0)
+                vTaskDelay(static_cast<TickType_t>(ticks));
+        }
 
         static void freertos_sleep_ns(int64 duration) noexcept
         {
-            freertos_port port;
+            if (duration <= 0)
+                return;
         #if RPP_CORTEX_M_ARCH
-            rpp::detail::rtos_sleep_spin(port, duration);
+            int64 start = freertos_get_time_ns();
+            // The tick count is an int, so start is negative after it wraps
+            int64 phase = (start % FREERTOS_NS_PER_TICK + FREERTOS_NS_PER_TICK) % FREERTOS_NS_PER_TICK;
+            freertos_delay_ticks(tick_spin_delay(duration, phase, FREERTOS_NS_PER_TICK));
+            while (freertos_get_time_ns() - start < duration) {}
         #else
             // The tick count is the only clock, so a spin cannot see the phase into the tick
-            rpp::detail::rtos_sleep_round_up(port, duration);
+            freertos_delay_ticks(tick_round_up_delay(duration, FREERTOS_NS_PER_TICK));
         #endif
         }
 
         static void freertos_sleep_ms(unsigned int millis) noexcept
         {
-            freertos_port port;
-            rpp::detail::rtos_sleep_round_up(port, int64(millis) * 1'000'000);
+            freertos_delay_ticks(tick_round_up_delay(int64(millis) * 1'000'000, FREERTOS_NS_PER_TICK));
         }
 
     #elif RPP_STM32_HAL

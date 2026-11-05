@@ -21,10 +21,7 @@ namespace rpp
     /** Let this thread sleep for provided MICROSECONDS */
     RPPAPI void sleep_us(unsigned int micros) noexcept;
 
-    /**
-     * Let this thread sleep for provided NANOSECONDS.
-     * FreeRTOS on Cortex-M delays the full ticks and spins the rest. Other FreeRTOS ports round up to whole ticks.
-     */
+    /** Let this thread sleep for provided NANOSECONDS. FreeRTOS on Cortex-M delays the full ticks and spins the rest, else rounds up to ticks. */
     RPPAPI void sleep_ns(int64 nanos) noexcept;
 
     struct Duration; // forward declaration
@@ -34,47 +31,6 @@ namespace rpp
     RPPAPI void sleep_for(const Duration& d) noexcept;
     /** Let this thread sleep until the provided system TimePoint */
     RPPAPI void sleep_until(const TimePoint& tp) noexcept;
-
-    namespace detail
-    {
-        /**
-         * The RTOS tick sleeps. A Port gives NS_PER_TICK, MAX_DELAY, now_ns() and delay(ticks).
-         * delay(n) wakes on the n-th tick boundary, so it can end up to one tick early.
-         * The tests drive these with a simulated clock.
-         */
-        template<class Port>
-        void rtos_delay_ticks(Port& port, int64 ticks) noexcept
-        {
-            // A 16-bit tick type cannot hold every delay
-            for (; ticks > Port::MAX_DELAY; ticks -= Port::MAX_DELAY)
-                port.delay(Port::MAX_DELAY);
-            if (ticks > 0)
-                port.delay(ticks);
-        }
-
-        /** Rounds up to whole ticks, and adds one tick for the partial first tick. */
-        template<class Port>
-        void rtos_sleep_round_up(Port& port, int64 duration) noexcept
-        {
-            if (duration > 0)
-                rtos_delay_ticks(port, (duration + Port::NS_PER_TICK - 1) / Port::NS_PER_TICK + 1);
-        }
-
-        /** Delays to the last tick boundary before the deadline, then spins. Needs a sub-tick now_ns(). */
-        template<class Port>
-        void rtos_sleep_spin(Port& port, int64 duration) noexcept
-        {
-            if (duration <= 0)
-                return;
-
-            int64 start = port.now_ns();
-            // The delay counts from the tick boundary before start, so add the phase into the tick
-            int64 phase = (start % Port::NS_PER_TICK + Port::NS_PER_TICK) % Port::NS_PER_TICK;
-            rtos_delay_ticks(port, (duration + phase) / Port::NS_PER_TICK);
-
-            while (port.now_ns() - start < duration) {}
-        }
-    }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
