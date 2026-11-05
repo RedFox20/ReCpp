@@ -284,57 +284,30 @@ namespace rpp
         #endif
         }
 
-        static constexpr int64 FREERTOS_NS_PER_TICK = 1'000'000'000 / configTICK_RATE_HZ;
-
-        static void freertos_delay_ticks(int64 ticks) noexcept
+        struct freertos_port
         {
-            // A 16-bit TickType_t cannot hold every delay
-            constexpr TickType_t max_step = portMAX_DELAY - 1;
-            while (ticks > max_step)
-            {
-                vTaskDelay(max_step);
-                ticks -= max_step;
-            }
-            if (ticks > 0)
-                vTaskDelay(static_cast<TickType_t>(ticks));
-        }
+            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
+            static constexpr int64 NS_PER_TICK = 1'000'000'000 / configTICK_RATE_HZ;
+            static constexpr int64 MAX_DELAY = portMAX_DELAY - 1;
+            static int64 now_ns() noexcept { return freertos_get_time_ns(); }
+            static void delay(int64 ticks) noexcept { vTaskDelay(static_cast<TickType_t>(ticks)); }
+        };
 
         static void freertos_sleep_ns(int64 duration) noexcept
         {
-            if (duration <= 0)
-                return;
-
-            // The tick is the unit of vTaskDelay(), so divide by its length, not by its rate
-            int64 ticks = duration / FREERTOS_NS_PER_TICK;
-            int64 nanos = duration - (ticks * FREERTOS_NS_PER_TICK);
-
-            // Sleep for full ticks
-            freertos_delay_ticks(ticks);
-
-            // Spin-wait for remaining nanoseconds
-            if (nanos > 0)
-            {
-                int64 start = freertos_get_time_ns();
-                int64 end = start + nanos;
-
-                if (end < start)
-                {
-                    // Sleep until timer wraps around
-                    while (freertos_get_time_ns() > start) {}
-                }
-
-                while (freertos_get_time_ns() < end) {}
-            }
+            freertos_port port;
+        #if RPP_CORTEX_M_ARCH
+            rpp::detail::rtos_sleep_spin(port, duration);
+        #else
+            // The tick count is the only clock, so a spin cannot see the phase into the tick
+            rpp::detail::rtos_sleep_round_up(port, duration);
+        #endif
         }
 
         static void freertos_sleep_ms(unsigned int millis) noexcept
         {
-            if (millis == 0)
-                return;
-
-            // Round up to whole ticks. vTaskDelay(n) can return n-1 ticks later, so add one tick.
-            int64 duration = int64(millis) * 1'000'000;
-            freertos_delay_ticks((duration + FREERTOS_NS_PER_TICK - 1) / FREERTOS_NS_PER_TICK + 1);
+            freertos_port port;
+            rpp::detail::rtos_sleep_round_up(port, int64(millis) * 1'000'000);
         }
 
     #elif RPP_STM32_HAL

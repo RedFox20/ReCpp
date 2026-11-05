@@ -182,6 +182,84 @@ TestImpl(test_timer)
     }
 #endif
 
+    // A FreeRTOS port at 1 kHz with a 16-bit tick. delay(n) wakes on the n-th tick boundary.
+    struct sim_rtos_port
+    {
+        static constexpr rpp::int64 NS_PER_TICK = 1'000'000;
+        static constexpr rpp::int64 MAX_DELAY = 0xFFFF - 1;
+        static constexpr rpp::int64 SPIN_STEP_NS = 1'000; // each now_ns() costs 1 us
+
+        rpp::int64 time_ns = 0;
+        rpp::int64 woke_ns = -1;
+        std::vector<rpp::int64> delays;
+
+        rpp::int64 now_ns() noexcept { return time_ns += SPIN_STEP_NS; }
+        void delay(rpp::int64 ticks) noexcept
+        {
+            delays.push_back(ticks);
+            time_ns = (time_ns / NS_PER_TICK + ticks) * NS_PER_TICK;
+            woke_ns = time_ns;
+        }
+    };
+
+    static constexpr rpp::int64 SIM_PHASES_NS[] = { 0, 1'000, 500'000, 998'000 };
+    static constexpr rpp::int64 SIM_DURATIONS_NS[] = { 1'000, 999'000, 1'000'000, 1'500'000, 10'000'000 };
+
+    TestCase(rtos_sleep_spin_never_returns_early_at_any_tick_phase)
+    {
+        for (rpp::int64 phase : SIM_PHASES_NS)
+        for (rpp::int64 duration : SIM_DURATIONS_NS)
+        {
+            sim_rtos_port port;
+            port.time_ns = 5 * sim_rtos_port::NS_PER_TICK + phase;
+            rpp::int64 start = port.time_ns;
+            rpp::detail::rtos_sleep_spin(port, duration);
+            AssertGreaterOrEqual(port.time_ns - start, duration);
+            // The spin covers less than one tick, so the delay takes the full ticks
+            rpp::int64 spun = port.time_ns - (port.woke_ns < 0 ? start : port.woke_ns);
+            AssertLess(spun, sim_rtos_port::NS_PER_TICK + sim_rtos_port::SPIN_STEP_NS);
+        }
+    }
+
+    TestCase(rtos_sleep_round_up_never_returns_early_at_any_tick_phase)
+    {
+        for (rpp::int64 phase : SIM_PHASES_NS)
+        for (rpp::int64 duration : SIM_DURATIONS_NS)
+        {
+            sim_rtos_port port;
+            port.time_ns = 5 * sim_rtos_port::NS_PER_TICK + phase;
+            rpp::int64 start = port.time_ns;
+            rpp::detail::rtos_sleep_round_up(port, duration);
+            AssertGreaterOrEqual(port.time_ns - start, duration);
+            AssertLessOrEqual(port.time_ns - start, duration + 2 * sim_rtos_port::NS_PER_TICK);
+        }
+    }
+
+    TestCase(rtos_sleep_splits_a_delay_which_the_tick_type_cannot_hold)
+    {
+        sim_rtos_port port;
+        rpp::detail::rtos_sleep_round_up(port, 70'000 * sim_rtos_port::NS_PER_TICK);
+        rpp::int64 total = 0;
+        for (rpp::int64 ticks : port.delays)
+        {
+            AssertInRange(ticks, 1, sim_rtos_port::MAX_DELAY);
+            total += ticks;
+        }
+        AssertThat(total, 70'001);
+    }
+
+    TestCase(rtos_sleep_returns_at_once_for_a_nonpositive_duration)
+    {
+        for (rpp::int64 duration : { rpp::int64{0}, rpp::int64{-1}, rpp::int64{-1'000'000} })
+        {
+            sim_rtos_port port;
+            rpp::detail::rtos_sleep_spin(port, duration);
+            rpp::detail::rtos_sleep_round_up(port, duration);
+            AssertThat(port.time_ns, rpp::int64{0});
+            AssertTrue(port.delays.empty());
+        }
+    }
+
     // every unit view of d names the same span. sec() compares exactly, because both sides divide exact integers
     static void check_units(rpp::Duration d, rpp::int64 ms, RPP_SOURCE_LOC)
     {
