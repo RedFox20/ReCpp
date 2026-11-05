@@ -149,7 +149,10 @@ namespace rpp
      * C-locale specific, simplified ftoa() that prints pretty human-readable floats
      * @param buffer Destination buffer assumed to be big enough. 32 bytes is more than enough for Float/Double.
      * @param f Float/Double value to convert to string
-     * @param maxDecimals Maximum number of decimal digits to output, default=6
+     * @param maxDecimals Maximum number of decimal digits to output, default=6.
+     *        INT_MAX writes the fewest decimals that read back as the same double, from 2^-8 up.
+     *        Below 2^-8 the fraction rounds to 60 bits, so only a short decimal such as 0.0000001 reads back.
+     *        Below 2^-61 it writes "0" or "-0".
      * @return Length of the string
      */
     RPPAPI int _tostring(char* buffer, double f, int maxDecimals = 6) noexcept;

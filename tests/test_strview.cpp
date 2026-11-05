@@ -7,8 +7,9 @@
 #include <climits> // INT_MAX
 #include <clocale> // setlocale
 #include <cstdint> // INTPTR_MAX, SIZE_MAX
+#include <cstdlib> // strtod
 #include <cstring> // strlen: the module build does not leak it through <rpp/strview.h>
-#include <cmath> // std::isinf
+#include <cmath> // std::isinf, ldexp
 #include <limits>
 #include <unordered_map>
 #if SIZE_MAX / 3 < INT_MAX && __linux__
@@ -331,6 +332,37 @@ TestImpl(test_strview)
         AssertThat(toString(-100.123456, 2), "-100.12");
         AssertThat(toString(+100.123456, 3), "100.123");
         AssertThat(toString(-100.123456, 3), "-100.123");
+
+        // INT_MAX writes the fewest decimals that read back as the same double
+        AssertThat(toString(0.1, INT_MAX), "0.1");
+        AssertThat(toString(0.3, INT_MAX), "0.3");
+        AssertThat(toString(0.8503892, INT_MAX), "0.8503892");
+        AssertThat(toString(-0.0499994, INT_MAX), "-0.0499994");
+        AssertThat(toString(3.141592653589793, INT_MAX), "3.141592653589793");
+        AssertThat(toString(-59.4371234, INT_MAX), "-59.4371234");
+        AssertThat(toString(std::numeric_limits<double>::quiet_NaN(), INT_MAX), "nan");
+        for (int e = -8; e <= -1; ++e)
+            AssertThat(strtod(toString(ldexp(1.0, e), INT_MAX).c_str(), nullptr), ldexp(1.0, e));
+
+        // below 2^-8 only a short decimal reads back, and below 2^-61 the text is 0
+        AssertThat(toString(0.001, INT_MAX), "0.001");
+        AssertThat(toString(1e-7, INT_MAX), "0.0000001");
+        AssertThat(toString(1e-20, INT_MAX), "0");
+
+        // xorshift64 mantissas with every exponent from 2^-8 to 2^52
+        uint64_t bits = 88172645463325252ull;
+        for (int i = 0; i < 20000; ++i)
+        {
+            bits ^= bits << 13;
+            bits ^= bits >> 7;
+            bits ^= bits << 17;
+            const uint64_t exponent = 1023 - 8 + (bits >> 32) % 61;
+            const uint64_t pattern = (bits & 0x800FFFFFFFFFFFFFull) | (exponent << 52);
+            double value;
+            memcpy(&value, &pattern, sizeof(value));
+            const std::string text = toString(value, INT_MAX);
+            AssertMsg(strtod(text.c_str(), nullptr) == value, "'%s' reads back a different double", text.c_str());
+        }
     }
 
     TestCase(equals_with_identical_strings)
