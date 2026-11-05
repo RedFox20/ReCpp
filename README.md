@@ -2812,10 +2812,10 @@ Nanosecond-precision `Duration` and `TimePoint` types, time constants, sleep uti
 
 | Type | Description |
 |------|-------------|
-| [`Duration`](src/rpp/timepoint.h#L30) | Unified nanosecond-precision duration (int64 nsec) |
-| [`TimePoint`](src/rpp/timepoint.h#L367) | System's most accurate time point measurement |
-| [`ClockType`](src/rpp/timepoint.h#L117) | Clock source selector for `TimePoint::now(ClockType)` |
-| [`CalendarTime`](src/rpp/timepoint.h#L334) | Calendar parts of a TimePoint: year, month, day, hour, minute, second, nanos |
+| [`Duration`](src/rpp/timepoint.h#L27) | Unified nanosecond-precision duration (int64 nsec) |
+| [`TimePoint`](src/rpp/timepoint.h#L323) | System's most accurate time point measurement |
+| [`ClockType`](src/rpp/timepoint.h#L73) | Clock source selector for `TimePoint::now(ClockType)` |
+| [`CalendarTime`](src/rpp/timepoint.h#L290) | Calendar parts of a TimePoint: year, month, day, hour, minute, second, nanos |
 
 ### ClockType Values
 
@@ -2839,32 +2839,32 @@ Monotonic clocks (`Monotonic`, `MonotonicRaw`, `MonotonicCoarse`, `Boottime`) ar
 
 | Method | Description |
 |--------|-------------|
-| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L187) | Create from fractional seconds |
-| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L495) | Create from milliseconds |
-| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L497) | Create from microseconds |
-| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L202) | Create from nanoseconds |
-| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L213) | Create from hours |
-| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L209) | Create from minutes |
-| [`sec()`](src/rpp/timepoint.h#L220) / [`msec()`](src/rpp/timepoint.h#L224) | Convert to fractional seconds / milliseconds |
-| [`seconds()`](src/rpp/timepoint.h#L228) / [`millis()`](src/rpp/timepoint.h#L232) / [`micros()`](src/rpp/timepoint.h#L236) / [`nanos()`](src/rpp/timepoint.h#L241) | Convert to integer time units |
-| [`to_string()`](src/rpp/timepoint.h#L305) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timepoint.h#L322) | Stopwatch-style format |
+| [`Duration::from_seconds(double s)`](src/rpp/timepoint.h#L143) | Create from fractional seconds |
+| [`Duration::from_millis(double ms)`](src/rpp/timepoint.h#L451) | Create from milliseconds |
+| [`Duration::from_micros(double us)`](src/rpp/timepoint.h#L453) | Create from microseconds |
+| [`Duration::from_nanos(int64 ns)`](src/rpp/timepoint.h#L158) | Create from nanoseconds |
+| [`Duration::from_hours(double h)`](src/rpp/timepoint.h#L169) | Create from hours |
+| [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L165) | Create from minutes |
+| [`sec()`](src/rpp/timepoint.h#L176) / [`msec()`](src/rpp/timepoint.h#L180) | Convert to fractional seconds / milliseconds |
+| [`seconds()`](src/rpp/timepoint.h#L184) / [`millis()`](src/rpp/timepoint.h#L188) / [`micros()`](src/rpp/timepoint.h#L192) / [`nanos()`](src/rpp/timepoint.h#L197) | Convert to integer time units |
+| [`to_string()`](src/rpp/timepoint.h#L264) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timepoint.h#L281) | Stopwatch-style format |
 
 ### TimePoint Methods
 
 | Method | Description |
 |--------|-------------|
-| [`TimePoint::now()`](src/rpp/timepoint.h#L402) | Current OS high-accuracy time point |
-| [`TimePoint::now(ClockType clock)`](src/rpp/timepoint.h#L412) | Time point from a specific clock source (monotonic clocks auto-synced to epoch) |
-| [`TimePoint::system_now()`](src/rpp/timepoint.h#L415) | Shorthand for `now(ClockType::Realtime)` — wall clock, subject to NTP adjustments |
-| [`TimePoint::monotonic_now()`](src/rpp/timepoint.h#L418) | Shorthand for `now(ClockType::Monotonic)` — monotonic, NTP-immune, epoch-synced |
-| [`TimePoint::local()`](src/rpp/timepoint.h#L421) | Current time with timezone offset |
-| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L442) | Duration between two time points |
-| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L445) | Fractional seconds between two points |
-| [`time_of_day()`](src/rpp/timepoint.h#L439) | Extract HH:MM:SS.nanos part |
-| [`to_epoch_us()`](src/rpp/timepoint.h#L393) | Convert to UNIX epoch microseconds |
-| [`utc_to_local()`](src/rpp/timepoint.h#L424) | Add timezone offset to this timepoint |
-| [`to_calendar()`](src/rpp/timepoint.h#L436) | Split into calendar parts, the inverse of the calendar constructor |
+| [`TimePoint::now()`](src/rpp/timepoint.h#L358) | Current OS high-accuracy time point |
+| [`TimePoint::now(ClockType clock)`](src/rpp/timepoint.h#L368) | Time point from a specific clock source (monotonic clocks auto-synced to epoch) |
+| [`TimePoint::system_now()`](src/rpp/timepoint.h#L371) | Shorthand for `now(ClockType::Realtime)` — wall clock, subject to NTP adjustments |
+| [`TimePoint::monotonic_now()`](src/rpp/timepoint.h#L374) | Shorthand for `now(ClockType::Monotonic)` — monotonic, NTP-immune, epoch-synced |
+| [`TimePoint::local()`](src/rpp/timepoint.h#L377) | Current time with timezone offset |
+| [`elapsed(const TimePoint& end)`](src/rpp/timepoint.h#L398) | Duration between two time points |
+| [`elapsed_sec(const TimePoint& end)`](src/rpp/timepoint.h#L401) | Fractional seconds between two points |
+| [`time_of_day()`](src/rpp/timepoint.h#L395) | Extract HH:MM:SS.nanos part |
+| [`to_epoch_us()`](src/rpp/timepoint.h#L349) | Convert to UNIX epoch microseconds |
+| [`utc_to_local()`](src/rpp/timepoint.h#L380) | Add timezone offset to this timepoint |
+| [`to_calendar()`](src/rpp/timepoint.h#L392) | Split into calendar parts, the inverse of the calendar constructor |
 
 ### Global Time Utilities
 
@@ -2872,10 +2872,10 @@ Monotonic clocks (`Monotonic`, `MonotonicRaw`, `MonotonicCoarse`, `Boottime`) ar
 |----------|-------------|
 | [`sleep_ms(millis)`](src/rpp/timepoint.h#L19) | Sleep for milliseconds |
 | [`sleep_us(micros)`](src/rpp/timepoint.h#L22) | Sleep for microseconds |
-| [`sleep_ns(nanos)`](src/rpp/timepoint.h#L28) | Sleep for nanoseconds |
-| [`sleep_for(const Duration& d)`](src/rpp/timepoint.h#L34) | Sleep for a Duration |
-| [`sleep_until(const TimePoint& tp)`](src/rpp/timepoint.h#L36) | Sleep until a TimePoint |
-| [`time_now_seconds()`](src/rpp/timepoint.h#L517) | Returns current time in fractional seconds (C linkage) |
+| [`sleep_ns(nanos)`](src/rpp/timepoint.h#L25) | Sleep for nanoseconds |
+| [`sleep_for(const Duration& d)`](src/rpp/timepoint.h#L31) | Sleep for a Duration |
+| [`sleep_until(const TimePoint& tp)`](src/rpp/timepoint.h#L33) | Sleep until a TimePoint |
+| [`time_now_seconds()`](src/rpp/timepoint.h#L473) | Returns current time in fractional seconds (C linkage) |
 
 ### Duration Literals
 
