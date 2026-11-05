@@ -10,6 +10,7 @@
 #include <cctype> // toupper
 #include <cfloat> // DBL_MAX
 #include <cstdint> // UINT64_MAX
+#include <climits> // INT_MAX
 #include <cwctype> // std::towupper
 //#include <charconv> // to_chars, C++17, not implemented yet
 
@@ -883,17 +884,66 @@ namespace rpp
         return true;
     }
 
+    /**
+     * Writes the fewest decimals that read back as the same double, from the exact mantissa in `bits`.
+     * @returns false if the decimals rounded up to a whole one
+     */
+    static bool write_exact_fraction(char*& end, uint64 bits) noexcept
+    {
+        constexpr int FRACTION_BITS = 60; // a wider fraction overflows uint64 at *10
+        const int exponent = int(bits >> 52) & 0x7FF;
+        const int shift = (exponent != 0 ? 1075 : 1074) - exponent; // the double is mantissa / 2^shift
+        const int lost = shift > FRACTION_BITS ? shift - FRACTION_BITS : 0;
+        const int s = shift - lost;
+        const uint64 mantissa = (bits & 0x000FFFFFFFFFFFFFull) | (exponent != 0 ? 1ull << 52 : 0);
+        const uint64 one = 1ull << s;
+        uint64 frac = 0;
+        if (lost == 0) {
+            frac = mantissa & (one - 1);
+        } else if (lost <= 64) { // round the lost bits to nearest
+            const uint64 half_units = mantissa >> (lost - 1);
+            frac = (half_units + 1) >> 1;
+        }
+        if (frac == 0)
+            return true;
+
+        *end++ = '.';
+        // stop within half a mantissa unit. With lost bits, the unit is coarse, so allow a whole one
+        const uint64 k = lost == 0 ? 2 : 1;
+        uint64 pow10 = 10;
+        while (true) {
+            frac *= 10;
+            *end++ = char('0' + (frac >> s));
+            frac &= one - 1;
+            if (k * frac < pow10)
+                return true;
+            if (k * (one - frac) < pow10) {
+                while (end[-1] == '9')
+                    --end;
+                if (end[-1] == '.')
+                    return false;
+                ++end[-1];
+                return true;
+            }
+            pow10 *= 10;
+        }
+    }
+
     int _tostring(char* buffer, double f, int maxDecimals) noexcept
     {
         //// @todo Implement scientific notation?
-        if (isnan(f)) {
-            buffer[0] = 'n'; buffer[1] = 'a'; buffer[2] = 'n'; buffer[3] = '\0';
-            return 3;
-        }
-        if (isinf(f)) {
+        uint64 bits;
+        RPP_BUILTIN_MEMCPY(&bits, &f, sizeof(bits));
+        // -ffast-math folds isnan() and isinf() to false, but not a bit test
+        if ((bits & 0x7FF0000000000000ull) == 0x7FF0000000000000ull) {
+            if ((bits & 0x000FFFFFFFFFFFFFull) != 0) {
+                RPP_BUILTIN_MEMCPY(buffer, "nan", 4);
+                return 3;
+            }
             char* p = buffer;
-            if (f < 0) *p++ = '-';
-            p[0] = 'i'; p[1] = 'n'; p[2] = 'f'; p[3] = '\0';
+            if ((bits >> 63) != 0)
+                *p++ = '-';
+            RPP_BUILTIN_MEMCPY(p, "inf", 4);
             return int(p - buffer) + 3;
         }
 
@@ -914,7 +964,10 @@ namespace rpp
 
         if (maxDecimals > 0) {
             double g = abs(f - i); //  (-1.2) - (-1.0) --> -0.2
-            if (g != 0.0 && !write_fraction(end, g, maxDecimals)) { // the fraction rounded up to a whole one
+            bool below_whole = true;
+            if (g != 0.0)
+                below_whole = maxDecimals == INT_MAX ? write_exact_fraction(end, bits) : write_fraction(end, g, maxDecimals);
+            if (!below_whole) { // the fraction rounded up to a whole one
                 end = buffer + (f < -0.0 ? 1 : 0);
                 end += _tostring(end, absIntegral + 1);
                 *end++ = '.';
