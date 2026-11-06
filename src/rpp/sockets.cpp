@@ -2031,7 +2031,8 @@ namespace rpp
             handle_errno(ESOCK(ESHUTDOWN));
 
             // a read never blocks after a FIN, and WSAPoll reports the FIN without POLLRDNORM, so recv() reads the close
-            return (pollFlags & PF_Read) != 0;
+            // a write fails at once, and a refused connect keeps SO_ERROR for connect_finish()
+            return true;
         }
 
         if ((revents & POLLERR) != 0) // some other socket error
