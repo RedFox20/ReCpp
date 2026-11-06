@@ -990,7 +990,9 @@ namespace rpp
                 : socket_awaiter{loop, sock, socket::PF_Write, timeout}, addr{addr} {}
             void await_suspend(rpp::coro_handle<> cont) noexcept
             {
-                if (sock.connect_start(addr))
+                const int64 left_ms = (end - frame.now()).millis();
+                const int cap_ms = left_ms > 0x7fffffff ? 0 : int(left_ms); // an endless wait keeps the OS default
+                if (sock.connect_start(addr, cap_ms))
                     loop.add_socket_waiter(*this, cont);
                 else
                     loop.post_resume(cont); // failed at once, and `ready` stays false

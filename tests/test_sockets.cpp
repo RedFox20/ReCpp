@@ -1086,6 +1086,20 @@ TestImpl(test_sockets)
         AssertFalse(client.connected());
     }
 
+#if __linux__ // the Linux values, because <netinet/in.h> makes rpp::socket ambiguous here
+    // the connect cap must leave a connected socket, where it would drop data which waits for an ACK
+    TestCase(tcp_connect_start_caps_the_attempt_and_clears_the_cap_when_connected)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        socket client;
+        AssertTrue(client.connect_start({"127.0.0.1", server.port()}, 10));
+        AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 10);
+        AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the loopback connect ends the poll
+        AssertTrue(client.connect_finish());
+        AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 0);
+    }
+#endif
+
     // WSAPoll reports a peer FIN as POLLHUP alone, and poll() still reports it, see BUGS.md C37
     TestCase(tcp_poll_reports_a_peer_close)
     {

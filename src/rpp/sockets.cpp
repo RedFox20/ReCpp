@@ -2175,7 +2175,7 @@ namespace rpp
 
     bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
     {
-        constexpr int default_cap_ms = 1000; // a slow radio link connects inside it
+        constexpr int default_cap_ms = 1000; // a connect which takes longer, even over a slow radio link, has failed
         return connect_start(remoteAddr, default_cap_ms, opt);
     }
 
@@ -2205,13 +2205,27 @@ namespace rpp
         auto sa = to_saddr(remoteAddr);
         set_errno_unlocked(0); // clear any errors
 
-    #if _WIN32 && defined(SIO_TCP_INITIAL_RTO)
-        // Windows also retries a refused SYN, so the retries of one, two and four RTTs end by the timeout
-        constexpr UCHAR syn_retries = 2;
-        TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis / 7, 1, 65535)), syn_retries };
-        DWORD rto_bytes = 0;
-        WSAIoctl(os_handle_unsafe(), SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr);
-    #endif
+        if (millis > 0)
+        {
+            const int sock = os_handle_unsafe();
+        #if _WIN32 && defined(SIO_TCP_INITIAL_RTO)
+            // Windows also retries a refused SYN, so the retries of one, two and four RTTs end by the timeout
+            constexpr UCHAR syn_retries = 2;
+            TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis / 7, 1, 65535)), syn_retries };
+            DWORD rto_bytes = 0;
+            if (WSAIoctl(sock, SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr) != 0)
+                LogWarning("socket fh:%d SIO_TCP_INITIAL_RTO failed: %s", sock, last_os_socket_err().c_str());
+        #elif defined(TCP_USER_TIMEOUT)
+            // Linux checks it when a SYN retry fires, so the attempt ends at the first retry after the timeout
+            unsigned int cap_ms = unsigned(millis);
+            if (setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&cap_ms, sizeof(cap_ms)) != 0)
+                LogWarning("socket fh:%d TCP_USER_TIMEOUT failed: %s", sock, last_os_socket_err().c_str());
+        #elif defined(TCP_CONNECTIONTIMEOUT)
+            int cap_sec = (millis + 999) / 1000; // Apple takes whole seconds
+            if (setsockopt(sock, IPPROTO_TCP, TCP_CONNECTIONTIMEOUT, (char*)&cap_sec, sizeof(cap_sec)) != 0)
+                LogWarning("socket fh:%d TCP_CONNECTIONTIMEOUT failed: %s", sock, last_os_socket_err().c_str());
+        #endif
+        }
 
         // this will return immediately because socket is in non-blocking mode and we hold the mutex
         if (::connect(os_handle_unsafe(), sa, sa.size()) == 0)
@@ -2257,6 +2271,12 @@ namespace rpp
         Category = SC_Client;
         set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
         Connected = true;
+
+    #if !_WIN32 && defined(TCP_USER_TIMEOUT)
+        // the connect cap would also drop a connection whose data waits that long for an ACK
+        unsigned int no_cap = 0;
+        setsockopt(os_handle_unsafe(), IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&no_cap, sizeof(no_cap));
+    #endif
 
         if (opt & SO_Nagle) set_nagle(true);
         else                set_nodelay(DEFAULT_NODELAY);

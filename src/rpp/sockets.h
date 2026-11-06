@@ -1387,15 +1387,15 @@ namespace rpp
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
          * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
-         * @note On Windows the OS ends the connect attempt inside one second, see the overload with a timeout.
+         * @note The OS ends the connect attempt after one second, see the overload with a timeout.
          */
         bool connect_start(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
 
         /**
-         * @brief Starts a non-blocking connect, as connect_start() does. On Windows the OS also ends the
-         *        connect attempt by `millis`, because Windows retries a refused SYN.
+         * @brief Starts a non-blocking connect, as connect_start() does, and the OS ends the attempt by `millis`.
+         *        Windows ends it inside `millis`. Linux ends it at the first SYN retry after `millis`, about 1 s.
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
-         * @param millis The longest time the OS may spend on the connect attempt
+         * @param millis The longest time the OS may spend on the connect attempt, and 0 or less keeps the OS default
          * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
          * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
          */

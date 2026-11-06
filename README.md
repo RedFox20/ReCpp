@@ -1814,7 +1814,7 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L834) | Run a delegate on the pool or await an `rpp::future`, and resume on the loop thread. A `std::future` does not compile |
 | [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L776) | Await a future launcher without a blocking worker after the launcher returns |
 | [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L593) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1104) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1106) | Event-driven join: suspend until all forks complete or timeout expires |
 | [`num_forks()`](src/rpp/event_loop.h#L632) | Number of active forked coroutines |
 | [`drain_forks()`](src/rpp/event_loop.h#L640) | Check completed forks for exceptions and clear them |
 | [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L863) | Wait for semaphore signal, resume on loop thread |
@@ -1822,13 +1822,13 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L891) | Pop from queue returning `optional<T>`, resume on loop thread |
 | [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L678) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
 | [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L670) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1119) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1121) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
 | [`delay(Duration duration)`](src/rpp/event_loop.h#L927) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
 | [`pending_waiters()`](src/rpp/event_loop.h#L365) | Number of delay() timers and socket waits pending on the loop thread |
 | [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L967) | Suspend until the socket has data, a closed peer or an error. False on timeout |
 | [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L976) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1033) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1011) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1035) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1013) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L163) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
 | [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L276) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
 | [`current_time()`](src/rpp/event_loop.h#L288) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
@@ -2419,7 +2419,7 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1372) | Connect to an address |
 | [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1437) | Connect by hostname and port |
 | [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1392) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
-| [`socket::connect_start(remoteAddr, millis, opt)`](src/rpp/sockets.h#L1402) | Start a non-blocking connect. On Windows the OS also ends the attempt by `millis` |
+| [`socket::connect_start(remoteAddr, millis, opt)`](src/rpp/sockets.h#L1402) | Start a non-blocking connect, and the OS ends the attempt by `millis` |
 | [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1409) | Read the result of connect_start() once the socket is writable. True when connected |
 | [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1360) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
 | [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1420) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
