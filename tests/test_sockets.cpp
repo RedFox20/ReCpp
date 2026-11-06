@@ -1072,7 +1072,6 @@ TestImpl(test_sockets)
         AssertTrue(remote.good());
     }
 
-#if !_WIN32 // Windows retries a refused loopback SYN for longer than a hang guard may wait
     // a refused connect ends the PF_Write poll, so a caller does not wait out its deadline
     TestCase(tcp_connect_start_reports_a_refused_connect)
     {
@@ -1080,13 +1079,12 @@ TestImpl(test_sockets)
         const int port = closed.port();
         closed.close();
         socket client;
-        AssertTrue(client.connect_start({"127.0.0.1", port}));
+        AssertTrue(client.connect_start({"127.0.0.1", port}, 10)); // Windows retries the refused SYN until the cap
         AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the refusal ends the poll
         AssertFalse(client.connect_finish());
         AssertEqual(client.last_err_type(), socket::SE_CONNREFUSED);
         AssertFalse(client.connected());
     }
-#endif
 
     // WSAPoll reports a peer FIN as POLLHUP alone, and poll() still reports it, see BUGS.md C37
     TestCase(tcp_poll_reports_a_peer_close)

@@ -2163,7 +2163,7 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        if (!connect_start(remoteAddr, opt))
+        if (!connect_start(remoteAddr, millis, opt))
             return false;
         const int pending = get_errno(); // a poll timeout clears the code, so the in-progress one is kept
         if (poll(millis, PF_Write))
@@ -2174,6 +2174,12 @@ namespace rpp
     }
 
     bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
+    {
+        constexpr int default_cap_ms = 1000; // a slow radio link connects inside it
+        return connect_start(remoteAddr, default_cap_ms, opt);
+    }
+
+    bool socket::connect_start(const ipaddress& remoteAddr, [[maybe_unused]] int millis, socket_option opt) noexcept
     {
         rpp::unique_lock lock { Mtx };
 
@@ -2198,6 +2204,14 @@ namespace rpp
         Addr = remoteAddr;
         auto sa = to_saddr(remoteAddr);
         set_errno_unlocked(0); // clear any errors
+
+    #if _WIN32 && defined(SIO_TCP_INITIAL_RTO)
+        // Windows also retries a refused SYN, so the retries of one, two and four RTTs end by the timeout
+        constexpr UCHAR syn_retries = 2;
+        TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis / 7, 1, 65535)), syn_retries };
+        DWORD rto_bytes = 0;
+        WSAIoctl(os_handle_unsafe(), SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr);
+    #endif
 
         // this will return immediately because socket is in non-blocking mode and we hold the mutex
         if (::connect(os_handle_unsafe(), sa, sa.size()) == 0)
