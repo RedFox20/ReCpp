@@ -528,7 +528,6 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
-        bool ConnectCapped;  // connect_start() set TCP_USER_TIMEOUT, so connect_finish() clears it. Fills padding, no ABI change
 
     public:
 
@@ -1394,7 +1393,7 @@ namespace rpp
 
         /**
          * @brief Starts a non-blocking connect, as connect_start() does, and the OS ends the attempt by `millis`.
-         *        Windows ends it inside `millis`. Linux ends it at the first SYN retry after `millis`, at 1, 3 or 7 s.
+         *        Windows ends it inside `millis`. Linux ends it at 3, 7 or 15 s, the first SYN give-up after `millis`.
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis The longest time the OS may spend on the connect attempt, and 0 or less keeps the OS default
          * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()

@@ -749,7 +749,6 @@ namespace rpp
         , Connected{false}
         , Category{SC_Unknown}
         , Type{ST_Unspecified}
-        , ConnectCapped{false}
     {
     }
     socket socket::from_os_handle(int handle, const ipaddress& addr, bool shared, bool blocking) noexcept
@@ -786,7 +785,6 @@ namespace rpp
         std::swap(Category, s.Category);
         std::swap(Type, s.Type);
         std::swap(Connected, s.Connected);
-        std::swap(ConnectCapped, s.ConnectCapped);
         return *this;
     }
     socket::~socket() noexcept
@@ -2207,7 +2205,6 @@ namespace rpp
         auto sa = to_saddr(remoteAddr);
         set_errno_unlocked(0); // clear any errors
 
-        ConnectCapped = false;
         if (millis > 0)
         {
             const int sock = os_handle_unsafe();
@@ -2218,18 +2215,14 @@ namespace rpp
             DWORD rto_bytes = 0;
             if (WSAIoctl(sock, SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr) != 0)
                 LogWarning("socket fh:%d SIO_TCP_INITIAL_RTO failed: %s", sock, last_os_socket_err().c_str());
-        #elif defined(TCP_USER_TIMEOUT)
-            // Linux checks it when a SYN retry fires, so the attempt ends at the first retry after the timeout
-            unsigned int prev_ms = 0;
-            socklen_t prev_len = sizeof(prev_ms);
-            getsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&prev_ms, &prev_len);
-            if (prev_ms == 0) // a timeout which the caller set bounds the connect already, so it stays
-            {
-                unsigned int cap_ms = unsigned(millis);
-                ConnectCapped = setsockopt(sock, IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&cap_ms, sizeof(cap_ms)) == 0;
-                if (!ConnectCapped)
-                    LogWarning("socket fh:%d TCP_USER_TIMEOUT failed: %s", sock, last_os_socket_err().c_str());
-            }
+        #elif defined(TCP_SYNCNT)
+            // Linux gives up after the retries double the wait, so the fewest which cover the timeout cap it
+            constexpr int default_syn_retries = 6; // the net.ipv4.tcp_syn_retries default
+            int syn_retries = 1;
+            while (syn_retries < default_syn_retries && ((2 << syn_retries) - 1) * 1000 < millis)
+                ++syn_retries;
+            if (setsockopt(sock, IPPROTO_TCP, TCP_SYNCNT, (char*)&syn_retries, sizeof(syn_retries)) != 0)
+                LogWarning("socket fh:%d TCP_SYNCNT failed: %s", sock, last_os_socket_err().c_str());
         #elif defined(TCP_CONNECTIONTIMEOUT)
             int cap_sec = (millis + 999) / 1000; // Apple takes whole seconds
             if (setsockopt(sock, IPPROTO_TCP, TCP_CONNECTIONTIMEOUT, (char*)&cap_sec, sizeof(cap_sec)) != 0)
@@ -2275,14 +2268,6 @@ namespace rpp
             handle_errno(so_err);
             return false;
         }
-    #if !_WIN32 && defined(TCP_USER_TIMEOUT)
-        if (ConnectCapped) // the connect cap would also drop a connection whose data waits that long for an ACK
-        {
-            unsigned int no_cap = 0;
-            setsockopt(os_handle_unsafe(), IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&no_cap, sizeof(no_cap));
-            ConnectCapped = false;
-        }
-    #endif
         configure_connected_client(opt);
         return true;
     }

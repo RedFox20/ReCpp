@@ -1087,16 +1087,16 @@ TestImpl(test_sockets)
     }
 
 #if __linux__ // the Linux values, because <netinet/in.h> makes rpp::socket ambiguous here
-    // the connect cap must leave a connected socket, where it would drop data which waits for an ACK
-    TestCase(tcp_connect_start_caps_the_attempt_and_clears_the_cap_when_connected)
+    // the connect cap is a SYN retry count, so it ends the attempt and never touches the connection
+    TestCase(tcp_connect_start_caps_the_syn_retries)
     {
         socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
-        socket client;
-        AssertTrue(client.connect_start({"127.0.0.1", server.port()}, 10));
-        AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 10);
-        AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the loopback connect ends the poll
-        AssertTrue(client.connect_finish());
-        AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 0);
+        socket fast;
+        AssertTrue(fast.connect_start({"127.0.0.1", server.port()}, 10));
+        AssertEqual(fast.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_SYNCNT*/ 7), 1);
+        socket slow;
+        AssertTrue(slow.connect_start({"127.0.0.1", server.port()}, 5000));
+        AssertEqual(slow.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_SYNCNT*/ 7), 2);
     }
 
     // a TCP_USER_TIMEOUT which the caller set also bounds the connect, so it stays after the connect
