@@ -525,6 +525,18 @@ TestImpl(test_async)
         AssertThat(result, 3);
     }
 
+    static int noexcept_range_handler(const std::range_error& /*e*/) noexcept { return 1; }
+
+    TestCase(noexcept_handlers_compile_and_catch)
+    {
+        static_assert(std::is_same_v<rpp::first_arg_type<int(double) noexcept>, double>);
+        future<void> f = rpp::async([] { throw std::runtime_error("background_thread_exception_msg"); });
+        int result = f.then([] { return 0; }, &noexcept_range_handler,
+                            [n = 1](const std::domain_error&) mutable noexcept { return ++n; },
+                            [](const std::runtime_error&) noexcept { return 3; }).get();
+        AssertThat(result, 3);
+    }
+
     // the handlers read like a chain of catch blocks, so the first match wins and not the most specific one
     TestCase(except_handlers_the_first_match_wins)
     {

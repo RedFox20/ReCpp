@@ -39,6 +39,19 @@ namespace rpp
         using arg_types = std::tuple<Args...>;
     };
 
+    // noexcept is part of the type, so no plain specialization above matches it
+    template<typename R, typename... Args>
+    struct function_traits<R(Args...) noexcept> : function_traits<R(Args...)> {};
+
+    template<typename R, typename... Args>
+    struct function_traits<R (*)(Args...) noexcept> : function_traits<R(Args...)> {};
+
+    template<typename T, typename R, typename... Args>
+    struct function_traits<R (T::*)(Args...) noexcept> : function_traits<R(Args...)> {};
+
+    template<typename T, typename R, typename... Args>
+    struct function_traits<R (T::*)(Args...) const noexcept> : function_traits<R(Args...)> {};
+
     template<typename T>
     using first_arg_type = typename std::tuple_element<0, typename function_traits<T>::arg_types>::type;
     
