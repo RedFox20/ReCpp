@@ -2221,16 +2221,17 @@ namespace rpp
     bool socket::connect_finish(socket_option opt) noexcept
     {
         rpp::unique_lock lock { Mtx };
-        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
-        if (so_err != 0)
-        {
-            handle_errno(so_err);
-            return false;
-        }
         if (!poll(0, PF_Write)) // a connect still in progress also has no SO_ERROR yet
         {
             if (!get_errno_unlocked())
                 set_errno_unlocked(ESOCK(EINPROGRESS));
+            return false;
+        }
+        // read after the poll, so a refusal which lands between the two is not a success
+        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
+        if (so_err != 0)
+        {
+            handle_errno(so_err);
             return false;
         }
         configure_connected_client(opt);
