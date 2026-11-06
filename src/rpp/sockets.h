@@ -1393,7 +1393,7 @@ namespace rpp
 
         /**
          * @brief Starts a non-blocking connect, as connect_start() does, and the OS ends the attempt by `millis`.
-         *        Windows ends it inside `millis`. Linux ends it at the first SYN retry after `millis`, about 1 s.
+         *        Windows ends it inside `millis`. Linux ends it at the first SYN retry after `millis`, at 1, 3 or 7 s.
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param millis The longest time the OS may spend on the connect attempt, and 0 or less keeps the OS default
          * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()

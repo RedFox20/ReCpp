@@ -555,6 +555,10 @@ A third shape compares two measured times, as
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
+`test_event_loop::queued_posts_skip_the_timer_scan_of_an_empty_poll` hit the same shape on
+`ubuntu-cpp23-modules-gcc15` at a543abf, with `drain => '3098.767' must be less than '2397.87825'`.
+Both paths scan the timers in `fire_due_waiters()`, so the ratio holds only while that scan outweighs the fixed cost of a poll.
+It passed 20 of 20 runs under gcc-13 ASAN here, and 20 of 20 with two CPU hogs.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash

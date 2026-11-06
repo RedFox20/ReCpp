@@ -2038,7 +2038,7 @@ namespace rpp
         if ((revents & POLLERR) != 0) // some other socket error
         {
             handle_errno(get_socket_level_error());
-            return false;
+            return (pollFlags & PF_Write) != 0; // WSAPoll reports a failed connect as POLLERR alone
         }
 
         set_errno(0); // clear errors
@@ -2256,12 +2256,20 @@ namespace rpp
             return false;
         }
         // read after the poll, so a refusal which lands between the two is not a success
+        const int poll_err = get_errno_unlocked(); // a POLLERR poll read SO_ERROR, and a POLLHUP poll set ESHUTDOWN
         int so_err = get_socket_level_error(); // the connect() manual puts the final status here
+        if (so_err == 0)
+            so_err = poll_err;
         if (so_err != 0)
         {
             handle_errno(so_err);
             return false;
         }
+    #if !_WIN32 && defined(TCP_USER_TIMEOUT)
+        // the connect cap would also drop a connection whose data waits that long for an ACK
+        unsigned int no_cap = 0;
+        setsockopt(os_handle_unsafe(), IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&no_cap, sizeof(no_cap));
+    #endif
         configure_connected_client(opt);
         return true;
     }
@@ -2271,12 +2279,6 @@ namespace rpp
         Category = SC_Client;
         set_autoclosing(DEFAULT_AUTOCLOSE_CLIENT_SOCKETS);
         Connected = true;
-
-    #if !_WIN32 && defined(TCP_USER_TIMEOUT)
-        // the connect cap would also drop a connection whose data waits that long for an ACK
-        unsigned int no_cap = 0;
-        setsockopt(os_handle_unsafe(), IPPROTO_TCP, TCP_USER_TIMEOUT, (char*)&no_cap, sizeof(no_cap));
-    #endif
 
         if (opt & SO_Nagle) set_nagle(true);
         else                set_nodelay(DEFAULT_NODELAY);
