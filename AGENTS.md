@@ -103,6 +103,7 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   line. A lambda with two statements or more spans several lines. See `recpp-review` R7.
 - **A `for` header only iterates, and a ternary only picks a value.** Neither reads input or
   assigns. An assignment never sits inside a condition. See `recpp-review` R7.
+- **Never add a field to `rpp::socket`.** Keep new state in the OS socket options, or in a local of the call. See R17.
 - **Never make a path slower.** Add no allocation or copy which the code did not make before.
   Test a cheap flag before a thread id or a system call. Measure on MSVC and in Debug too. See R17.
 - **Use the ReCpp tool which exists**, such as `rpp::unlock_guard` or `RPP_BUILTIN_MEMCPY`. A destructor
