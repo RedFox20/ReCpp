@@ -1814,7 +1814,7 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L834) | Run a delegate on the pool or await an `rpp::future`, and resume on the loop thread. A `std::future` does not compile |
 | [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L776) | Await a future launcher without a blocking worker after the launcher returns |
 | [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L593) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1104) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1106) | Event-driven join: suspend until all forks complete or timeout expires |
 | [`num_forks()`](src/rpp/event_loop.h#L632) | Number of active forked coroutines |
 | [`drain_forks()`](src/rpp/event_loop.h#L640) | Check completed forks for exceptions and clear them |
 | [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L863) | Wait for semaphore signal, resume on loop thread |
@@ -1822,13 +1822,13 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 | [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L891) | Pop from queue returning `optional<T>`, resume on loop thread |
 | [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L678) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
 | [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L670) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1119) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1121) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
 | [`delay(Duration duration)`](src/rpp/event_loop.h#L927) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
 | [`pending_waiters()`](src/rpp/event_loop.h#L365) | Number of delay() timers and socket waits pending on the loop thread |
 | [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L967) | Suspend until the socket has data, a closed peer or an error. False on timeout |
 | [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L976) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1033) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1011) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1035) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1013) | Non-blocking connect which completes through wait_writable(). True when connected |
 | [`time_frame`](src/rpp/event_loop.h#L163) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
 | [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L276) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
 | [`current_time()`](src/rpp/event_loop.h#L288) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
@@ -2379,7 +2379,7 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`ipaddress6`](src/rpp/sockets.h#L419) | IPv6 convenience wrapper |
 | [`ipinterface`](src/rpp/sockets.h#L451) | Network interface info (name, addr, netmask, broadcast, gateway) |
 | [`socket`](src/rpp/sockets.h#L496) | Full TCP/UDP socket with send, recv, select, etc. |
-| [`socket_poller`](src/rpp/sockets.h#L1491) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
+| [`socket_poller`](src/rpp/sockets.h#L1503) | A poll set with a wake handle. poll() returns on a ready entry, the timeout, or a wake() from any thread |
 
 ### raw_address Methods
 
@@ -2407,32 +2407,33 @@ Full cross-platform TCP/UDP socket wrapper with IPv4/IPv6 support.
 | [`set_nagle(bool enable)`](src/rpp/sockets.h#L1028) | Enable/disable Nagle's algorithm |
 | [`set_dscp(int dscp)`](src/rpp/sockets.h#L1046) | Set the DSCP of every packet the socket sends. Windows ignores IP_TOS, so it returns false there |
 | [`get_dscp()`](src/rpp/sockets.h#L1049) | Get the DSCP of the packets the socket sends, or -1 on error and on Windows |
-| [`send_arp_request(const raw_address& target)`](src/rpp/sockets.h#L1475) | Broadcast an ARP request for `target` from a make_arp() socket. A request for address() announces this host |
+| [`send_arp_request(const raw_address& target)`](src/rpp/sockets.h#L1487) | Broadcast an ARP request for `target` from a make_arp() socket. A request for address() announces this host |
 
 ### socket Static Methods
 
 | Method | Description |
 |--------|-------------|
-| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1296) | Create a listening server socket |
-| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1305) | Create a listening server socket |
-| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1349) | Accept an incoming connection |
-| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1371) | Connect to an address |
-| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1425) | Connect by hostname and port |
-| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1390) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
-| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1397) | Read the result of connect_start() once the socket is writable. True when connected |
-| [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1359) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
-| [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1408) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
-| [`socket::make_arp(iface, opt)`](src/rpp/sockets.h#L1467) | Open a Linux packet socket for the ARP frames of an interface. It needs CAP_NET_RAW, and its close is slow |
-| [`poll_entry`](src/rpp/sockets.h#L1269) | One socket in a poll set, with its own flags and its own ready result |
-| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1506) | Add a socket to the next poll. Returns its index for ready() |
-| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1520) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
-| [`socket_poller::wake()`](src/rpp/sockets.h#L1531) | End a poll in progress from any thread, a no-op when no poll is armed |
-| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1510) | True when the entry fired in the last poll. An error or a hangup fires too |
-| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1512) | True when wake() can end a poll. Without it a caller polls in short slices |
-| [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1284) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
+| [`socket::listen(localAddr, ipp, opt)`](src/rpp/sockets.h#L1297) | Create a listening server socket |
+| [`socket::listen_to(localAddr, ipp, opt)`](src/rpp/sockets.h#L1306) | Create a listening server socket |
+| [`socket::accept(timeoutMillis)`](src/rpp/sockets.h#L1350) | Accept an incoming connection |
+| [`socket::connect(remoteAddr, opt)`](src/rpp/sockets.h#L1372) | Connect to an address |
+| [`socket::connect_to(remoteAddr, opt)`](src/rpp/sockets.h#L1437) | Connect by hostname and port |
+| [`socket::connect_start(remoteAddr, opt)`](src/rpp/sockets.h#L1392) | Start a non-blocking connect and return at once. Poll for PF_Write, then call connect_finish() |
+| [`socket::connect_start(remoteAddr, millis, opt)`](src/rpp/sockets.h#L1402) | Start a non-blocking connect, and the OS ends the attempt by `millis` |
+| [`socket::connect_finish(opt)`](src/rpp/sockets.h#L1409) | Read the result of connect_start() once the socket is writable. True when connected |
+| [`socket::accept(Loop& loop, timeout)`](src/rpp/sockets.h#L1360) | Awaitable accept on an event loop, a wrapper for event_loop::accept() |
+| [`socket::connect(Loop& loop, remoteAddr, timeout)`](src/rpp/sockets.h#L1420) | Awaitable connect on an event loop, a wrapper for event_loop::connect() |
+| [`socket::make_arp(iface, opt)`](src/rpp/sockets.h#L1479) | Open a Linux packet socket for the ARP frames of an interface. It needs CAP_NET_RAW, and its close is slow |
+| [`poll_entry`](src/rpp/sockets.h#L1270) | One socket in a poll set, with its own flags and its own ready result |
+| [`socket_poller::add(socket& sock, PollFlag events)`](src/rpp/sockets.h#L1518) | Add a socket to the next poll. Returns its index for ready() |
+| [`socket_poller::poll(int timeoutMillis, const HasWork& has_work)`](src/rpp/sockets.h#L1532) | Arm the wake, skip the poll when has_work() is true, else poll. Returns the number of ready entries |
+| [`socket_poller::wake()`](src/rpp/sockets.h#L1543) | End a poll in progress from any thread, a no-op when no poll is armed |
+| [`socket_poller::ready(int index)`](src/rpp/sockets.h#L1522) | True when the entry fired in the last poll. An error or a hangup fires too |
+| [`socket_poller::can_wake()`](src/rpp/sockets.h#L1524) | True when wake() can end a poll. Without it a caller polls in short slices |
+| [`socket::poll(std::span<poll_entry> entries, int timeoutMillis)`](src/rpp/sockets.h#L1285) | Poll a set of sockets, each with its own flags. An error or a hangup also marks an entry ready |
 | [`protocol_info`](src/rpp/sockets.h#L86) | Describes socket protocol version, address family, type and protocol |
-| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1542) | Creates an INADDR_ANY UDP socket bound to a random port |
-| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1548) | Creates an INADDR_ANY TCP listener bound to a random port |
+| [`make_udp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1554) | Creates an INADDR_ANY UDP socket bound to a random port |
+| [`make_tcp_randomport(opt, bind_address)`](src/rpp/sockets.h#L1560) | Creates an INADDR_ANY TCP listener bound to a random port |
 
 ### Example: IP Addresses
 
@@ -5119,8 +5120,8 @@ Function type traits for extracting return types and argument types from callabl
 
 | Trait | Description |
 |-------|-------------|
-| [`function_traits<T>`](src/rpp/traits.h#L13) | Extracts `ret_type` and `arg_types` from functions, lambdas, member functions |
-| [`first_arg_type<T>`](src/rpp/traits.h#L43) | First argument type of a callable |
+| [`function_traits<T>`](src/rpp/traits.h#L13) | Extracts `ret_type` and `arg_types` from functions, lambdas and member functions, also `noexcept` ones |
+| [`first_arg_type<T>`](src/rpp/traits.h#L56) | First argument type of a callable |
 
 ---
 

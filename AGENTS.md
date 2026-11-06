@@ -103,6 +103,7 @@ Examples and rationale: [`docs/CODE_STYLE.md`](docs/CODE_STYLE.md).
   line. A lambda with two statements or more spans several lines. See `recpp-review` R7.
 - **A `for` header only iterates, and a ternary only picks a value.** Neither reads input or
   assigns. An assignment never sits inside a condition. See `recpp-review` R7.
+- **Never add a field to `rpp::socket`.** Keep new state in the OS socket options, or in a local of the call. See R17.
 - **Never make a path slower.** Add no allocation or copy which the code did not make before.
   Test a cheap flag before a thread id or a system call. Measure on MSVC and in Debug too. See R17.
 - **Use the ReCpp tool which exists**, such as `rpp::unlock_guard` or `RPP_BUILTIN_MEMCPY`. A destructor
@@ -147,7 +148,9 @@ Mama 0.14.13 and later treat a `MAJOR.MINOR` change as an ABI break, and rebuild
 Only a PATCH bump keeps the ABI.
 
 1. Bump PATCH when the ABI stays the same, such as a `.cpp` fix, a new function, a changed inline body, or a regenerated `.cppm` file.
-2. Bump MINOR when the ABI or the API changes: a class layout, an inline signature, a template, an ABI flag, or a removed symbol.
+   An addition is also PATCH, such as a new type, overload or template specialization. No existing binary uses it.
+2. Bump MINOR only when a change breaks what an existing binary uses. That is a class layout, an inline signature,
+   an existing template signature or layout, an ABI flag, or a removed symbol.
 3. Bump MAJOR only for a new major release, such as the C++20 modules refactor in 2.0.0.
 
 Put all pending ABI breaks into one changeset, so that one MINOR bump covers them. Each PR which breaks the ABI alone adds a MINOR bump and a rebuild of each dependent package.

@@ -2031,11 +2031,15 @@ namespace rpp
             handle_errno(ESOCK(ESHUTDOWN));
 
             // a read never blocks after a FIN, and WSAPoll reports the FIN without POLLRDNORM, so recv() reads the close
-            return (pollFlags & PF_Read) != 0;
+            // a write fails at once, and a refused connect keeps SO_ERROR for connect_finish()
+            return true;
         }
 
         if ((revents & POLLERR) != 0) // some other socket error
         {
+            // WSAPoll reports a failed connect as POLLERR alone, and a read of SO_ERROR resets it on Windows
+            if ((pollFlags & PF_Write) != 0)
+                return true; // connect_finish() or the next send() reads the error
             handle_errno(get_socket_level_error());
             return false;
         }
@@ -2162,7 +2166,7 @@ namespace rpp
 
     bool socket::connect(const ipaddress& remoteAddr, int millis, socket_option opt) noexcept
     {
-        if (!connect_start(remoteAddr, opt))
+        if (!connect_start(remoteAddr, millis, opt))
             return false;
         const int pending = get_errno(); // a poll timeout clears the code, so the in-progress one is kept
         if (poll(millis, PF_Write))
@@ -2173,6 +2177,12 @@ namespace rpp
     }
 
     bool socket::connect_start(const ipaddress& remoteAddr, socket_option opt) noexcept
+    {
+        constexpr int default_cap_ms = 1000; // a connect which takes longer, even over a slow radio link, has failed
+        return connect_start(remoteAddr, default_cap_ms, opt);
+    }
+
+    bool socket::connect_start(const ipaddress& remoteAddr, [[maybe_unused]] int millis, socket_option opt) noexcept
     {
         rpp::unique_lock lock { Mtx };
 
@@ -2198,6 +2208,35 @@ namespace rpp
         auto sa = to_saddr(remoteAddr);
         set_errno_unlocked(0); // clear any errors
 
+        if (millis > 0)
+        {
+            const int sock = os_handle_unsafe();
+        #if _WIN32 && defined(SIO_TCP_INITIAL_RTO)
+            // Windows also retries a refused SYN, and each retry waits double, so the retries which fit end by the timeout
+            constexpr int min_rto_ms = 300; // the Windows MinRto default, a shorter RTT does not apply
+            TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis, 1, 65535)), TCP_INITIAL_RTO_NO_SYN_RETRANSMISSIONS };
+            if (millis >= 7 * min_rto_ms)
+                rto = { USHORT(rpp::clamp(millis / 7, 1, 65535)), 2 };
+            else if (millis >= 3 * min_rto_ms)
+                rto = { USHORT(millis / 3), 1 };
+            DWORD rto_bytes = 0;
+            if (WSAIoctl(sock, SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr) != 0)
+                LogWarning("socket fh:%d SIO_TCP_INITIAL_RTO failed: %s", sock, last_os_socket_err().c_str());
+        #elif defined(TCP_SYNCNT)
+            // Linux gives up after the retries double the wait, so the fewest which cover the timeout cap it
+            constexpr int default_syn_retries = 6; // the net.ipv4.tcp_syn_retries default
+            int syn_retries = 1;
+            while (syn_retries < default_syn_retries && ((2 << syn_retries) - 1) * 1000 < millis)
+                ++syn_retries;
+            if (setsockopt(sock, IPPROTO_TCP, TCP_SYNCNT, (char*)&syn_retries, sizeof(syn_retries)) != 0)
+                LogWarning("socket fh:%d TCP_SYNCNT failed: %s", sock, last_os_socket_err().c_str());
+        #elif defined(TCP_CONNECTIONTIMEOUT)
+            int cap_sec = (millis + 999) / 1000; // Apple takes whole seconds
+            if (setsockopt(sock, IPPROTO_TCP, TCP_CONNECTIONTIMEOUT, (char*)&cap_sec, sizeof(cap_sec)) != 0)
+                LogWarning("socket fh:%d TCP_CONNECTIONTIMEOUT failed: %s", sock, last_os_socket_err().c_str());
+        #endif
+        }
+
         // this will return immediately because socket is in non-blocking mode and we hold the mutex
         if (::connect(os_handle_unsafe(), sa, sa.size()) == 0)
             return true;
@@ -2220,16 +2259,20 @@ namespace rpp
     bool socket::connect_finish(socket_option opt) noexcept
     {
         rpp::unique_lock lock { Mtx };
-        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
-        if (so_err != 0)
-        {
-            handle_errno(so_err);
-            return false;
-        }
         if (!poll(0, PF_Write)) // a connect still in progress also has no SO_ERROR yet
         {
             if (!get_errno_unlocked())
                 set_errno_unlocked(ESOCK(EINPROGRESS));
+            return false;
+        }
+        // read after the poll, so a refusal which lands between the two is not a success
+        const int poll_err = get_errno_unlocked(); // a POLLHUP poll set ESHUTDOWN, and get_opt() resets it
+        int so_err = get_socket_level_error(); // the connect() manual puts the final status here
+        if (so_err == 0)
+            so_err = poll_err;
+        if (so_err != 0)
+        {
+            handle_errno(so_err);
             return false;
         }
         configure_connected_client(opt);

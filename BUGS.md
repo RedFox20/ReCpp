@@ -44,23 +44,6 @@ The gate reads the global, per-config and directory flags at configure time. A `
 call after `add_subdirectory` comes too late for it. A parent which adds the flag that way must set
 `BUILD_WITH_MODULES=OFF` before `add_subdirectory`.
 
-### B35. A `noexcept` error handler does not compile
-`rpp::function_traits` in `traits.h` has no specialization for a `noexcept` member function, so
-`first_arg_type` fails on a `noexcept` lambda. A handler such as
-`[](const std::runtime_error&) noexcept { return 2; }` fails in `rpp::future::then()`,
-where g++ 14.4 reports `'operator()' is not a member of`. The same handler
-without `noexcept` compiles, and so does a `noexcept` task.
-
-### B33. `proc_cpu_times` expects user CPU time before the kernel reports any
-`test_timer::proc_cpu_times` reads `t1` before it spins. It asserts at `test_timer.cpp:737` that
-`t1.user_time_us` is above zero. The case alone failed `t1.user_time_us => '0'` in 4 of 20 plain
-gcc-14 runs at a load average of 0.02. It failed 8 of 20 times at a load average of 0.25. In a
-full clang-18 TSAN run, `t1` read 6671 ms of user time, because the earlier cases ran first.
-
-The same case spins 50 ms and requires 45 ms of CPU time at `test_timer.cpp:753`. On a 4 core VM
-that floor failed 1 of 5 runs under TSAN and 1 of 20 on plain gcc-14. The VM reports steal time in
-`/proc/stat`, which its load average does not show.
-
 ### B30. GCC drops a `#pragma GCC diagnostic` region across a module boundary
 A template which a module exports instantiates in the importer. GCC then looks the diagnostic
 state up at the instantiation point, and the `push` and `ignored` lines around the declaration
@@ -83,26 +66,6 @@ Each one wraps the GNU pmf-conversion extension, which has no standard spelling,
 cannot go. `-Wpmf-conversions` needs no flag, so a unit which only imports warns at the default
 flag set. The ReCpp build stays quiet because every consumer includes the header before the
 import. Measured on gcc-15.
-
-### B29. `udp_load_balancer` misses its throughput floor under full-suite load
-`test_sockets::udp_load_balancer` asserts the balancer reaches 75 percent of the target rate
-over the run. One full-suite run reported 91 KB against a 153 KB floor, at
-`test_sockets.cpp:1232`.
-
-The sender loop runs on the calling thread and shares the container with the rest of the
-suite. A starved sender sends less, so the floor measures the machine as much as it measures
-the balancer.
-
-Measured in this container, on a docs-only tree:
-
-| Run shape | Result |
-|---|---|
-| full suite, 4 runs | 1 failure |
-| `test_sockets` alone, 3 runs | 0 failures |
-
-R10 says to record a timing report rather than patch it on the spot. A `best_of_3` around
-the send loop would pin the balancer instead of the load. Issue #70 took that same repair for
-`test_concurrent_queue`.
 
 ### B28. gcc-14 crashes an importer which reaches `exception_ptr.h` and calls `future::get()`
 gcc-14 needs three conditions at once. Remove any one of them and the importer compiles.
@@ -592,6 +555,10 @@ A third shape compares two measured times, as
 `parallel_elapsed => '0.111749' must be less or equal than '0.107670'`. A two core runner
 gives a parallel loop no margin over a single thread. AGENTS.md R2 already says to wait on an
 event, not on the clock.
+`test_event_loop::queued_posts_skip_the_timer_scan_of_an_empty_poll` hit the same shape on
+`ubuntu-cpp23-modules-gcc15` at a543abf, with `drain => '3098.767' must be less than '2397.87825'`.
+Both paths scan the timers in `fire_due_waiters()`, so the ratio holds only while that scan outweighs the fixed cost of a poll.
+It passed 20 of 20 runs under gcc-13 ASAN here, and 20 of 20 with two CPU hogs.
 
 Reproduce it without CI. Pin CPU hogs to the test core:
 ```bash
@@ -743,6 +710,18 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 `write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
+
+### C43. `udp_load_balancer` missed its throughput floor under full-suite load (was B29)
+A starved sender loses its balancer budget for good, so one loaded run fell under the floor.
+The case now times a fixed packet count and asserts on the fastest of three runs.
+
+### C42. `proc_cpu_times` failed on a loaded host and on a fresh process (was B33)
+It asserted user CPU time before the kernel reported any, and a wall clock spin got less CPU under load.
+The case now spins until the process CPU time advances, and asserts user time only after the spin.
+
+### C41. A `noexcept` error handler did not compile (was B35)
+`rpp::function_traits` had no specialization for a `noexcept` function, function pointer or member function.
+`traits.h` now has all four, which `noexcept_handlers_compile_and_catch` pins.
 
 ### C40. `exit()` waited for a running task of the global pool
 The static global pool died in `exit()`, so a task which outlived the statics hung the process or ran on freed statics.

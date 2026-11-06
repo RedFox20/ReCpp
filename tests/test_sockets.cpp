@@ -1072,6 +1072,50 @@ TestImpl(test_sockets)
         AssertTrue(remote.good());
     }
 
+    // a refused connect ends the PF_Write poll, so a caller does not wait out its deadline
+    TestCase(tcp_connect_start_reports_a_refused_connect)
+    {
+        socket closed = rpp::make_tcp_randomport();
+        const int port = closed.port();
+        closed.close();
+        socket client;
+        AssertTrue(client.connect_start({"127.0.0.1", port}, 10)); // Windows retries the refused SYN until the cap
+        AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the refusal ends the poll
+        AssertFalse(client.connect_finish());
+        AssertEqual(client.last_err_type(), socket::SE_CONNREFUSED);
+        AssertFalse(client.connected());
+    }
+
+#if __linux__ // the Linux values, because <netinet/in.h> makes rpp::socket ambiguous here
+    // the connect cap is a SYN retry count, so it ends the attempt and never touches the connection
+    TestCase(tcp_connect_start_caps_the_syn_retries)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        socket fast;
+        AssertTrue(fast.connect_start({"127.0.0.1", server.port()}, 10));
+        AssertEqual(fast.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_SYNCNT*/ 7), 1);
+        socket slow;
+        AssertTrue(slow.connect_start({"127.0.0.1", server.port()}, 5000));
+        AssertEqual(slow.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_SYNCNT*/ 7), 2);
+    }
+
+    // a TCP_USER_TIMEOUT which the caller set also bounds the connect, so it stays after the connect
+    TestCase(tcp_connect_start_keeps_the_user_timeout_of_the_caller)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        for (int millis : { 0, 10 })
+        {
+            socket client;
+            AssertTrue(client.create(AF_IPv4, IPP_TCP));
+            AssertEqual(client.set_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18, 5000), 0);
+            AssertTrue(client.connect_start({"127.0.0.1", server.port()}, millis));
+            AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the loopback connect ends the poll
+            AssertTrue(client.connect_finish());
+            AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 5000);
+        }
+    }
+#endif
+
     // WSAPoll reports a peer FIN as POLLHUP alone, and poll() still reports it, see BUGS.md C37
     TestCase(tcp_poll_reports_a_peer_close)
     {
@@ -1329,59 +1373,40 @@ TestImpl(test_sockets)
 
     TestCase(udp_load_balancer)
     {
-        // setup load balancer at 2MB/s
-        constexpr double DATA_RATE_MiBps = 2 * 1024 * 1024; // 2 MiB/s
-        constexpr double TEST_RUNTIME_SEC = 0.1; // don't run for too long
+        constexpr uint32_t DATA_RATE_Bps = 2 * 1024 * 1024;
         constexpr int PACKET_SIZE = 280; // Mavlink max
-        rpp::load_balancer balancer { uint32_t(DATA_RATE_MiBps) };
-
-        rpp::socket receiverSocket = create_udp_listener();
-        AssertTrue(receiverSocket.good());
-        std::atomic_bool running { true };
-
-        rpp::future<int32_t> receiver = rpp::async(
-            [&running, &receiverSocket]() {
-                int32_t bytesReceived = 0;
-                uint8_t buffer[2048];
-                rpp::ipaddress from;
-                while (running) {
-                    if (receiverSocket.poll(10)) do {
-                        bytesReceived += receiverSocket.recvfrom(from, buffer, sizeof(buffer));
-                    } while (receiverSocket.available() > 0);
-                }
-                return bytesReceived;
-            }
-        );
-
+        constexpr int NUM_PACKETS = 125;
+        rpp::socket receiver = create_udp_listener();
         rpp::socket sender = create_udp_listener();
+        AssertTrue(receiver.good());
         AssertTrue(sender.good());
-        uint8_t buffer[1024];
+        rpp::ipaddress receiverAddr = rpp::ipaddress4{"127.0.0.1", receiver.port()};
+        uint8_t buffer[PACKET_SIZE] = {};
 
-        rpp::ipaddress receiverAddr = rpp::ipaddress4{"127.0.0.1", receiverSocket.port()};
-        print_info("receiver: %s\n", receiverAddr.cstr());
-        print_info("sender: %s\n", sender.address().cstr());
+        // the first send does not wait, and each later one waits for the bytes before it
+        const double expected_sec = (NUM_PACKETS - 1) * PACKET_SIZE / double(DATA_RATE_Bps);
 
-        rpp::Timer t;
-        while (t.elapsed() < TEST_RUNTIME_SEC)
+        // a starved sender loses its budget for good, so the fastest run shows what the balancer allows
+        const double fastest_sec = best_of_3([&]
         {
-            balancer.wait_to_send(PACKET_SIZE);
-            if (sender.sendto(receiverAddr, buffer, PACKET_SIZE) <= 0)
+            rpp::load_balancer balancer { DATA_RATE_Bps };
+            rpp::Timer t;
+            for (int i = 0; i < NUM_PACKETS; ++i)
             {
-                AssertFailed("sender.sendto failed: %s", sender.last_err().c_str());
-                break;
+                balancer.wait_to_send(PACKET_SIZE);
+                if (sender.sendto(receiverAddr, buffer, PACKET_SIZE) <= 0)
+                {
+                    AssertFailed("sender.sendto failed: %s", sender.last_err().c_str());
+                    break;
+                }
             }
-        }
+            return t.elapsed();
+        });
+        print_info("fastest: %.1fms, expected: %.1fms\n", fastest_sec * 1000, expected_sec * 1000);
 
-        running = false;
-        double elapsed = t.elapsed();
-        int32_t actualReceived = receiver.get();
-        int32_t actualReceivedKB = actualReceived / 1024;
-        print_info("elapsed: %.3fs, actual received: %d KB\n", elapsed, actualReceivedKB);
-
-        // we should not have sent more than max limit here
-        AssertLessOrEqual(actualReceivedKB, (int)(1.05 * DATA_RATE_MiBps * TEST_RUNTIME_SEC / 1024));
-        // however, we should have sent at least 1.5MB, otherwise the load balancer is inefficient
-        AssertGreaterOrEqual(actualReceivedKB, (int)(0.75 * DATA_RATE_MiBps * TEST_RUNTIME_SEC / 1024));
+        // the fastest run must not beat the rate limit, and must not fall far behind it
+        AssertGreaterOrEqual(fastest_sec, expected_sec / 1.05);
+        AssertLessOrEqual(fastest_sec, expected_sec / 0.75);
     }
 
     // an ARP open or send which cannot work gives an error the caller can test, also without CAP_NET_RAW

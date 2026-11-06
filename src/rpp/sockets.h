@@ -1214,6 +1214,7 @@ namespace rpp
          * @param pollFlags [optional] Poll flags to use, default is [PF_Read]
          * @returns true if the socket is signaled, false on timeout or error (check socket::last_err())
          *          A peer close signals PF_Read, and the next recv() reports the close.
+         *          A failed connect signals PF_Write, and connect_finish() reports the error.
          */
         bool poll(int timeoutMillis, PollFlag pollFlags = PF_Read) noexcept;
 
@@ -1386,8 +1387,19 @@ namespace rpp
          * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
          * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
          * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
+         * @note The OS ends the connect attempt after one second, see the overload with a timeout.
          */
         bool connect_start(const ipaddress& remoteAddr, socket_option opt = SO_None) noexcept;
+
+        /**
+         * @brief Starts a non-blocking connect, as connect_start() does, and the OS ends the attempt by `millis`.
+         *        Windows ends it inside `millis`. Linux ends it at 3, 7 or 15 s, the first SYN give-up after `millis`.
+         * @param remoteAddr Initialized SockAddr4 (IPv4) or SockAddr6 (IPv6) network address
+         * @param millis The longest time the OS may spend on the connect attempt, and 0 or less keeps the OS default
+         * @param opt Socket options to set, only SO_NonBlock applies before connect_finish()
+         * @return TRUE when the connect started or completed, FALSE on an immediate error (check socket::last_err())
+         */
+        bool connect_start(const ipaddress& remoteAddr, int millis, socket_option opt = SO_None) noexcept;
 
         /**
          * @brief Reads the result of a connect_start() once the socket is writable, and configures the client.

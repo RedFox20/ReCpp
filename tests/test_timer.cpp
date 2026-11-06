@@ -653,9 +653,15 @@ TestImpl(test_timer)
     TestCase(proc_cpu_times)
     {
         rpp::cpu_usage_info t1 = rpp::proc_total_cpu_usage();
-        int spin_us = 50'000;
-        spin_sleep_for_us(spin_us, /*full_spin*/true); // spin wait for accurate time counts
-        rpp::cpu_usage_info t2 = rpp::proc_total_cpu_usage();
+        rpp::cpu_usage_info t2 = t1;
+        constexpr rpp::int64 spin_us = 50'000;
+        rpp::TimePoint hang_guard = rpp::TimePoint::now() + rpp::seconds(1); // ends the spin if the counter stops
+        // spin until the CPU time advances, because a loaded host gives a wall clock spin less CPU
+        while (t2.cpu_time_us - t1.cpu_time_us < spin_us && rpp::TimePoint::now() < hang_guard)
+        {
+            spin_sleep_for_us(1'000, /*full_spin*/true);
+            t2 = rpp::proc_total_cpu_usage();
+        }
 
         print_info("#1 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t1.cpu_time_ms(), t1.user_time_ms(), t1.kernel_time_ms());
         print_info("#2 cpu all:%.1fms usr:%.1fms sys:%.1fms\n", t2.cpu_time_ms(), t2.user_time_ms(), t2.kernel_time_ms());
@@ -671,7 +677,6 @@ TestImpl(test_timer)
         AssertGreater(t1.kernel_time_us, 0u);
         AssertGreater(t2.kernel_time_us, 0u);
     #endif
-        AssertGreater(t1.user_time_us, 0u);
         AssertGreater(t1.cpu_time_us, 0u);
         AssertGreater(t2.user_time_us, 0u);
         // only compare CPU times, since we're uncertain about USER/KERNEL distribution
@@ -682,12 +687,11 @@ TestImpl(test_timer)
         // since calculations are done using system clock, most time should be spent in kernel
         // AssertGreater(kernel_delta, user_delta);
 
+        AssertGreaterOrEqual(cpu_delta, spin_us); // fails only when the hang guard ends the spin
         #if _MSC_VER
             // TODO: Windows CPU usage timing accuracy is 15.6ms, so we need to relax the timings
-            AssertGreaterOrEqual(cpu_delta, 0);
             AssertLessOrEqual(cpu_delta, spin_us + 64'000);
         #else
-            AssertGreaterOrEqual(cpu_delta, spin_us - 5'000);
             AssertLessOrEqual(cpu_delta, spin_us + 5'000);
         #endif
     }

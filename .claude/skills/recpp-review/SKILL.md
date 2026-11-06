@@ -415,6 +415,7 @@ proves it runs under ASAN and reports the rate, per R1.
 A change to `src/`, `CMakeLists.txt`, or `mamafile.py` which alters the built library
 bumps `self.version` in `mamafile.py`. AGENTS.md Versioning names the level to bump.
 Report a missing bump, or a bump below that level, as blocking. An API break needs MINOR, not MAJOR.
+An addition which no existing binary uses is PATCH. Never ask for MINOR for a new type, overload or specialization.
 Report an ABI break as blocking when another open PR also breaks the ABI. Move both into one changeset.
 
 ### R15. A view never outlives its string
@@ -468,6 +469,7 @@ instantiates a large template, and the binary grows with every call site.
 ReCpp exists to be lighter and faster than `std::`, so a slower path is a defect even when
 the result is right.
 
+- Never add a field to `rpp::socket`. Keep new state in the OS socket options, or in a local of the call.
 - Never add an allocation or a copy which the code did not make before. Two callers which
   share a read loop share a helper which takes the growth strategy, as `read_until_eof()`
   does for `read_all()` and `read_text()`. Never build a `std::string` and copy it again.
