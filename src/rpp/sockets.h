@@ -528,6 +528,7 @@ namespace rpp
         bool Connected;      // for connection oriented sockets [SC_Client, SC_Accept] whether the connection is still valid
         socket_category Category;
         socket_type Type;
+        bool ConnectCapped;  // connect_start() set TCP_USER_TIMEOUT, so connect_finish() clears it. Fills padding, no ABI change
 
     public:
 

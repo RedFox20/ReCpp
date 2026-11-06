@@ -1098,6 +1098,22 @@ TestImpl(test_sockets)
         AssertTrue(client.connect_finish());
         AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 0);
     }
+
+    // a TCP_USER_TIMEOUT which the caller set also bounds the connect, so it stays after the connect
+    TestCase(tcp_connect_start_keeps_the_user_timeout_of_the_caller)
+    {
+        socket server = listen(rpp::make_tcp_randomport(rpp::SO_NonBlock));
+        for (int millis : { 0, 10 })
+        {
+            socket client;
+            AssertTrue(client.create(AF_IPv4, IPP_TCP));
+            AssertEqual(client.set_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18, 5000), 0);
+            AssertTrue(client.connect_start({"127.0.0.1", server.port()}, millis));
+            AssertTrue(client.poll(1000, socket::PF_Write)); // hang guard, the loopback connect ends the poll
+            AssertTrue(client.connect_finish());
+            AssertEqual(client.get_opt(/*IPPROTO_TCP*/ 6, /*TCP_USER_TIMEOUT*/ 18), 5000);
+        }
+    }
 #endif
 
     // WSAPoll reports a peer FIN as POLLHUP alone, and poll() still reports it, see BUGS.md C37
