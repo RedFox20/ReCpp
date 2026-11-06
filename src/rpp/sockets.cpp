@@ -2037,8 +2037,11 @@ namespace rpp
 
         if ((revents & POLLERR) != 0) // some other socket error
         {
+            // WSAPoll reports a failed connect as POLLERR alone, and a read of SO_ERROR resets it on Windows
+            if ((pollFlags & PF_Write) != 0)
+                return true; // connect_finish() or the next send() reads the error
             handle_errno(get_socket_level_error());
-            return (pollFlags & PF_Write) != 0; // WSAPoll reports a failed connect as POLLERR alone
+            return false;
         }
 
         set_errno(0); // clear errors
@@ -2263,7 +2266,7 @@ namespace rpp
             return false;
         }
         // read after the poll, so a refusal which lands between the two is not a success
-        const int poll_err = get_errno_unlocked(); // a POLLERR poll read SO_ERROR, and a POLLHUP poll set ESHUTDOWN
+        const int poll_err = get_errno_unlocked(); // a POLLHUP poll set ESHUTDOWN, and get_opt() resets it
         int so_err = get_socket_level_error(); // the connect() manual puts the final status here
         if (so_err == 0)
             so_err = poll_err;
