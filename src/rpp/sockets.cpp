@@ -2209,9 +2209,13 @@ namespace rpp
         {
             const int sock = os_handle_unsafe();
         #if _WIN32 && defined(SIO_TCP_INITIAL_RTO)
-            // Windows also retries a refused SYN, so the retries of one, two and four RTTs end by the timeout
-            constexpr UCHAR syn_retries = 2;
-            TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis / 7, 1, 65535)), syn_retries };
+            // Windows also retries a refused SYN, and each retry waits double, so the retries which fit end by the timeout
+            constexpr int min_rto_ms = 300; // the Windows MinRto default, a shorter RTT does not apply
+            TCP_INITIAL_RTO_PARAMETERS rto { USHORT(rpp::clamp(millis, 1, 65535)), TCP_INITIAL_RTO_NO_SYN_RETRANSMISSIONS };
+            if (millis >= 7 * min_rto_ms)
+                rto = { USHORT(rpp::clamp(millis / 7, 1, 65535)), 2 };
+            else if (millis >= 3 * min_rto_ms)
+                rto = { USHORT(millis / 3), 1 };
             DWORD rto_bytes = 0;
             if (WSAIoctl(sock, SIO_TCP_INITIAL_RTO, &rto, sizeof(rto), nullptr, 0, &rto_bytes, nullptr, nullptr) != 0)
                 LogWarning("socket fh:%d SIO_TCP_INITIAL_RTO failed: %s", sock, last_os_socket_err().c_str());
