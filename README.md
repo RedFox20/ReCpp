@@ -2848,8 +2848,8 @@ Monotonic clocks (`Monotonic`, `MonotonicRaw`, `MonotonicCoarse`, `Boottime`) ar
 | [`Duration::from_minutes(int32 m)`](src/rpp/timepoint.h#L165) | Create from minutes |
 | [`sec()`](src/rpp/timepoint.h#L176) / [`msec()`](src/rpp/timepoint.h#L180) | Convert to fractional seconds / milliseconds |
 | [`seconds()`](src/rpp/timepoint.h#L184) / [`millis()`](src/rpp/timepoint.h#L188) / [`micros()`](src/rpp/timepoint.h#L192) / [`nanos()`](src/rpp/timepoint.h#L197) | Convert to integer time units |
-| [`to_string()`](src/rpp/timepoint.h#L261) | Human-readable duration string |
-| [`to_stopwatch_string()`](src/rpp/timepoint.h#L278) | Stopwatch-style format |
+| [`to_string()`](src/rpp/timepoint.h#L264) | Human-readable duration string |
+| [`to_stopwatch_string()`](src/rpp/timepoint.h#L281) | Stopwatch-style format |
 
 ### TimePoint Methods
 

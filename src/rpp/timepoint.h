@@ -15,13 +15,13 @@ namespace rpp
 {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /** Let this thread sleep for provided MILLISECONDS */
+    /** Let this thread sleep for provided MILLISECONDS. FreeRTOS rounds up to whole ticks. */
     RPPAPI void sleep_ms(unsigned int millis) noexcept;
 
     /** Let this thread sleep for provided MICROSECONDS */
     RPPAPI void sleep_us(unsigned int micros) noexcept;
 
-    /** Let this thread sleep for provided NANOSECONDS */
+    /** Let this thread sleep for provided NANOSECONDS. FreeRTOS on Cortex-M delays the full ticks and spins the rest, else rounds up to ticks. */
     RPPAPI void sleep_ns(int64 nanos) noexcept;
 
     struct Duration; // forward declaration
