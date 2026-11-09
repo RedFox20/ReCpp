@@ -33,10 +33,13 @@ namespace rpp
 
     #if RPP_INT_SIZE == 4
         using int32  = int;
-        using uint32 = unsigned int;
     #else
         using int32  = long;
-        using uint32 = unsigned long;
+    #endif
+    #if _MSC_VER
+        using uint32 = unsigned int;
+    #else // <cstdint> takes this builtin too, and arm-none-eabi makes it unsigned long, not unsigned int
+        using uint32 = __UINT32_TYPE__;
     #endif
 
         using int64  = long long;

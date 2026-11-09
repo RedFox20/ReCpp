@@ -488,9 +488,9 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`int16`](src/rpp/config.types.h#L31) | `short` (16-bit signed) |
 | [`uint16`](src/rpp/config.types.h#L32) | `unsigned short` (16-bit unsigned) |
 | [`int32`](src/rpp/config.types.h#L35) | `int` or `long` depending on `RPP_INT_SIZE` (32-bit signed) |
-| [`uint32`](src/rpp/config.types.h#L36) | `unsigned int` or `unsigned long` (32-bit unsigned) |
-| [`int64`](src/rpp/config.types.h#L42) | `long long` (64-bit signed) |
-| [`uint64`](src/rpp/config.types.h#L43) | `unsigned long long` (64-bit unsigned) |
+| [`uint32`](src/rpp/config.types.h#L40) | `unsigned int` or `unsigned long` (32-bit unsigned) |
+| [`int64`](src/rpp/config.types.h#L45) | `long long` (64-bit signed) |
+| [`uint64`](src/rpp/config.types.h#L46) | `unsigned long long` (64-bit unsigned) |
 
 ---
 
@@ -5101,16 +5101,16 @@ C++20 concepts, and the detection idiom for a caller which brings its own expres
 | Trait | Description |
 |-------|-------------|
 | [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L27) | Detection idiom, for an alias the caller writes |
-| [`has_to_string<T>`](src/rpp/type_traits.h#L38) | True if `to_string(T)` is valid |
-| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L41) | True if `T::to_string()` exists |
-| [`has_std_to_string<T>`](src/rpp/type_traits.h#L34) | True if `std::to_string(T)` is valid |
-| [`has_get_memb<T>`](src/rpp/type_traits.h#L44) | True if `T::get()` exists |
-| [`has_set_memb<T, U>`](src/rpp/type_traits.h#L47) | True if `T::set(U)` exists |
-| [`has_contains_memb<C, T>`](src/rpp/type_traits.h#L50) | True if `C::contains(T)` exists |
-| [`is_iterable<T>`](src/rpp/type_traits.h#L56) | True if T supports range-for |
-| [`is_container<T>`](src/rpp/type_traits.h#L62) | True if T is a container with `size()` |
-| [`is_stringlike<T>`](src/rpp/type_traits.h#L59) | True if T is string-like |
-| [`Operation`](src/rpp/type_traits.h#L26) | The expression alias a caller passes to `is_detected` |
+| [`has_to_string<T>`](src/rpp/type_traits.h#L46) | True if `to_string(T)` is valid |
+| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L49) | True if `T::to_string()` exists |
+| [`has_std_to_string<T>`](src/rpp/type_traits.h#L42) | True if `std::to_string(T)` is valid |
+| [`has_get_memb<T>`](src/rpp/type_traits.h#L52) | True if `T::get()` exists |
+| [`has_set_memb<T, U>`](src/rpp/type_traits.h#L55) | True if `T::set(U)` exists |
+| [`has_contains_memb<C, T>`](src/rpp/type_traits.h#L58) | True if `C::contains(T)` exists |
+| [`is_iterable<T>`](src/rpp/type_traits.h#L64) | True if T supports range-for |
+| [`is_container<T>`](src/rpp/type_traits.h#L70) | True if T is a container with `size()` |
+| [`is_stringlike<T>`](src/rpp/type_traits.h#L67) | True if T is string-like |
+| [`Operation`](src/rpp/type_traits.h#L29) | The expression alias a caller passes to `is_detected` |
 
 ---
 
