@@ -2087,27 +2087,27 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L105) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, a `pthread_mutex_t` elsewhere |
+| [`mutex`](src/rpp/mutex.h#L106) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, a `pthread_mutex_t` elsewhere |
 | [`futex_mutex`](src/rpp/mutex.h#L42) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
-| [`recursive_mutex`](src/rpp/mutex.h#L126) | Recursive mutex variant, a recursive `pthread_mutex_t` on POSIX |
-| [`unique_lock<Mutex>`](src/rpp/mutex.h#L329) | Holds a mutex like `std::unique_lock`, with `rpp::defer_lock` and `rpp::adopt_lock` |
-| [`defer_lock_t`](src/rpp/mutex.h#L319) | Tag type for a `unique_lock` which does not take the mutex yet |
-| [`adopt_lock_t`](src/rpp/mutex.h#L321) | Tag type for a lock which adopts a mutex this thread already holds |
-| [`defer_lock`](src/rpp/mutex.h#L323) | The `defer_lock_t` value |
-| [`adopt_lock`](src/rpp/mutex.h#L325) | The `adopt_lock_t` value |
-| [`lock_guard<Mutex>`](src/rpp/mutex.h#L402) | Holds a mutex for its whole scope, like `std::lock_guard` |
-| [`dual_lock_guard<Mutex>`](src/rpp/mutex.h#L416) | Holds two mutexes for its scope, and takes them in address order, so two threads never deadlock on one pair |
-| [`unlock_guard<Lock>`](src/rpp/mutex.h#L442) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
-| [`synchronized<T>`](src/rpp/mutex.h#L708) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`recursive_mutex`](src/rpp/mutex.h#L127) | Recursive mutex variant, a recursive `pthread_mutex_t` on POSIX |
+| [`unique_lock<Mutex>`](src/rpp/mutex.h#L330) | Holds a mutex like `std::unique_lock`, with `rpp::defer_lock` and `rpp::adopt_lock` |
+| [`defer_lock_t`](src/rpp/mutex.h#L320) | Tag type for a `unique_lock` which does not take the mutex yet |
+| [`adopt_lock_t`](src/rpp/mutex.h#L322) | Tag type for a lock which adopts a mutex this thread already holds |
+| [`defer_lock`](src/rpp/mutex.h#L324) | The `defer_lock_t` value |
+| [`adopt_lock`](src/rpp/mutex.h#L326) | The `adopt_lock_t` value |
+| [`lock_guard<Mutex>`](src/rpp/mutex.h#L403) | Holds a mutex for its whole scope, like `std::lock_guard` |
+| [`dual_lock_guard<Mutex>`](src/rpp/mutex.h#L417) | Holds two mutexes for its scope, and takes them in address order, so two threads never deadlock on one pair |
+| [`unlock_guard<Lock>`](src/rpp/mutex.h#L443) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
+| [`synchronized<T>`](src/rpp/mutex.h#L709) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L462) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L498) | Spin-lock with timeout |
-| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L215) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L540) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L463) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L499) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L216) | Indicates platform provides native critical_section mutex |
+| [`SyncableType`](src/rpp/mutex.h#L541) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
 call, and has a trivial destructor, so a static instance is safe before and after `main()`. In a TSAN build each
@@ -2115,10 +2115,10 @@ lock and unlock annotates itself, so TSAN reports a lock-order inversion as it d
 
 | Method | Description |
 |--------|-------------|
-| [`try_lock()`](src/rpp/mutex.h#L65) | Takes the lock without a wait, and returns false when another thread holds it |
-| [`lock()`](src/rpp/mutex.h#L74) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
-| [`lock_contended()`](src/rpp/mutex.h#L83) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
-| [`unlock()`](src/rpp/mutex.h#L92) | Releases the lock, and wakes one sleeping thread when the lock was contended |
+| [`try_lock()`](src/rpp/mutex.h#L66) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/mutex.h#L75) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
+| [`lock_contended()`](src/rpp/mutex.h#L84) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/mutex.h#L93) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under `futex_mutex`, the condition variable and the semaphore flags.
 

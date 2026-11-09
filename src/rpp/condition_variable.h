@@ -58,8 +58,8 @@ namespace rpp
     {
         static constexpr rpp::uint32 WAITER = 1u << 16; // the high half of state counts the waiters
         static constexpr rpp::uint32 WAKES = WAITER - 1; // the low half counts the wakes which no waiter took yet
-        std::atomic_uint32_t seq { 0 }; // the word a waiter sleeps on, and a notify changes
-        std::atomic_uint32_t state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
+        std::atomic<rpp::uint32> seq { 0 }; // the word a waiter sleeps on, and a notify changes
+        std::atomic<rpp::uint32> state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
 
         // only the exact type, because another lock or a derived mutex can add its own work to lock() and unlock()
         template<class Lock>
