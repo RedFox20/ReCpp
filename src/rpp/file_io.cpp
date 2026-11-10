@@ -23,6 +23,7 @@
 #else
     #include <sys/file.h> // flock
     #include <fcntl.h> // fcntl
+    #include <sys/stat.h> // fstat
     #include <unistd.h> // ftruncate
 #endif
 
@@ -599,6 +600,22 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+#if __APPLE__
+    // macOS has no fallocate: reserve the bytes past the end, then grow the size, as fallocate mode 0 does
+    static int apple_fallocate(int fd, int64 size) noexcept
+    {
+        struct stat st {};
+        if (fstat(fd, &st) != 0)
+            return -1;
+        if (size <= st.st_size)
+            return 0; // fallocate mode 0 never shrinks a file
+        fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, size - st.st_size, 0 };
+        if (fcntl(fd, F_PREALLOCATE, &store) == -1)
+            return -1;
+        return ftruncate(fd, size);
+    }
+#endif
+
     bool file::preallocate(int64 preallocSize, int64 seekPos, int seekMode) noexcept
     {
         if (!Handle || preallocSize <= 0) return false;
@@ -613,9 +630,8 @@ namespace rpp /* ReCpp */
             return false; // invalid file descriptor
     #if __EMSCRIPTEN__ // posix_fallocate only, the same as fallocate mode 0
         if (posix_fallocate(fd, 0, preallocSize) != 0)
-    #elif __APPLE__ // no fallocate: reserve the blocks, then extend the size like fallocate mode 0
-        fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, preallocSize, 0 };
-        if (fcntl(fd, F_PREALLOCATE, &store) == -1 || ftruncate(fd, preallocSize) != 0)
+    #elif __APPLE__
+        if (apple_fallocate(fd, preallocSize) != 0)
     #else
         if (fallocate(fd, 0, 0, preallocSize) != 0)
     #endif

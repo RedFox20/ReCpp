@@ -483,6 +483,21 @@ TestImpl(test_file_io)
     #endif
     }
 
+    // fallocate mode 0 never shrinks a file, so a smaller preallocation keeps the data past it
+    TestCase(preallocate_keeps_the_data_of_a_larger_file)
+    {
+    #if !_MSC_VER // preallocate() is not implemented on Windows
+        file f { TestFile, file::CREATENEW };
+        AssertTrue(f.good());
+        const std::string data(8192, 'x');
+        AssertThat(f.write(data.data(), static_cast<int>(data.size())), 8192);
+        f.flush();
+        AssertTrue(f.preallocate(4096));
+        AssertThat(f.size(), 8192);
+        AssertThat(file::read_all_text(TestFile), data);
+    #endif
+    }
+
     TestCase(sync_writes_the_buffered_data_to_the_file)
     {
         file f { TestFile, file::READWRITE }; // the DELETE access of CREATENEW on Windows denies the second open
