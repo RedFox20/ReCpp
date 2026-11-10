@@ -22,6 +22,8 @@
     #include <io.h> // _setmode
 #else
     #include <sys/file.h> // flock
+    #include <fcntl.h> // fcntl
+    #include <unistd.h> // ftruncate
 #endif
 
 namespace rpp /* ReCpp */
@@ -611,6 +613,9 @@ namespace rpp /* ReCpp */
             return false; // invalid file descriptor
     #if __EMSCRIPTEN__ // posix_fallocate only, the same as fallocate mode 0
         if (posix_fallocate(fd, 0, preallocSize) != 0)
+    #elif __APPLE__ // no fallocate: reserve the blocks, then extend the size like fallocate mode 0
+        fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, preallocSize, 0 };
+        if (fcntl(fd, F_PREALLOCATE, &store) == -1 || ftruncate(fd, preallocSize) != 0)
     #else
         if (fallocate(fd, 0, 0, preallocSize) != 0)
     #endif

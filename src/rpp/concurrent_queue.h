@@ -16,7 +16,7 @@
 #include <optional> // std::optional
 #include <atomic> // std::atomic_bool
 #include <cstring> // memmove
-#include <malloc.h> // malloc, free
+#include <cstdlib> // malloc, free
 
 #include "future_types.h" // rpp::coro_handle
 #include "delegate.h" // rpp::delegate (for coroutine awaiter)

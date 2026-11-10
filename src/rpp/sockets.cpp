@@ -677,9 +677,9 @@ namespace rpp
                     in.addr = to_ipaddress(*(saddr*)ifa->ifa_addr);
                     if (ifa->ifa_netmask)
                         in.netmask = to_ipaddress(*(saddr*)ifa->ifa_netmask);
-                    if ((ifa->ifa_flags & 0x2/*IFF_BROADCAST*/) != 0 && ifa->ifa_ifu.ifu_broadaddr)
+                    if ((ifa->ifa_flags & 0x2/*IFF_BROADCAST*/) != 0 && ifa->ifa_broadaddr)
                     {
-                        in.broadcast = to_ipaddress(*(saddr*)ifa->ifa_ifu.ifu_broadaddr);
+                        in.broadcast = to_ipaddress(*(saddr*)ifa->ifa_broadaddr);
                     }
                     // TODO: gateway
                 }
@@ -853,7 +853,8 @@ namespace rpp
             return 0;
 
         saddr a = to_saddr(to);
-        socklen_t len = sizeof(a);
+        // the length of the family, as for bind() and connect(): BSD rejects an IPv4 address with the IPv6 length
+        socklen_t len = static_cast<socklen_t>(a.size());
         rpp::unique_lock lock = rpp::spin_lock(Mtx);
         return handle_txres(::sendto(os_handle_unsafe(), (const char*)buffer, numBytes, 0, &a.sa, len));
     }
@@ -1364,9 +1365,10 @@ namespace rpp
     {
         switch (iocmd)
         {
-            case FIONREAD: return "FIONREAD";
-            case FIONBIO:  return "FIONBIO";
-            case FIOASYNC: return "FIOASYNC";
+            // macOS defines FIONBIO above INT_MAX, so a bare case label narrows
+            case static_cast<int>(FIONREAD): return "FIONREAD";
+            case static_cast<int>(FIONBIO):  return "FIONBIO";
+            case static_cast<int>(FIOASYNC): return "FIOASYNC";
             default: {
                 static char buf[32];
                 snprintf(buf, sizeof(buf), "%d", iocmd);

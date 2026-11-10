@@ -144,7 +144,7 @@
 // explicitly disable for embedded platforms that shouldn't use UTF16 strings
 #  if defined(YOCTO_LINUX) || defined(MIPS) || defined(RASPI)
 #    define RPP_ENABLE_UNICODE 0
-#  elif defined(_MSC_VER) || defined(__ANDROID__) || defined(__linux__)
+#  elif defined(_MSC_VER) || defined(__ANDROID__) || defined(__linux__) || defined(__APPLE__)
 #    define RPP_ENABLE_UNICODE 1
 #  else
 #    define RPP_ENABLE_UNICODE 0

@@ -126,7 +126,7 @@ namespace rpp
             // no pthread_getname_np: the name stays empty
         #else
             char name[64];
-            if (pthread_getname_np(static_cast<pthread_t>(thread_id), name, sizeof(name)) == 0)
+            if (pthread_getname_np((pthread_t)thread_id, name, sizeof(name)) == 0)
             {
                 thread_name = name;
             }
