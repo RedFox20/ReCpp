@@ -6,6 +6,7 @@
 #  include <cstdio> // fprintf
 #elif __APPLE__
 #  include <mach/mach.h>
+#  include <sys/resource.h> // getrusage
 #else // linux and Android
 #  include <unistd.h> // getpagesize
 #  include <sys/time.h> // timeval

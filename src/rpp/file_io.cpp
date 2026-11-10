@@ -22,6 +22,9 @@
     #include <io.h> // _setmode
 #else
     #include <sys/file.h> // flock
+    #include <fcntl.h> // fcntl
+    #include <sys/stat.h> // fstat
+    #include <unistd.h> // ftruncate
 #endif
 
 namespace rpp /* ReCpp */
@@ -597,6 +600,25 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+#if __APPLE__
+    // macOS has no fallocate: reserve the blocks the file misses, then grow the size, as fallocate mode 0 does
+    static int apple_fallocate(int fd, int64 size) noexcept
+    {
+        struct stat st {};
+        if (fstat(fd, &st) != 0)
+            return -1;
+        // a sparse file has fewer blocks than its length, so the length alone proves no reservation
+        const int64 allocated = int64(st.st_blocks) * 512;
+        if (size > allocated)
+        {
+            fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, size - allocated, 0 };
+            if (fcntl(fd, F_PREALLOCATE, &store) == -1)
+                return -1;
+        }
+        return size > st.st_size ? ftruncate(fd, size) : 0; // fallocate mode 0 never shrinks a file
+    }
+#endif
+
     bool file::preallocate(int64 preallocSize, int64 seekPos, int seekMode) noexcept
     {
         if (!Handle || preallocSize <= 0) return false;
@@ -611,6 +633,8 @@ namespace rpp /* ReCpp */
             return false; // invalid file descriptor
     #if __EMSCRIPTEN__ // posix_fallocate only, the same as fallocate mode 0
         if (posix_fallocate(fd, 0, preallocSize) != 0)
+    #elif __APPLE__
+        if (apple_fallocate(fd, preallocSize) != 0)
     #else
         if (fallocate(fd, 0, 0, preallocSize) != 0)
     #endif

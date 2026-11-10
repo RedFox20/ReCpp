@@ -8,7 +8,7 @@
 #if _MSC_VER
 #  include <stdlib.h> // _byteswap_ulong, _byteswap_uint64
 #  include <cstring> // memcpy
-#else
+#elif !__APPLE__ // the __builtin_bswap intrinsics need no header on Apple
 #  include <byteswap.h> // __builtin_bswap32, __builtin_bswap64
 #endif
 
