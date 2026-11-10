@@ -601,18 +601,21 @@ namespace rpp /* ReCpp */
     }
 
 #if __APPLE__
-    // macOS has no fallocate: reserve the bytes past the end, then grow the size, as fallocate mode 0 does
+    // macOS has no fallocate: reserve the blocks the file misses, then grow the size, as fallocate mode 0 does
     static int apple_fallocate(int fd, int64 size) noexcept
     {
         struct stat st {};
         if (fstat(fd, &st) != 0)
             return -1;
-        if (size <= st.st_size)
-            return 0; // fallocate mode 0 never shrinks a file
-        fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, size - st.st_size, 0 };
-        if (fcntl(fd, F_PREALLOCATE, &store) == -1)
-            return -1;
-        return ftruncate(fd, size);
+        // a sparse file has fewer blocks than its length, so the length alone proves no reservation
+        const int64 allocated = int64(st.st_blocks) * 512;
+        if (size > allocated)
+        {
+            fstore_t store { F_ALLOCATEALL, F_PEOFPOSMODE, 0, size - allocated, 0 };
+            if (fcntl(fd, F_PREALLOCATE, &store) == -1)
+                return -1;
+        }
+        return size > st.st_size ? ftruncate(fd, size) : 0; // fallocate mode 0 never shrinks a file
     }
 #endif
 
