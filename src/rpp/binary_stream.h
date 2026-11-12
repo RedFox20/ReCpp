@@ -348,7 +348,8 @@ namespace rpp
         void unsafe_buffer_decode(rpp::uint32& dst) noexcept;
         void unsafe_buffer_decode(rpp::uint64& dst) noexcept;
         FINLINE void unsafe_buffer_decode(rpp::int16& dst) noexcept { unsafe_buffer_decode((rpp::uint16&)dst); }
-        FINLINE void unsafe_buffer_decode(rpp::int32& dst) noexcept { unsafe_buffer_decode((rpp::uint32&)dst); }
+        // On Cortex-M, an int is not the signed type of an unsigned long, so a reference cast breaks strict aliasing
+        FINLINE void unsafe_buffer_decode(rpp::int32& dst) noexcept { rpp::uint32 u; unsafe_buffer_decode(u); dst = (rpp::int32)u; }
         FINLINE void unsafe_buffer_decode(rpp::int64& dst) noexcept { unsafe_buffer_decode((rpp::uint64&)dst); }
         void unsafe_buffer_decode(float& dst) noexcept;
         void unsafe_buffer_decode(double& dst) noexcept;
@@ -526,6 +527,10 @@ namespace rpp
     inline binary_stream& operator<<(binary_stream& w, rpp::uint16 v) noexcept { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, rpp::int32 v)  noexcept { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, rpp::uint32 v) noexcept { return w.write(v); }
+#if RPP_CORTEX_M_ARCH // GCC makes rpp::uint32 an unsigned long, so unsigned int needs its own overload
+    template<std::same_as<unsigned int> U> requires (!std::same_as<U, rpp::uint32>)
+    inline binary_stream& operator<<(binary_stream& w, U v) noexcept { return w.write((rpp::uint32)v); }
+#endif
     inline binary_stream& operator<<(binary_stream& w, rpp::int64 v)  noexcept { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, rpp::uint64 v) noexcept { return w.write(v); }
     inline binary_stream& operator<<(binary_stream& w, float v)  noexcept { return w.write(v); }
@@ -548,6 +553,10 @@ namespace rpp
     inline binary_stream& operator>>(binary_stream& r, rpp::uint16& v) noexcept { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, rpp::int32& v)  noexcept { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, rpp::uint32& v) noexcept { r.read(v); return r; }
+#if RPP_CORTEX_M_ARCH
+    template<std::same_as<unsigned int> U> requires (!std::same_as<U, rpp::uint32>)
+    inline binary_stream& operator>>(binary_stream& r, U& v) noexcept { rpp::uint32 u = 0; r.read(u); v = u; return r; }
+#endif
     inline binary_stream& operator>>(binary_stream& r, rpp::int64& v)  noexcept { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, rpp::uint64& v) noexcept { r.read(v); return r; }
     inline binary_stream& operator>>(binary_stream& r, float& v)  noexcept { r.read(v); return r; }

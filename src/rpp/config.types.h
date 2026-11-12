@@ -36,10 +36,14 @@ namespace rpp
     #else
         using int32  = long;
     #endif
-    #if _MSC_VER
-        using uint32 = unsigned int;
-    #else // <cstdint> takes this builtin too, and arm-none-eabi makes it unsigned long, not unsigned int
+    // Cortex-M newlib makes std::uint32_t an unsigned long. config.h can come after this header,
+    // so test the inputs from which it derives RPP_CORTEX_M_ARCH.
+    #if RPP_CORTEX_M_ARCH || RPP_STM32_HAL
         using uint32 = __UINT32_TYPE__;
+    #elif RPP_INT_SIZE == 4
+        using uint32 = unsigned int;
+    #else
+        using uint32 = unsigned long;
     #endif
 
         using int64  = long long;

@@ -9,8 +9,7 @@
 
 namespace rpp
 {
-    // config.types.h has no include, so the aliases are checked here. A std::atomic_uint32_t needs an rpp::uint32 to CAS.
-    // rpp::int32 stays int, because the int overloads, such as Duration::from_millis(int32), take an int literal.
+    // config.types.h has no include, so the aliases are checked here. A std::atomic_uint32_t needs an rpp::uint32 to CAS.    // rpp::int32 stays int, because the int overloads, such as Duration::from_millis(int32), take an int literal.
     static_assert(std::is_same_v<rpp::uint32, std::uint32_t>, "rpp::uint32 must be std::uint32_t");
     static_assert(sizeof(rpp::int32) == 4, "rpp::int32 must be 32 bits");
     static_assert(sizeof(rpp::int16) == 2 && sizeof(rpp::uint16) == 2, "rpp::int16 and rpp::uint16 must be 16 bits");
