@@ -2586,28 +2586,28 @@ Buffered binary read/write stream with abstract source interface.
 |-------|-------------|
 | [`stream_source`](src/rpp/binary_stream.h#L28) | Abstract stream interface (implement for custom sources) |
 | [`binary_stream`](src/rpp/binary_stream.h#L130) | Buffered binary stream with typed read/write |
-| [`file_writer`](src/rpp/binary_stream.h#L653) | File-backed stream_source |
-| [`binary_buffer`](src/rpp/binary_stream.h#L579) | Binary stream which does not flush data |
-| [`socket_writer`](src/rpp/binary_stream.h#L594) | Binary socket writer for UDP/TCP |
-| [`socket_reader`](src/rpp/binary_stream.h#L620) | Binary socket reader for UDP/TCP |
-| [`file_reader`](src/rpp/binary_stream.h#L720) | File-backed binary stream reader |
+| [`file_writer`](src/rpp/binary_stream.h#L671) | File-backed stream_source |
+| [`binary_buffer`](src/rpp/binary_stream.h#L597) | Binary stream which does not flush data |
+| [`socket_writer`](src/rpp/binary_stream.h#L612) | Binary socket writer for UDP/TCP |
+| [`socket_reader`](src/rpp/binary_stream.h#L638) | Binary socket reader for UDP/TCP |
+| [`file_reader`](src/rpp/binary_stream.h#L738) | File-backed binary stream reader |
 
 ### binary_stream Methods
 
 | Method | Description |
 |--------|-------------|
 | [`write(const void* data, int numBytes)`](src/rpp/binary_stream.h#L221) | Write raw bytes |
-| [`write<T>(const T& value)`](src/rpp/binary_stream.h#L263) | Write a typed value |
-| [`write(strview s)`](src/rpp/binary_stream.h#L288) | Write a string |
-| [`read(void* dst, int max)`](src/rpp/binary_stream.h#L358) | Read raw bytes |
-| [`read<T>()`](src/rpp/binary_stream.h#L390) | Read a typed value |
-| [`write_byte()`](src/rpp/binary_stream.h#L263) / [`write_int16()`](src/rpp/binary_stream.h#L265) / [`write_int32()`](src/rpp/binary_stream.h#L269) / [`write_int64()`](src/rpp/binary_stream.h#L273) | Write specific integer sizes |
-| [`write_float()`](src/rpp/binary_stream.h#L277) / [`write_double()`](src/rpp/binary_stream.h#L279) | Write floating point |
-| [`read_byte()`](src/rpp/binary_stream.h#L395) / [`read_int16()`](src/rpp/binary_stream.h#L397) / [`read_int32()`](src/rpp/binary_stream.h#L401) / [`read_int64()`](src/rpp/binary_stream.h#L405) | Read specific integer sizes |
-| [`read_float()`](src/rpp/binary_stream.h#L409) / [`read_double()`](src/rpp/binary_stream.h#L411) | Read floating point |
-| [`read_string()`](src/rpp/binary_stream.h#L477) | Read a length-prefixed string |
-| [`peek(void* buf, int numBytes)`](src/rpp/binary_stream.h#L370) | Peek without consuming |
-| [`skip(int numBytes)`](src/rpp/binary_stream.h#L384) | Skip bytes |
+| [`write<T>(const T& value)`](src/rpp/binary_stream.h#L271) | Write a typed value |
+| [`write(strview s)`](src/rpp/binary_stream.h#L296) | Write a string |
+| [`read(void* dst, int max)`](src/rpp/binary_stream.h#L376) | Read raw bytes |
+| [`read<T>()`](src/rpp/binary_stream.h#L408) | Read a typed value |
+| [`write_byte()`](src/rpp/binary_stream.h#L271) / [`write_int16()`](src/rpp/binary_stream.h#L273) / [`write_int32()`](src/rpp/binary_stream.h#L277) / [`write_int64()`](src/rpp/binary_stream.h#L281) | Write specific integer sizes |
+| [`write_float()`](src/rpp/binary_stream.h#L285) / [`write_double()`](src/rpp/binary_stream.h#L287) | Write floating point |
+| [`read_byte()`](src/rpp/binary_stream.h#L413) / [`read_int16()`](src/rpp/binary_stream.h#L415) / [`read_int32()`](src/rpp/binary_stream.h#L419) / [`read_int64()`](src/rpp/binary_stream.h#L423) | Read specific integer sizes |
+| [`read_float()`](src/rpp/binary_stream.h#L427) / [`read_double()`](src/rpp/binary_stream.h#L429) | Read floating point |
+| [`read_string()`](src/rpp/binary_stream.h#L495) | Read a length-prefixed string |
+| [`peek(void* buf, int numBytes)`](src/rpp/binary_stream.h#L388) | Peek without consuming |
+| [`skip(int numBytes)`](src/rpp/binary_stream.h#L402) | Skip bytes |
 | [`flush()`](src/rpp/binary_stream.h#L207) | Flush write buffer |
 | [`good()`](src/rpp/binary_stream.h#L195) | True if stream is valid |
 | [`size()`](src/rpp/binary_stream.h#L172) / [`capacity()`](src/rpp/binary_stream.h#L173) | Buffer metrics |
@@ -5100,17 +5100,17 @@ C++20 concepts, and the detection idiom for a caller which brings its own expres
 
 | Trait | Description |
 |-------|-------------|
-| [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L29) | Detection idiom, for an alias the caller writes |
-| [`has_to_string<T>`](src/rpp/type_traits.h#L45) | True if `to_string(T)` is valid |
-| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L48) | True if `T::to_string()` exists |
-| [`has_std_to_string<T>`](src/rpp/type_traits.h#L41) | True if `std::to_string(T)` is valid |
-| [`has_get_memb<T>`](src/rpp/type_traits.h#L51) | True if `T::get()` exists |
-| [`has_set_memb<T, U>`](src/rpp/type_traits.h#L54) | True if `T::set(U)` exists |
-| [`has_contains_memb<C, T>`](src/rpp/type_traits.h#L57) | True if `C::contains(T)` exists |
-| [`is_iterable<T>`](src/rpp/type_traits.h#L63) | True if T supports range-for |
-| [`is_container<T>`](src/rpp/type_traits.h#L69) | True if T is a container with `size()` |
-| [`is_stringlike<T>`](src/rpp/type_traits.h#L66) | True if T is string-like |
-| [`Operation`](src/rpp/type_traits.h#L29) | The expression alias a caller passes to `is_detected` |
+| [`is_detected<Op, Args...>`](src/rpp/type_traits.h#L27) | Detection idiom, for an alias the caller writes |
+| [`has_to_string<T>`](src/rpp/type_traits.h#L38) | True if `to_string(T)` is valid |
+| [`has_to_string_memb<T>`](src/rpp/type_traits.h#L41) | True if `T::to_string()` exists |
+| [`has_std_to_string<T>`](src/rpp/type_traits.h#L34) | True if `std::to_string(T)` is valid |
+| [`has_get_memb<T>`](src/rpp/type_traits.h#L44) | True if `T::get()` exists |
+| [`has_set_memb<T, U>`](src/rpp/type_traits.h#L47) | True if `T::set(U)` exists |
+| [`has_contains_memb<C, T>`](src/rpp/type_traits.h#L50) | True if `C::contains(T)` exists |
+| [`is_iterable<T>`](src/rpp/type_traits.h#L56) | True if T supports range-for |
+| [`is_container<T>`](src/rpp/type_traits.h#L62) | True if T is a container with `size()` |
+| [`is_stringlike<T>`](src/rpp/type_traits.h#L59) | True if T is string-like |
+| [`Operation`](src/rpp/type_traits.h#L26) | The expression alias a caller passes to `is_detected` |
 
 ---
 

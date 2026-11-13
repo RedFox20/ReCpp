@@ -62,6 +62,30 @@ TestImpl(test_binary_stream)
         AssertThat(buf.available(), 0);
     }
 
+    // On Cortex-M, unsigned int is not rpp::uint32. Each 4-byte integer must use the byte-wise path at any offset
+    TestCase(other_32bit_integers)
+    {
+        rpp::binary_buffer buf;
+        buf.write_byte(0xAA); // the next value starts at an unaligned offset
+        buf.write(char32_t(0x01020304));
+        buf.write(5u);
+        buf << 6u;
+        AssertThat(buf.available(), 13);
+
+        const rpp::byte* p = (const rpp::byte*)buf.data();
+        AssertThat(p[1], 0x04); // little-endian
+        AssertThat(p[4], 0x01);
+
+        AssertThat(buf.read_byte(), 0xAA);
+        AssertThat((rpp::uint32)buf.peek<char32_t>(), 0x01020304u);
+        AssertThat((rpp::uint32)buf.read<char32_t>(), 0x01020304u);
+        AssertThat(buf.read<unsigned>(), 5u);
+        unsigned u = 0;
+        buf >> u;
+        AssertThat(u, 6u);
+        AssertThat(buf.available(), 0);
+    }
+
     TestCase(strings)
     {
         rpp::binary_buffer buf;

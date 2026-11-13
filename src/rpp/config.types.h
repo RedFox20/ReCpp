@@ -49,6 +49,14 @@ namespace rpp
         using int64  = long long;
         using uint64 = unsigned long long;
 
+        static_assert(sizeof(int16) == 2 && sizeof(uint16) == 2, "rpp::int16 and rpp::uint16 must be 16 bits");
+        static_assert(sizeof(int32) == 4 && sizeof(uint32) == 4, "rpp::int32 and rpp::uint32 must be 32 bits");
+        static_assert(sizeof(int64) == 8 && sizeof(uint64) == 8, "rpp::int64 and rpp::uint64 must be 64 bits");
+    #ifdef __UINT32_TYPE__ // <cstdint> takes std::uint32_t from this builtin. MSVC has no builtin, and uses unsigned int
+        // A std::atomic_uint32_t needs an rpp::uint32 to CAS. rpp::int32 stays int, so Duration::from_millis(int32) takes an int literal
+        static_assert(__is_same(uint32, __UINT32_TYPE__), "rpp::uint32 must be std::uint32_t. Add this target to the __UINT32_TYPE__ condition above");
+    #endif
+
     #endif // RPP_BASIC_INTEGER_TYPEDEFS
 
     /// wraps a log argument for the formatting macros in <rpp/debugging.h>, returns it unchanged

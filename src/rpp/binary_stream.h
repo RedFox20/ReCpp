@@ -250,9 +250,17 @@ namespace rpp
         template<class T>
         void unsafe_write(const T& data) noexcept
         {
-            *reinterpret_cast<T*>(Ptr + WritePos) = data;
-            WritePos += (int)sizeof(T);
-            End      += (int)sizeof(T);
+            // On Cortex-M, unsigned int is not rpp::uint32, so it takes the unaligned-safe overload here
+            if constexpr (std::is_integral_v<T> && sizeof(T) == 4)
+            {
+                unsafe_write((rpp::uint32)data);
+            }
+            else
+            {
+                *reinterpret_cast<T*>(Ptr + WritePos) = data;
+                WritePos += (int)sizeof(T);
+                End      += (int)sizeof(T);
+            }
         }
 
     public:
@@ -341,7 +349,17 @@ namespace rpp
         template<class T>
         void unsafe_buffer_decode(T& dst) noexcept
         {
-            dst = *reinterpret_cast<T*>(Ptr + ReadPos);
+            // On Cortex-M, unsigned int is not rpp::uint32, so it takes the unaligned-safe overload here
+            if constexpr (std::is_integral_v<T> && sizeof(T) == 4)
+            {
+                rpp::uint32 u;
+                unsafe_buffer_decode(u);
+                dst = (T)u;
+            }
+            else
+            {
+                dst = *reinterpret_cast<T*>(Ptr + ReadPos);
+            }
         }
 
         void unsafe_buffer_decode(rpp::uint16& dst) noexcept;
