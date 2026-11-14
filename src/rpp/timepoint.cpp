@@ -223,32 +223,68 @@ namespace rpp
         FINLINE static int get_tick() noexcept;
         FINLINE static int get_tick_rate_hz() noexcept;
 
+        /**
+         * @returns The time at this SysTick state. The count to 0 sets PENDSTSET, so VAL 0 starts the next tick.
+         *          Still one tick early in an ISR that preempts the SysTick handler before it stores the tick.
+         */
+        static constexpr int64 systick_time_ns(int64 tick, bool pending, int64 st,
+                                               int64 cycles_per_tick, int64 ns_per_tick) noexcept
+        {
+            if (pending)
+                ++tick;
+
+            // SysTick counts down
+            int64 elapsed = st == 0 ? 0 : cycles_per_tick - st;
+            return tick * ns_per_tick + elapsed * ns_per_tick / cycles_per_tick;
+        }
+
+        /** Across a tick boundary that an ISR sees with SysTick pending, the time moves forward one cycle per step. */
+        static constexpr bool systick_time_moves_forward() noexcept
+        {
+            constexpr int64 cycles = 1000;
+            constexpr int64 ns = 100'000'000; // 10 Hz tick
+            const int64 seen[] = {
+                systick_time_ns(5, false, 1, cycles, ns),   // the last cycle of tick 5
+                systick_time_ns(5, true, 0, cycles, ns),    // the count to 0, before the reload
+                systick_time_ns(5, true, 999, cycles, ns),  // reloaded, the handler did not run
+                systick_time_ns(6, false, 998, cycles, ns), // the handler ran
+            };
+            for (int i = 1; i < 4; ++i)
+                if (seen[i] - seen[i - 1] != ns / cycles)
+                    return false;
+            // A slow SysTick clock lets the handler run while VAL is still 0
+            return systick_time_ns(6, false, 0, cycles, ns) == systick_time_ns(5, true, 0, cycles, ns);
+        }
+        static_assert(systick_time_moves_forward(), "a pending SysTick moves the time back one tick");
+
+        FINLINE static bool systick_pending() noexcept
+        {
+            return (SCB->ICSR & SCB_ICSR_PENDSTSET_Msk) != 0;
+        }
+
         /** @brief Get time in nanoseconds. This depends on get_tick and get_tick_rate_hz. */
         static int64 cortex_m_get_time_ns() noexcept
         {
             int tick;
             int st;
+            bool pending;
 
+            // Not COUNTFLAG: a read of SysTick->CTRL clears it, and the HAL reads CTRL too
             do
             {
                 tick = get_tick();
+                pending = systick_pending();
                 st = SysTick->VAL;
                 // Clear the instruction pipeline
                 asm volatile("nop");
                 asm volatile("nop");
-            } while (tick != get_tick()); // Ensure no rollover
+            } // Ensure no rollover, and no count to 0 between the two pending reads
+            while (tick != get_tick() || pending != systick_pending());
 
             int ticks_per_second = get_tick_rate_hz();
             int ns_per_tick = 1'000'000'000 / ticks_per_second;
             int64 cycles_per_tick = SysTick->LOAD + 1;
-
-            // Current tick count times ns_per_tick
-            int64 tick_time = int64{tick} * ns_per_tick;
-            // How far along we are into the next tick in nanoseconds
-            // NOTE: SysTick counts down, therefore we use (cycles_per_tick - st)
-            int64 tick_fraction = int64{cycles_per_tick - st} * ns_per_tick / cycles_per_tick;
-
-            return tick_time + tick_fraction;
+            return systick_time_ns(tick, pending, st, cycles_per_tick, ns_per_tick);
         }
 
         /** @brief Wait for a specified duration in nanoseconds. */
