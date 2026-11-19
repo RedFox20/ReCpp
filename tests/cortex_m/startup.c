@@ -31,7 +31,8 @@ __attribute__((naked)) void* __aeabi_read_tp(void)
 // so the heap grows to a limit from the linker script instead
 void* _sbrk(ptrdiff_t increment)
 {
-    extern char end, __heap_end;
+    extern char end;
+    extern char __heap_end;
     static char* heap_top = &end;
     if (heap_top + increment > &__heap_end)
     {
