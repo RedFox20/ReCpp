@@ -112,6 +112,7 @@ export namespace rpp {
     using rpp::readLEU32;
     using rpp::readLEU64;
     using rpp::bit_array;
+    using rpp::bitset;
 }
 // GENERATED EXPORTS END
 

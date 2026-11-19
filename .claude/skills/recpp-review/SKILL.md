@@ -453,12 +453,13 @@ A heavy std header slows the build of every file which includes it. Each `std::s
 instantiates a large template, and the binary grows with every call site.
 
 - Never include `<algorithm>`, `<functional>`, `<chrono>`, `<regex>`, `<future>`, `<filesystem>`,
-  `<random>`, `<format>`, `<iomanip>`, `<fstream>`, `<locale>`, `<sstream>`, `<ranges>` or `<iostream>`.
+  `<random>`, `<format>`, `<iomanip>`, `<fstream>`, `<locale>`, `<sstream>`, `<ranges>`, `<bitset>` or `<iostream>`.
   On g++ 13 each one adds 28k to 83k preprocessed lines. `<cstring>` adds 600.
 - Never call `std::sort`, `std::stable_sort` or `std::ranges::sort`. Use `rpp::sort` or
   `rpp::insertion_sort` from `sort.h`.
 - Use the ReCpp form: `rpp::min` and `rpp::max` from `minmax.h`, and `rpp::any_of`, `rpp::find_if`
   and `rpp::contains` from `collections.h`. Use `rpp::delegate` for a callable and `rpp::TimePoint` for a clock.
+  Use `rpp::bitset<N>` from `bitutils.h` in place of `std::bitset<N>`.
 - A test which needs one more helper writes it in the test file. A loop replaces `std::fill`.
 - A file may keep a listed header only to time `rpp::TimePoint` against a second clock, or to test a
   named compiler bug. A trailing comment on the include says which.
@@ -473,6 +474,8 @@ the result is right.
 - Never add an allocation or a copy which the code did not make before. Two callers which
   share a read loop share a helper which takes the growth strategy, as `read_until_eof()`
   does for `read_all()` and `read_text()`. Never build a `std::string` and copy it again.
+- A bit count known at compile time uses `rpp::bitset<N>`, which keeps the bits inline. `rpp::bit_array`
+  allocates, so use it only for a bit count known at run time.
 - A cleanup which makes a path slower, or hides what it does, is a defect. Keep the explicit
   code, as in `vec.cpp` and the `binary_stream` byte writes.
 - Order a condition cheap first. Test a plain flag before a thread id, a system call or a

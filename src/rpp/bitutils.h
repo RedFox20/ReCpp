@@ -1,4 +1,5 @@
 #pragma once
+#include "config.h" // RPP_BUILTIN_MEMSET
 #include <cstdint> // uint8_t
 
 namespace rpp
@@ -116,6 +117,86 @@ namespace rpp
          * @return Number of ! BYTES ! filled in dest
          */
         uint32_t copyNegatedBits(uint32_t startBit, uint8_t* dest, uint32_t numBits) const noexcept;
+    };
+
+    ////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @brief Fixed-size array of bits in inline storage, a light port of std::bitset<N>.
+     *        The bytes use the bit_array layout, and the bitset ignores an index past the end.
+     */
+    template<uint32_t NBits>
+    class bitset
+    {
+        static_assert(NBits > 0, "rpp::bitset needs at least one bit");
+        static constexpr uint32_t num_bytes = (NBits + 7) / 8;
+        uint8_t bytes[num_bytes] = {};
+    public:
+
+        /** @brief Creates a bitset with every bit clear */
+        bitset() noexcept = default;
+
+        /** @brief Copies the low NBits bits of an integer, as std::bitset<N>(unsigned long long) does */
+        constexpr explicit bitset(uint64_t bits) noexcept
+        {
+            constexpr uint32_t count = num_bytes < 8 ? num_bytes : 8;
+            for (uint32_t i = 0; i < count; ++i)
+                bytes[i] = uint8_t(bits >> (i * 8));
+            if constexpr (NBits % 8 != 0)
+                bytes[num_bytes - 1] &= uint8_t((1u << (NBits % 8)) - 1);
+        }
+
+        /** @return Number of bits in this bitset */
+        constexpr uint32_t size_bits() const noexcept { return NBits; }
+        /** @return Number of bytes in the inline buffer */
+        constexpr uint32_t size_bytes() const noexcept { return num_bytes; }
+        /** @return The inline buffer, with the least significant bit first in each byte */
+        const uint8_t* get_buffer() const noexcept { return bytes; }
+
+        /** @brief Clears every bit */
+        void reset() noexcept { RPP_BUILTIN_MEMSET(bytes, 0, num_bytes); }
+
+        // FINLINE on each writer stops a false -Warray-bounds when gcc 13 merges the bodies of two sizes
+        /** @brief Sets the bit, or does nothing when the bit is past the end */
+        FINLINE void set(uint32_t bit) noexcept
+        {
+            if (bit < NBits)
+                bytes[bit / 8] |= uint8_t(1u << (bit % 8));
+        }
+
+        /** @brief Sets the bit to the value, or does nothing when the bit is past the end */
+        void set(uint32_t bit, bool value) noexcept
+        {
+            if (value)
+                set(bit);
+            else
+                unset(bit);
+        }
+
+        /** @brief Clears the bit, or does nothing when the bit is past the end */
+        FINLINE void unset(uint32_t bit) noexcept
+        {
+            if (bit < NBits)
+                bytes[bit / 8] &= uint8_t(~(1u << (bit % 8)));
+        }
+
+        /** @return true if the bit is set, false if it is clear or past the end */
+        bool is_set(uint32_t bit) const noexcept
+        {
+            return bit < NBits && (bytes[bit / 8] & (1u << (bit % 8))) != 0;
+        }
+
+        /** @return true if this call set the bit, false if the bit was set already or is past the end */
+        FINLINE bool check_and_set(uint32_t bit) noexcept
+        {
+            if (bit >= NBits)
+                return false;
+            const uint8_t mask = uint8_t(1u << (bit % 8));
+            if ((bytes[bit / 8] & mask) != 0)
+                return false;
+            bytes[bit / 8] |= mask;
+            return true;
+        }
     };
 
     ////////////////////////////////////////////////////////////////////////////////
