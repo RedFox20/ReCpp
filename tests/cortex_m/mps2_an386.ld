@@ -54,8 +54,9 @@ SECTIONS
         *(COMMON)
         __bss_end__ = .;
     } > RAM
-    /* the rdimon crt0 asks QEMU for the heap and the stack, and malloc starts at end */
+    /* the heap of _sbrk in startup.c, below the main stack */
     end = .;
     __end__ = .;
     __stack = ORIGIN(RAM) + LENGTH(RAM);
+    __heap_end = __stack - 64K;
 }
