@@ -14,6 +14,7 @@
 #include "predicates.h" // rpp::IsPredicate
 #include "debugging.h" // LogError
 #include "mutex.h" // rpp::cvar
+#include "atomic.h" // rpp::atomic_uint32
 #include <atomic>
 #include <type_traits> // std::is_same_v
 
@@ -58,8 +59,8 @@ namespace rpp
     {
         static constexpr rpp::uint32 WAITER = 1u << 16; // the high half of state counts the waiters
         static constexpr rpp::uint32 WAKES = WAITER - 1; // the low half counts the wakes which no waiter took yet
-        std::atomic<rpp::uint32> seq { 0 }; // the word a waiter sleeps on, and a notify changes
-        std::atomic<rpp::uint32> state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
+        rpp::atomic_uint32 seq { 0 }; // the word a waiter sleeps on, and a notify changes
+        rpp::atomic_uint32 state { 0 }; // lets a notify skip the wake syscall when every waiter has a wake
 
         // only the exact type, because another lock or a derived mutex can add its own work to lock() and unlock()
         template<class Lock>

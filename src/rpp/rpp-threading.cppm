@@ -85,6 +85,12 @@ export namespace rpp {
     using rpp::run_tasks;
     using rpp::seqlock_atomic;
     using rpp::atomic;
+    using rpp::atomic_int16;
+    using rpp::atomic_uint16;
+    using rpp::atomic_int32;
+    using rpp::atomic_uint32;
+    using rpp::atomic_int64;
+    using rpp::atomic_uint64;
 #if !RPP_BARE_METAL
     using rpp::set_this_thread_name;
     using rpp::get_this_thread_name;

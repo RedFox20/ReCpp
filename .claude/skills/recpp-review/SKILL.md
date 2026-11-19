@@ -120,7 +120,7 @@ Targets: Windows MSVC 2019 to 2026, Android NDK r27 to r29, Yocto AArch64
 clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 `config.h` also carries `RPP_FREERTOS`, `RPP_BARE_METAL`, and `RPP_CORTEX_M_ARCH`.
 CI runs a Cortex-M4 on FreeRTOS under QEMU. There, `uint32_t` is an `unsigned long`, which is
-never `rpp::uint32`. So a word which a CAS updates through an `rpp::uint32` is a `std::atomic<rpp::uint32>`.
+never `rpp::uint32`. So a word which a CAS updates through an `rpp::uint32` is an `rpp::atomic_uint32` from `atomic.h`.
 
 - A platform API needs a guard from `config.h`: `_MSC_VER`, `RPP_MSVC_WIN`,
   `RPP_ANDROID`, `__APPLE__`, `YOCTO_LINUX`, `MIPS`, `RASPI`, `RPP_ENABLE_UNICODE`,

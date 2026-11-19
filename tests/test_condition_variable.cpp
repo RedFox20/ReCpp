@@ -1,3 +1,4 @@
+#include <rpp/atomic.h> // rpp::atomic_uint32
 #include <rpp/condition_variable.h>
 #include <rpp/semaphore.h>
 #include <rpp/timer.h>
@@ -262,7 +263,7 @@ TestImpl(test_condition_variable)
 
     TestCase(cvar_wait_returns_at_once_when_the_word_already_changed)
     {
-        std::atomic_uint32_t word { 1 };
+        rpp::atomic_uint32 word { 1 };
         rpp::cvar::wake_one(&word); // no thread sleeps on it
         rpp::cvar::wake_all(&word);
         rpp::Timer t;
@@ -275,7 +276,7 @@ TestImpl(test_condition_variable)
 
     TestCase(cvar_wait_for_returns_true_when_another_thread_changes_the_word)
     {
-        std::atomic_uint32_t word { 0 };
+        rpp::atomic_uint32 word { 0 };
         std::thread changer([&] { rpp::sleep_ms(3); word.store(1); rpp::cvar::wake_all(&word); });
         rpp::Timer t;
         AssertTrue(rpp::cvar::wait_for(&word, 0, rpp::seconds(1)));
@@ -312,7 +313,7 @@ TestImpl(test_condition_variable)
     template<class T> static rpp::uint32 word_of(const T& sync)
     {
         static_assert(std::is_standard_layout_v<T>);
-        return reinterpret_cast<const std::atomic_uint32_t*>(&sync)->load();
+        return reinterpret_cast<const rpp::atomic_uint32*>(&sync)->load();
     }
 
     // a waiter counts itself under the lock, so this thread sees the count only after the waiter released the lock to wait

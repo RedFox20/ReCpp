@@ -1,3 +1,4 @@
+#include <rpp/atomic.h> // rpp::atomic_uint32
 #include <rpp/semaphore.h>
 #include <rpp/coroutines.h>
 #include <rpp/async.h>
@@ -356,7 +357,7 @@ TestImpl(test_semaphore)
                 auto lock = sem.spin_lock();
                 started.notify();
                 (void)sem.wait(lock, rpp::seconds(1)); // a hang guard, the notify below releases it
-                word = reinterpret_cast<const std::atomic_uint32_t*>(&sem.mutex())->load(); // the mutex word comes first
+                word = reinterpret_cast<const rpp::atomic_uint32*>(&sem.mutex())->load(); // the mutex word comes first
             });
             (void)started.wait(rpp::seconds(1)); // a hang guard, the waiter releases it
             rpp::sleep_ms(5); // lets the waiter fall asleep, so it relocks after the notify released the mutex

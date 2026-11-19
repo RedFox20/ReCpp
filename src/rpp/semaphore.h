@@ -2,6 +2,7 @@
 #include "condition_variable.h"
 #include "debugging.h"
 #include "config.types.h" // rpp::__wrap
+#include "atomic.h" // rpp::atomic_uint32
 #include "mutex.h"
 #include "timepoint.h" // rpp::Duration
 #include "predicates.h" // rpp::IsCallable
@@ -404,7 +405,7 @@ namespace rpp
         {
             static constexpr rpp::uint32 SET = 1;
             static constexpr rpp::uint32 WAITER = 2;
-            std::atomic<rpp::uint32> state { 0 };
+            rpp::atomic_uint32 state { 0 };
 
             bool is_set() const noexcept { return (state.load(std::memory_order_acquire) & SET) != 0; }
 

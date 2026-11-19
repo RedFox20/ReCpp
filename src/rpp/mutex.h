@@ -5,6 +5,7 @@
 #include "timer.h" // rpp:Timer
 #include "threads.h" // rpp::yield
 #include "timepoint.h" // rpp::Duration
+#include "atomic.h" // rpp::atomic_uint32
 #include <atomic>
 #include <initializer_list> // synchronize_guard::operator=
 #include <utility> // std::swap
@@ -44,7 +45,7 @@ namespace rpp
         static constexpr rpp::uint32 UNLOCKED = 0;
         static constexpr rpp::uint32 LOCKED = 1;
         static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
-        std::atomic<rpp::uint32> word { UNLOCKED };
+        rpp::atomic_uint32 word { UNLOCKED };
 
         // try_lock() without its TSAN annotation, because lock() annotates once, and a nested one counts the lock twice
         bool try_take() noexcept
