@@ -19,9 +19,10 @@
 #define configCHECK_FOR_STACK_OVERFLOW       2
 #define configUSE_MALLOC_FAILED_HOOK         1
 
-// no configPRIO_BITS: the port asserts it against the hardware, and QEMU implements every priority bit
+// QEMU implements every priority bit. The port then asserts a clear sub-priority bit in the max syscall
+// priority, and it would assert a configPRIO_BITS against the hardware
 #define configKERNEL_INTERRUPT_PRIORITY      255
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY 191
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY 160
 
 #define INCLUDE_vTaskDelay                   1
 #define INCLUDE_vTaskDelete                  1
