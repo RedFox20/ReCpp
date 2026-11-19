@@ -44,7 +44,7 @@ namespace rpp
         static constexpr rpp::uint32 UNLOCKED = 0;
         static constexpr rpp::uint32 LOCKED = 1;
         static constexpr rpp::uint32 CONTENDED = 2; // locked, and a thread can sleep until the unlock
-        std::atomic_uint32_t word { UNLOCKED };
+        std::atomic<rpp::uint32> word { UNLOCKED };
 
         // try_lock() without its TSAN annotation, because lock() annotates once, and a nested one counts the lock twice
         bool try_take() noexcept

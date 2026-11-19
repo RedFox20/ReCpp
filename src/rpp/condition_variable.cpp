@@ -31,7 +31,7 @@ namespace rpp::cvar
 {
     static FINLINE rpp::uint32 load_word(const void* addr) noexcept
     {
-        return static_cast<const std::atomic_uint32_t*>(addr)->load(std::memory_order_relaxed);
+        return static_cast<const std::atomic<rpp::uint32>*>(addr)->load(std::memory_order_relaxed);
     }
 
     // os_wait() sleeps once while the word equals `expected`, and a null timeout waits forever.

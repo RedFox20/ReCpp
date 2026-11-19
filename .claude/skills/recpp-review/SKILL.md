@@ -119,6 +119,8 @@ Targets: Windows MSVC 2019 to 2026, Android NDK r27 to r29, Yocto AArch64
 (i.MX8M+, Xilinx Zynq UltraScale+, Ambarella CV25), Ubuntu g++ 13 to 15 and
 clang++ 18 to 21, iOS and macOS Apple Clang, Raspberry Pi, MIPSEL g++ 11.
 `config.h` also carries `RPP_FREERTOS`, `RPP_BARE_METAL`, and `RPP_CORTEX_M_ARCH`.
+CI runs a Cortex-M4 on FreeRTOS under QEMU. There, `uint32_t` is an `unsigned long`, which is
+never `rpp::uint32`. So a word which a CAS updates through an `rpp::uint32` is a `std::atomic<rpp::uint32>`.
 
 - A platform API needs a guard from `config.h`: `_MSC_VER`, `RPP_MSVC_WIN`,
   `RPP_ANDROID`, `__APPLE__`, `YOCTO_LINUX`, `MIPS`, `RASPI`, `RPP_ENABLE_UNICODE`,
@@ -280,6 +282,8 @@ CXX23=1 mama clang build clang-tidy test="nogdb -vv"
 # 3. Android NDK, aarch64 under QEMU
 CXX23=1 mama android verbose build with_tests && ./run_android_tests -vv
 # 4. Windows MSVC, see the mirror steps below
+# 4b. Cortex-M4 on FreeRTOS under QEMU, for a change to a header or to a bare-metal path, see docs/BUILD.md
+cmake -S tests/cortex_m -B build-cortex-m -G Ninja && cmake --build build-cortex-m --target run_tests
 # 5. the branch carries no merge commit, so this prints nothing
 git log --merges --oneline origin/master..HEAD
 ```
