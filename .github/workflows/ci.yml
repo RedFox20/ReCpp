@@ -229,6 +229,28 @@ jobs:
           NO_NINJA: 1
         run: CXX20=1 mama mips verbose build jobs=$(nproc) # this target builds, it runs no tests
 
+  # newlib makes uint32_t an unsigned long, which no host compiler does. See tests/cortex_m/CMakeLists.txt
+  cortex-m4-freertos-gcc13:
+    name: cortex-m4-freertos-gcc13
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15 # a deadlock in QEMU stops here
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install arm-none-eabi-gcc and qemu-system-arm
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib \
+                                  qemu-system-arm ninja-build
+      - name: Cross build for Cortex-M4F on FreeRTOS
+        shell: bash
+        run: |
+          cmake -S tests/cortex_m -B build-cortex-m -G Ninja
+          cmake --build build-cortex-m
+      - name: Test on qemu-system-arm -M mps2-an386
+        shell: bash
+        run: cmake --build build-cortex-m --target run_tests
+
   consumer:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04

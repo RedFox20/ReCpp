@@ -480,7 +480,9 @@ through a pointer includes `<exception>`.
 ### B15. `event_loop.h` does not compile on bare metal, and no bare-metal build runs the rest
 `rpp::condition_variable` now takes any lock, and a bare-metal wait yields until the word
 changes. So `semaphore.h`, `concurrent_queue.h`, `thread_pool.h`, `async.h` and
-`coroutines.h` pass `g++ -fsyntax-only -DRPP_FREERTOS=1` on an x86 host. No target has run them.
+`coroutines.h` pass `g++ -fsyntax-only -DRPP_FREERTOS=1` on an x86 host. `tests/cortex_m`
+runs `semaphore.h` on FreeRTOS under QEMU. No target has run the other four, or the `wfe` wait
+of a Cortex-M with no RTOS.
 
 `event_loop.h` still fails there. `event_loop::on_owner_thread()` calls `rpp::get_thread_id()`,
 and `threads.h` declares that name only when `!RPP_BARE_METAL`.

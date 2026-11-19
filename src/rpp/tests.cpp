@@ -1157,6 +1157,7 @@ namespace rpp
                      numTests, results.test_cases_passed, results.test_cases_run, get_time_str(results.elapsed_time));
         }
 
+    #if !RPP_BARE_METAL // a bare metal build has no thread pool and no process memory info
         // do final cleanup to sanity check memory usage
         rpp::thread_pool::global().clear_idle_tasks();
         rpp::string_buffer san;
@@ -1174,6 +1175,7 @@ namespace rpp
         rpp::proc_mem_info info = proc_current_mem_used();
         consolef(Default, "Memory used PHYS:%.2fMB VIRT:%.2fMB %s\n",
                  info.physical_mem_mb(), info.virtual_size_mb(), san.c_str());
+    #endif
         return 0;
     }
 

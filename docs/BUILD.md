@@ -110,3 +110,18 @@ cmake --build build
 ```
 The repo root holds a `.clang-tidy` config file. CMake enables
 `CMAKE_EXPORT_COMPILE_COMMANDS` automatically.
+
+## Cortex-M4 on FreeRTOS, under QEMU
+
+`tests/cortex_m` builds the library and the tests which need no OS with arm-none-eabi-gcc.
+The tests run on FreeRTOS in `qemu-system-arm -M mps2-an386`. newlib makes `uint32_t` an
+`unsigned long`, so this build finds type errors which no host build shows.
+
+```bash
+sudo apt-get install gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib qemu-system-arm
+cmake -S tests/cortex_m -B build-cortex-m -G Ninja
+cmake --build build-cortex-m --target run_tests
+```
+CMake downloads FreeRTOS-Kernel and CMSIS 6. `-DFETCHCONTENT_SOURCE_DIR_FREERTOS=<dir>` and
+`-DFETCHCONTENT_SOURCE_DIR_CMSIS=<dir>` use a local copy instead. To select tests, run QEMU
+directly with `-append "<patterns>"`, as the `run_tests` target in `tests/cortex_m/CMakeLists.txt` shows.
