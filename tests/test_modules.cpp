@@ -119,6 +119,9 @@ TestImpl(test_modules)
         bits.set(3);
         AssertThat(bits.isSet(3), true);
         AssertThat(bits.isSet(4), false);
+        rpp::bitset<16> fixed;
+        fixed.set(3);
+        AssertThat(fixed.is_set(3), true);
     }
 
     // a namespace-scope constant needs `inline`, or the module and the header get one copy each

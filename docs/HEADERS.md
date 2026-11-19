@@ -40,7 +40,7 @@ Every header lives in `src/rpp/`. Test files live in `tests/`.
 | `debugging.macros.h` | The logging and assertion macros, which a C++20 module cannot export |
 | `source_loc.h` | Portable call site capture for assert and log messages |
 | `stack_trace.h` | Stack tracing and traced exceptions |
-| `bitutils.h` | Fixed-length bit array |
+| `bitutils.h` | Fixed-length bit arrays, on the heap or in inline storage |
 | `endian.h` | Endian byte-swap read and write |
 | `memory_pool.h` | Linear bump-allocator memory pools |
 | `sort.h` | Minimal insertion sort |

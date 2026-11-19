@@ -342,7 +342,7 @@ See `BUGS.md` B8.
 | [Stack Trace](#rppstack_traceh) | [`stack_trace.h`](src/rpp/stack_trace.h) | Stack tracing and traced exceptions |
 | [Predicates](#rpppredicatesh) | [`predicates.h`](src/rpp/predicates.h) | Portable callable and predicate concepts |
 | [Source Location](#rppsource_loch) | [`source_loc.h`](src/rpp/source_loc.h) | Portable call site capture for assert and log messages |
-| [Bit Utils](#rppbitutilsh) | [`bitutils.h`](src/rpp/bitutils.h) | Fixed-length bit array |
+| [Bit Utils](#rppbitutilsh) | [`bitutils.h`](src/rpp/bitutils.h) | Fixed-length bit arrays, on the heap or in inline storage |
 | [Close Sync](#rppclose_synch) | [`close_sync.h`](src/rpp/close_sync.h) | Read-write synchronization for safe async destruction |
 | [Endian](#rppendianh) | [`endian.h`](src/rpp/endian.h) | Endian byte-swap read/write utilities |
 | [Memory Pool](#rppmemory_poolh) | [`memory_pool.h`](src/rpp/memory_pool.h) | Linear bump-allocator memory pools |
@@ -4392,25 +4392,26 @@ for (uint64_t addr : callstack) {
 
 ## rpp/bitutils.h
 
-Fixed-length bit array.
+Fixed-length bit arrays. Use `bitset<NBits>` when the bit count is known at compile time, because it never allocates.
 
 | Class | Description |
 |-------|-------------|
-| [`bit_array`](src/rpp/bitutils.h#L12) | Dynamic bit array with set/unset/test operations |
+| [`bit_array`](src/rpp/bitutils.h#L13) | Dynamic bit array with set/unset/test operations |
+| [`bitset<NBits>`](src/rpp/bitutils.h#L129) | Fixed-size bit array in inline storage, a light port of `std::bitset<N>` |
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| [`set(int bit)`](src/rpp/bitutils.h#L62) | Set a bit |
-| [`set(int bit, bool value)`](src/rpp/bitutils.h#L69) | Set a bit to a value |
-| [`unset(int bit)`](src/rpp/bitutils.h#L75) | Clear a bit |
-| [`isSet(int bit)`](src/rpp/bitutils.h#L80) | Test a bit |
-| [`checkAndSet(int bit)`](src/rpp/bitutils.h#L86) | Test and set atomically |
-| [`reset(int numBits)`](src/rpp/bitutils.h#L56) | Reset with new size |
-| [`sizeBytes()`](src/rpp/bitutils.h#L46) / [`sizeBits()`](src/rpp/bitutils.h#L48) | Size queries |
-| [`getBuffer()`](src/rpp/bitutils.h#L50) / [`getByte(int i)`](src/rpp/bitutils.h#L91) | Raw access |
-| [`copy()`](src/rpp/bitutils.h#L100) / [`copyNegated()`](src/rpp/bitutils.h#L109) | Copy operations |
+| [`set(int bit)`](src/rpp/bitutils.h#L63) | Set a bit |
+| [`set(int bit, bool value)`](src/rpp/bitutils.h#L70) | Set a bit to a value |
+| [`unset(int bit)`](src/rpp/bitutils.h#L76) | Clear a bit |
+| [`isSet(int bit)`](src/rpp/bitutils.h#L81) | Test a bit |
+| [`checkAndSet(int bit)`](src/rpp/bitutils.h#L87) | Test and set atomically |
+| [`reset(int numBits)`](src/rpp/bitutils.h#L57) | Reset with new size |
+| [`sizeBytes()`](src/rpp/bitutils.h#L47) / [`sizeBits()`](src/rpp/bitutils.h#L49) | Size queries |
+| [`getBuffer()`](src/rpp/bitutils.h#L51) / [`getByte(int i)`](src/rpp/bitutils.h#L92) | Raw access |
+| [`copy()`](src/rpp/bitutils.h#L101) / [`copyNegated()`](src/rpp/bitutils.h#L110) | Copy operations |
 
 ### Example: Bit Array Operations
 
@@ -4449,6 +4450,33 @@ uint32_t negCopied = bits.copyNegated(0, buf, 4);
 
 // reset to a new size (clears all bits)
 bits.reset(256);
+```
+
+### bitset Methods
+
+| Method | Description |
+|--------|-------------|
+| [`bitset(uint64_t bits)`](src/rpp/bitutils.h#L140) | Copies the low `NBits` bits of an integer |
+| [`set(uint32_t bit)`](src/rpp/bitutils.h#L161) | Sets a bit |
+| [`set(uint32_t bit, bool value)`](src/rpp/bitutils.h#L168) | Sets a bit to a value |
+| [`unset(uint32_t bit)`](src/rpp/bitutils.h#L177) | Clears a bit |
+| [`is_set(uint32_t bit)`](src/rpp/bitutils.h#L184) | Returns true if the bit is set |
+| [`check_and_set(uint32_t bit)`](src/rpp/bitutils.h#L190) | Sets a clear bit and returns true, or returns false |
+| [`reset()`](src/rpp/bitutils.h#L157) | Clears every bit |
+| [`size_bits()`](src/rpp/bitutils.h#L150) / [`size_bytes()`](src/rpp/bitutils.h#L152) | Returns the bit count and the byte count |
+| [`get_buffer()`](src/rpp/bitutils.h#L154) | Returns the inline buffer, in the `bit_array` byte layout |
+
+```cpp
+#include <rpp/bitutils.h>
+
+// a 1024 bit window on the stack or in a class, with no heap allocation
+rpp::bitset<1024> seen;
+if (seen.check_and_set(seq % 1024))
+    forward(packet);
+seen.reset();
+
+rpp::bitset<23> flags { status }; // the low bits of status
+bool armed = flags.is_set(3);
 ```
 
 ---

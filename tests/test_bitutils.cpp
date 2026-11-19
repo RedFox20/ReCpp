@@ -347,4 +347,106 @@ TestImpl(test_bitutils)
         });
         AssertLess(partial, whole * 4.0);
     }
+
+    // the storage is inline, so the object holds only the bytes and no heap pointer
+    static_assert(sizeof(rpp::bitset<1>) == 1);
+    static_assert(sizeof(rpp::bitset<23>) == 3);
+    static_assert(sizeof(rpp::bitset<65536>) == 8192);
+    static_assert(rpp::bitset<55>{}.size_bytes() == 7);
+
+    TestCase(bitset_starts_clear)
+    {
+        rpp::bitset<55> bits;
+        for (uint32_t i = 0; i < bits.size_bytes(); ++i)
+            AssertThat(bits.get_buffer()[i], uint8_t(0));
+    }
+
+    TestCase(bitset_set_and_unset_write_the_raw_bytes_lsb_first)
+    {
+        rpp::bitset<20> bits;
+        bits.set(0);
+        bits.set(9);
+        bits.set(19, true);
+        bits.set(4, true);
+        bits.set(4, false);
+        bits.unset(9);
+        bits.unset(10);
+        AssertTrue(bits.is_set(0));
+        AssertFalse(bits.is_set(4));
+        AssertFalse(bits.is_set(9));
+        AssertFalse(bits.is_set(10));
+        AssertTrue(bits.is_set(19));
+        AssertThat(bits.get_buffer()[0], uint8_t(0x01));
+        AssertThat(bits.get_buffer()[1], uint8_t(0x00));
+        AssertThat(bits.get_buffer()[2], uint8_t(0x08));
+    }
+
+    // bitset ignores an index past the end as bit_array does, so the guard words and the spare bits stay intact
+    TestCase(bitset_ignores_an_index_past_the_end)
+    {
+        struct {
+            uint32_t before = 0xBAADF00D;
+            rpp::bitset<12> bits;
+            uint32_t after = 0xCAFEF00D;
+        } padded;
+        for (uint32_t bit = 12; bit < 64; ++bit)
+        {
+            padded.bits.set(bit);
+            padded.bits.set(bit, true);
+            padded.bits.unset(bit);
+            AssertFalse(padded.bits.check_and_set(bit));
+            AssertFalse(padded.bits.is_set(bit));
+        }
+        AssertThat(padded.bits.get_buffer()[1], uint8_t(0));
+        AssertThat(padded.before, 0xBAADF00Du);
+        AssertThat(padded.after, 0xCAFEF00Du);
+    }
+
+    TestCase(bitset_check_and_set_is_true_only_for_a_clear_bit)
+    {
+        rpp::bitset<8> bits;
+        AssertTrue(bits.check_and_set(5));
+        AssertFalse(bits.check_and_set(5));
+        AssertThat(bits.get_buffer()[0], uint8_t(1 << 5));
+    }
+
+    // as std::bitset<N>(unsigned long long) does, the constructor drops the bits at N and above
+    TestCase(bitset_from_an_integer_keeps_the_low_bits)
+    {
+        const rpp::bitset<23> flags{ 0xFFFF'FFFFULL };
+        AssertThat(flags.get_buffer()[0], uint8_t(0xFF));
+        AssertThat(flags.get_buffer()[1], uint8_t(0xFF));
+        AssertThat(flags.get_buffer()[2], uint8_t(0x7F));
+
+        const rpp::bitset<72> wide{ 0x8000'0000'0000'0001ULL };
+        AssertTrue(wide.is_set(0));
+        AssertFalse(wide.is_set(1));
+        AssertTrue(wide.is_set(63));
+        AssertThat(wide.get_buffer()[7], uint8_t(0x80));
+        AssertThat(wide.get_buffer()[8], uint8_t(0));
+    }
+
+    TestCase(bitset_reset_clears_every_bit)
+    {
+        rpp::bitset<65536> bits;
+        for (uint32_t bit = 0; bit < bits.size_bits(); bit += 97)
+            bits.set(bit);
+        bits.set(65535);
+        bits.reset();
+        for (uint32_t i = 0; i < bits.size_bytes(); ++i)
+            AssertThat(bits.get_buffer()[i], uint8_t(0));
+    }
+
+    // the same writes give the same bytes, so a buffer moves between bitset and bit_array
+    TestCase(bitset_has_the_bit_array_layout)
+    {
+        rpp::bitset<100> bits;
+        rpp::bit_array ref{ 100 };
+        for (uint32_t bit = 0; bit < 100; bit += 7)
+        {
+            bits.set(bit);
+            ref.set(bit);
+        }
+        AssertThat(memcmp(bits.get_buffer(), ref.getBuffer(), bits.size_bytes()), 0);
+    }
 };
