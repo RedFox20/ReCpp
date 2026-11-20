@@ -7,6 +7,7 @@
 #include <unistd.h> // _exit
 
 extern uint32_t __stack;
+uint32_t SystemCoreClock = 25000000;
 void _start(void);
 void SVC_Handler(void);
 void PendSV_Handler(void);

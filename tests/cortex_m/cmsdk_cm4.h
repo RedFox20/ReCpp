@@ -20,3 +20,5 @@ typedef enum IRQn
 #define __FPU_PRESENT          1U
 
 #include <core_cm4.h>
+
+extern uint32_t SystemCoreClock; // the CPU clock in Hz

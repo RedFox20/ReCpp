@@ -23,7 +23,9 @@
 #  if RPP_FREERTOS
 #    include <FreeRTOS.h>
 #    include <task.h>
-#  elif RPP_CORTEX_M_ARCH
+#  endif
+#  if RPP_CORTEX_M_ARCH
+#    include RPP_CORTEX_M_DEVICE_H // SystemCoreClock
 #    include RPP_CORTEX_M_CORE_H
 #  endif
 #else
@@ -782,7 +784,7 @@ namespace rpp
         usleep(useconds_t(millis) * 1000);
 #elif RPP_FREERTOS
         vTaskDelay(millis / portTICK_PERIOD_MS);
-#elif RPP_CORTEX_M
+#elif RPP_CORTEX_M_ARCH
         spin_sleep_for_ms(uint64_t(millis));
 #else
         usleep(millis * 1000);
@@ -818,29 +820,34 @@ namespace rpp
 
     void test::spin_sleep_for_us(uint64_t microseconds, bool full_spin) noexcept
     {
-#if RPP_CORTEX_M
+#if RPP_CORTEX_M_ARCH
         (void)full_spin; // always full spin on Cortex-M
         const uint32_t cpu_freq_mhz = SystemCoreClock / 1'000'000u;
 #  ifdef DWT
-        // on Cortex-M we can use the DWT cycle counter for precise timing
-        const uint32_t cpu_freq_mhz = SystemCoreClock / 1'000'000u;
+        // the cycle counter runs only after a debugger or this code enables it
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+        DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
         const uint32_t start_cycles = DWT->CYCCNT;
         const uint32_t wait_cycles = static_cast<uint32_t>(microseconds * cpu_freq_mhz);
-        while ((DWT->CYCCNT - start_cycles) < wait_cycles)
+        if (DWT->CYCCNT != start_cycles) // QEMU and a core with no cycle counter read a stopped counter
         {
+            while ((DWT->CYCCNT - start_cycles) < wait_cycles)
+            {
+            }
+            return;
         }
-#  else
+#  endif
         uint32_t loops = microseconds * (cpu_freq_mhz / 2);
 
-        // This loop takes exactly 2 CPU cycles per iteration (SUBS + BNE)
+        // an iteration takes no fewer cycles than the divisor above, so the spin never ends early
         asm volatile(
+            ".syntax unified        \n"  // GCC reads Thumb-1 inline asm as divided syntax
             "1: subs %[l], %[l], #1 \n"  // Decrement loop
-            "   bne  1b             \n"  // Branch if not zero
+            "   bcs  1b             \n"  // Branch until the count passes zero, so a zero count ends at once
             : [l] "+r" (loops)
             :
             : "cc"
         );
-#  endif
 #else
         // NOTE: high_resolution_clock might not be available on some target systems
         //       which would require a fallback to rolling our own.
