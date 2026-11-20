@@ -176,6 +176,7 @@ TestImpl(test_binary_stream)
         }
     }
 
+#if !RPP_BARE_METAL // no file system
     TestCase(file_read_write)
     {
         int count = 512;
@@ -214,4 +215,5 @@ TestImpl(test_binary_stream)
         }
         rpp::delete_file(file);
     }
+#endif
 };

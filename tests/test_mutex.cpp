@@ -1,4 +1,5 @@
 #include <rpp/tests.h>
+#include <rpp/atomic.h> // rpp::atomic_uint32
 #include <rpp/mutex.h>
 #include <rpp/condition_variable.h>
 #include <rpp/threads.h> // rpp::yield
@@ -665,7 +666,7 @@ TestImpl(test_mutex)
     {
         if constexpr (std::is_same_v<rpp::mutex, rpp::futex_mutex>)
         {
-            const auto* word = reinterpret_cast<const std::atomic_uint32_t*>(&m);
+            const auto* word = reinterpret_cast<const rpp::atomic_uint32*>(&m);
             const rpp::TimePoint deadline = rpp::TimePoint::monotonic_now() + rpp::seconds(1); // a hang guard, a locker ends it
             while (word->load() != 2u && rpp::TimePoint::monotonic_now() < deadline)
                 rpp::yield();

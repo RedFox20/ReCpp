@@ -170,5 +170,14 @@ namespace rpp
     template<class T>
     using atomic = std::conditional_t<std::atomic<T>::is_always_lock_free || sizeof(T) != 8, std::atomic<T>, seqlock_atomic<T>>;
 
+    /// rpp::atomic of each rpp integer alias. A word which a CAS updates through an rpp::uint32 is an atomic_uint32,
+    /// because newlib makes std::atomic_uint32_t an atomic unsigned long
+    using atomic_int16  = atomic<int16>;
+    using atomic_uint16 = atomic<uint16>;
+    using atomic_int32  = atomic<int32>;
+    using atomic_uint32 = atomic<uint32>;
+    using atomic_int64  = atomic<int64>;
+    using atomic_uint64 = atomic<uint64>;
+
     static_assert(sizeof(atomic<int64>) == 8, "rpp::atomic<int64> takes the 8 bytes of an int64 on every target");
 } // namespace rpp

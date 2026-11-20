@@ -10,6 +10,7 @@
  */
 #include "atomic_timepoint.h" // rpp::AtomicTimeSource (optional warpable clock)
 #include "async.h" // rpp::future, rpp::IsFuture
+#include "atomic.h" // rpp::atomic_uint32
 #include "collections.h" // rpp::erase_if
 #include "concurrent_queue.h"
 #include "config.h"
@@ -217,7 +218,7 @@ namespace rpp
         mutable std::atomic_int time_source_readers { 0 };
 
         // bumps on every set_time_source(), so a frame can tell which clock built its offset
-        std::atomic<rpp::uint32> time_source_generation { 0 };
+        rpp::atomic_uint32 time_source_generation { 0 };
 
         // thread-safe FIFO queue of resume events
         rpp::concurrent_queue<resume_event> resume_queue;

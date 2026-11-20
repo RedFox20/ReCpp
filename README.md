@@ -400,7 +400,7 @@ A `static_assert` in `config.h` rejects a lower `-std`. `RPP_INLINE_STATIC` and
 | [`RPP_TSAN`](src/rpp/config.h#L112) | `1` if ThreadSanitizer is enabled |
 | [`RPP_UBSAN`](src/rpp/config.h#L119) | `1` if UndefinedBehaviorSanitizer is enabled (Clang only) |
 | [`RPP_SANITIZERS`](src/rpp/config.h#L129) | `1` if any sanitizer (ASAN, TSAN, UBSAN) is enabled |
-| [`RPP_TSAN_ANNOTATE(call)`](src/rpp/mutex.h#L18) | Expands to `call` when ThreadSanitizer is enabled, and to nothing otherwise |
+| [`RPP_TSAN_ANNOTATE(call)`](src/rpp/mutex.h#L19) | Expands to `call` when ThreadSanitizer is enabled, and to nothing otherwise |
 
 ### Platform & Architecture
 
@@ -1753,7 +1753,7 @@ Neither is a future: there is no `get()`/`wait()`/`.then()` — drive by `co_awa
 | [`done()`](src/rpp/task.h#L173) | True once resolved; lets a driver poll completion without awaiting (no `wait()`) |
 | [`deferred<T>::start()`](src/rpp/task.h#L225) | Launch a not-yet-awaited deferred (used by `run_until_done`) |
 
-Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L498) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L509).
+Drive a top-level task to completion with [`event_loop::run_until_done(task<T>&)`](src/rpp/event_loop.h#L499) or [`run_until_done(deferred<T>&)`](src/rpp/event_loop.h#L510).
 
 Example: [tests/test_task.cpp](tests/test_task.cpp)
 
@@ -1796,61 +1796,61 @@ Single-threaded event loop that serializes coroutine completions. Unlike `thread
 
 | Class | Description |
 |-------|-------------|
-| [`event_loop`](src/rpp/event_loop.h#L145) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
-| [`event_task`](src/rpp/event_loop.h#L55) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
+| [`event_loop`](src/rpp/event_loop.h#L146) | Main event loop class with `run_loop()`, `run_once()`, `run_until_idle()`, `run_until_done(task)` |
+| [`event_task`](src/rpp/event_loop.h#L56) | Lightweight top-level coroutine return type for event-loop-driven coroutines |
 
 ### event_loop Methods
 
 | Method | Description |
 |--------|-------------|
-| [`run_loop()`](src/rpp/event_loop.h#L441) | Run the loop until `stop()` is called, then drain remaining work |
-| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L451) | Process at most one pending resume event. `Duration::zero()` polls without blocking |
-| [`run_until_idle()`](src/rpp/event_loop.h#L468) | Run until no background tasks and no pending resume events remain |
-| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L480) | Drive the loop until the given `event_task` completes, then rethrow on failure |
-| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L498) | Pump the loop until the eager `rpp::task<T>` completes, then return its value or rethrow |
-| [`pump_until_ready(future<T>&, timeout)`](src/rpp/event_loop.h#L528) | Pump on the owner thread until that future is ready, or return false on timeout |
-| [`run_until_ready(future<T>&, timeout)`](src/rpp/event_loop.h#L546) | Pump until that future is ready and collect its result, or throw on timeout |
-| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L559) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
-| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L834) | Run a delegate on the pool or await an `rpp::future`, and resume on the loop thread. A `std::future` does not compile |
-| [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L776) | Await a future launcher without a blocking worker after the launcher returns |
-| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L593) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
-| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1106) | Event-driven join: suspend until all forks complete or timeout expires |
-| [`num_forks()`](src/rpp/event_loop.h#L632) | Number of active forked coroutines |
-| [`drain_forks()`](src/rpp/event_loop.h#L640) | Check completed forks for exceptions and clear them |
-| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L863) | Wait for semaphore signal, resume on loop thread |
-| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L877) | Pop from queue, resume on loop thread |
-| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L891) | Pop from queue returning `optional<T>`, resume on loop thread |
-| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L678) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
-| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L670) | Post a raw coroutine handle resume to the loop thread |
-| [`resume_on_loop()`](src/rpp/event_loop.h#L1121) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
-| [`delay(Duration duration)`](src/rpp/event_loop.h#L927) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
-| [`pending_waiters()`](src/rpp/event_loop.h#L365) | Number of delay() timers and socket waits pending on the loop thread |
-| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L967) | Suspend until the socket has data, a closed peer or an error. False on timeout |
-| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L976) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
-| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1035) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
-| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1013) | Non-blocking connect which completes through wait_writable(). True when connected |
-| [`time_frame`](src/rpp/event_loop.h#L163) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
-| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L276) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
-| [`current_time()`](src/rpp/event_loop.h#L288) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
-| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L291) | The virtual time of `src`, or the monotonic wall clock when it is null |
-| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L295) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
-| [`get_time_source_frame()`](src/rpp/event_loop.h#L305) | Snapshot the loop clock on the thread which builds a deadline |
-| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L931) | Park on the loop timer queue until a time point, resume on the loop thread |
-| [`stop()`](src/rpp/event_loop.h#L379) | Signal the loop to stop and finalize pending tasks |
-| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L388) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
-| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L400) | Stop, wait for the background tasks, run every queued resume, and detach the time source |
-| [`set_except_handler(handler)`](src/rpp/event_loop.h#L406) | Set custom exception handler for unhandled background errors |
-| [`has_pending_work()`](src/rpp/event_loop.h#L368) | True if any background tasks or resume events are pending |
-| [`background_tasks()`](src/rpp/event_loop.h#L356) | Number of tasks currently suspended in background work |
-| [`pending_completions()`](src/rpp/event_loop.h#L362) | Number of pending resume events queued for the loop thread |
-| [`main_thread_id()`](src/rpp/event_loop.h#L374) | Thread ID of the loop's owner thread |
+| [`run_loop()`](src/rpp/event_loop.h#L442) | Run the loop until `stop()` is called, then drain remaining work |
+| [`run_once(Duration timeout)`](src/rpp/event_loop.h#L452) | Process at most one pending resume event. `Duration::zero()` polls without blocking |
+| [`run_until_idle()`](src/rpp/event_loop.h#L469) | Run until no background tasks and no pending resume events remain |
+| [`run_until_done(event_task& task)`](src/rpp/event_loop.h#L481) | Drive the loop until the given `event_task` completes, then rethrow on failure |
+| [`run_until_done(task<T>& task)`](src/rpp/event_loop.h#L499) | Pump the loop until the eager `rpp::task<T>` completes, then return its value or rethrow |
+| [`pump_until_ready(future<T>&, timeout)`](src/rpp/event_loop.h#L529) | Pump on the owner thread until that future is ready, or return false on timeout |
+| [`run_until_ready(future<T>&, timeout)`](src/rpp/event_loop.h#L547) | Pump until that future is ready and collect its result, or throw on timeout |
+| [`ensure_on_owner_thread(source_location)`](src/rpp/event_loop.h#L560) | Debug check: true if on the loop's owner thread, else logs an error at the call site |
+| [`run_async(Func&& fut_or_cb)`](src/rpp/event_loop.h#L835) | Run a delegate on the pool or await an `rpp::future`, and resume on the loop thread. A `std::future` does not compile |
+| [`async_launcher_awaiter<T>`](src/rpp/event_loop.h#L777) | Await a future launcher without a blocking worker after the launcher returns |
+| [`fork(Func&& coro_factory)`](src/rpp/event_loop.h#L594) | Fork a concurrent coroutine path (fire-and-forget, tracked internally) |
+| [`join_forks(Duration timeout)`](src/rpp/event_loop.h#L1107) | Event-driven join: suspend until all forks complete or timeout expires |
+| [`num_forks()`](src/rpp/event_loop.h#L633) | Number of active forked coroutines |
+| [`drain_forks()`](src/rpp/event_loop.h#L641) | Check completed forks for exceptions and clear them |
+| [`await(semaphore&, Duration)`](src/rpp/event_loop.h#L864) | Wait for semaphore signal, resume on loop thread |
+| [`await(concurrent_queue<T>&, T&, Duration)`](src/rpp/event_loop.h#L878) | Pop from queue, resume on loop thread |
+| [`await_pop(concurrent_queue<T>&, Duration)`](src/rpp/event_loop.h#L892) | Pop from queue returning `optional<T>`, resume on loop thread |
+| [`post(delegate<void()> callback)`](src/rpp/event_loop.h#L679) | Post a callback to execute on the loop thread (like `run_on_main_thread`) |
+| [`post_resume(coro_handle<> handle)`](src/rpp/event_loop.h#L671) | Post a raw coroutine handle resume to the loop thread |
+| [`resume_on_loop()`](src/rpp/event_loop.h#L1122) | `co_await` to unconditionally reschedule the current coroutine onto the loop thread |
+| [`delay(Duration duration)`](src/rpp/event_loop.h#L928) | Park on the loop timer queue, resume on the loop thread at the deadline. No pool worker sleeps |
+| [`pending_waiters()`](src/rpp/event_loop.h#L366) | Number of delay() timers and socket waits pending on the loop thread |
+| [`wait_readable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L968) | Suspend until the socket has data, a closed peer or an error. False on timeout |
+| [`wait_writable(socket& sock, Duration timeout)`](src/rpp/event_loop.h#L977) | Suspend until the socket accepts a send() or completed a connect. False on timeout |
+| [`accept(socket& listener, Duration timeout)`](src/rpp/event_loop.h#L1036) | Wait on the loop thread until the listener has a pending connection, then accept it. Invalid socket on timeout |
+| [`connect(socket& sock, const ipaddress& addr, Duration timeout)`](src/rpp/event_loop.h#L1014) | Non-blocking connect which completes through wait_writable(). True when connected |
+| [`time_frame`](src/rpp/event_loop.h#L164) | Snapshot of the loop clock, so a detached time source cannot strand a pending wait |
+| [`set_time_source(AtomicTimeSource* clock)`](src/rpp/event_loop.h#L277) | Attach a warpable clock, or null for wall-clock time. Every call waits for the readers to drop the old one |
+| [`current_time()`](src/rpp/event_loop.h#L289) | The loop's current time: the attached clock's virtual time, else the monotonic wall clock |
+| [`current_time(const AtomicTimeSource* src)`](src/rpp/event_loop.h#L292) | The virtual time of `src`, or the monotonic wall clock when it is null |
+| [`current_time(time_frame& frame)`](src/rpp/event_loop.h#L296) | Refresh `frame` from the live clock and return its time. Any swap of that clock leaves the frame alone |
+| [`get_time_source_frame()`](src/rpp/event_loop.h#L306) | Snapshot the loop clock on the thread which builds a deadline |
+| [`delay_until(TimePoint until)`](src/rpp/event_loop.h#L932) | Park on the loop timer queue until a time point, resume on the loop thread |
+| [`stop()`](src/rpp/event_loop.h#L380) | Signal the loop to stop and finalize pending tasks |
+| [`wait_on_all(Duration timeout)`](src/rpp/event_loop.h#L389) | Block until all pending work drains, with timeout. Leaves a resume queued as the background task count hits zero |
+| [`stop_and_wait_all_ready(Duration max_wait)`](src/rpp/event_loop.h#L401) | Stop, wait for the background tasks, run every queued resume, and detach the time source |
+| [`set_except_handler(handler)`](src/rpp/event_loop.h#L407) | Set custom exception handler for unhandled background errors |
+| [`has_pending_work()`](src/rpp/event_loop.h#L369) | True if any background tasks or resume events are pending |
+| [`background_tasks()`](src/rpp/event_loop.h#L357) | Number of tasks currently suspended in background work |
+| [`pending_completions()`](src/rpp/event_loop.h#L363) | Number of pending resume events queued for the loop thread |
+| [`main_thread_id()`](src/rpp/event_loop.h#L375) | Thread ID of the loop's owner thread |
 
 ### event_task Methods
 
 | Method | Description |
 |--------|-------------|
-| [`done()`](src/rpp/event_loop.h#L96) | True if the coroutine has finished or was never started |
-| [`rethrow_if_exception()`](src/rpp/event_loop.h#L99) | Rethrow any unhandled exception captured by the coroutine |
+| [`done()`](src/rpp/event_loop.h#L97) | True if the coroutine has finished or was never started |
+| [`rethrow_if_exception()`](src/rpp/event_loop.h#L100) | Rethrow any unhandled exception captured by the coroutine |
 | `on_complete` | Optional completion callback in `promise_type`, called at `final_suspend` (used by `fork()`) |
 
 ### event_loop Example
@@ -2087,27 +2087,27 @@ Cross-platform mutex, spin locks, and synchronized value wrappers.
 
 | Class | Description |
 |-------|-------------|
-| [`mutex`](src/rpp/mutex.h#L105) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, a `pthread_mutex_t` elsewhere |
-| [`futex_mutex`](src/rpp/mutex.h#L42) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
-| [`recursive_mutex`](src/rpp/mutex.h#L126) | Recursive mutex variant, a recursive `pthread_mutex_t` on POSIX |
-| [`unique_lock<Mutex>`](src/rpp/mutex.h#L329) | Holds a mutex like `std::unique_lock`, with `rpp::defer_lock` and `rpp::adopt_lock` |
-| [`defer_lock_t`](src/rpp/mutex.h#L319) | Tag type for a `unique_lock` which does not take the mutex yet |
-| [`adopt_lock_t`](src/rpp/mutex.h#L321) | Tag type for a lock which adopts a mutex this thread already holds |
-| [`defer_lock`](src/rpp/mutex.h#L323) | The `defer_lock_t` value |
-| [`adopt_lock`](src/rpp/mutex.h#L325) | The `adopt_lock_t` value |
-| [`lock_guard<Mutex>`](src/rpp/mutex.h#L402) | Holds a mutex for its whole scope, like `std::lock_guard` |
-| [`dual_lock_guard<Mutex>`](src/rpp/mutex.h#L416) | Holds two mutexes for its scope, and takes them in address order, so two threads never deadlock on one pair |
-| [`unlock_guard<Lock>`](src/rpp/mutex.h#L442) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
-| [`synchronized<T>`](src/rpp/mutex.h#L708) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
+| [`mutex`](src/rpp/mutex.h#L106) | Platform mutex: `futex_mutex` on Linux and Android, `SRWLOCK` on MSVC, a semaphore on FreeRTOS, a critical section on Cortex-M, a `pthread_mutex_t` elsewhere |
+| [`futex_mutex`](src/rpp/mutex.h#L43) | Mutex in one 32-bit word, which sleeps through `rpp::cvar`. A `condition_variable` wait relocks it as contended |
+| [`recursive_mutex`](src/rpp/mutex.h#L127) | Recursive mutex variant, a recursive `pthread_mutex_t` on POSIX |
+| [`unique_lock<Mutex>`](src/rpp/mutex.h#L330) | Holds a mutex like `std::unique_lock`, with `rpp::defer_lock` and `rpp::adopt_lock` |
+| [`defer_lock_t`](src/rpp/mutex.h#L320) | Tag type for a `unique_lock` which does not take the mutex yet |
+| [`adopt_lock_t`](src/rpp/mutex.h#L322) | Tag type for a lock which adopts a mutex this thread already holds |
+| [`defer_lock`](src/rpp/mutex.h#L324) | The `defer_lock_t` value |
+| [`adopt_lock`](src/rpp/mutex.h#L326) | The `adopt_lock_t` value |
+| [`lock_guard<Mutex>`](src/rpp/mutex.h#L403) | Holds a mutex for its whole scope, like `std::lock_guard` |
+| [`dual_lock_guard<Mutex>`](src/rpp/mutex.h#L417) | Holds two mutexes for its scope, and takes them in address order, so two threads never deadlock on one pair |
+| [`unlock_guard<Lock>`](src/rpp/mutex.h#L443) | Unlocks a held `rpp::unique_lock` or `std::unique_lock`, and relocks it at scope exit |
+| [`synchronized<T>`](src/rpp/mutex.h#L709) | Thread-safe value wrapper, accessed via `sync()` → `synchronize_guard` |
 
 ### Free Functions
 
 | Function | Description |
 |----------|-------------|
-| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L462) | Spin-lock with fallback to blocking lock |
-| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L498) | Spin-lock with timeout |
-| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L215) | Indicates platform provides native critical_section mutex |
-| [`SyncableType`](src/rpp/mutex.h#L540) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
+| [`spin_lock(Mutex m)`](src/rpp/mutex.h#L463) | Spin-lock with fallback to blocking lock |
+| [`spin_lock_for(Mutex m, timeout)`](src/rpp/mutex.h#L499) | Spin-lock with timeout |
+| [`RPP_HAS_CRITICAL_SECTION_MUTEX`](src/rpp/mutex.h#L216) | Indicates platform provides native critical_section mutex |
+| [`SyncableType`](src/rpp/mutex.h#L541) | Concept for a type offering `get_mutex()` and `get_ref()`, which `synchronize_guard` locks |
 
 `futex_mutex` has the `std::mutex` interface, and adds `lock_contended()`. It takes 4 bytes, needs no constructor
 call, and has a trivial destructor, so a static instance is safe before and after `main()`. In a TSAN build each
@@ -2115,19 +2115,19 @@ lock and unlock annotates itself, so TSAN reports a lock-order inversion as it d
 
 | Method | Description |
 |--------|-------------|
-| [`try_lock()`](src/rpp/mutex.h#L65) | Takes the lock without a wait, and returns false when another thread holds it |
-| [`lock()`](src/rpp/mutex.h#L74) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
-| [`lock_contended()`](src/rpp/mutex.h#L83) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
-| [`unlock()`](src/rpp/mutex.h#L92) | Releases the lock, and wakes one sleeping thread when the lock was contended |
+| [`try_lock()`](src/rpp/mutex.h#L66) | Takes the lock without a wait, and returns false when another thread holds it |
+| [`lock()`](src/rpp/mutex.h#L75) | Takes the lock. While another thread holds it, this thread spins for a short time and then sleeps |
+| [`lock_contended()`](src/rpp/mutex.h#L84) | Takes the lock and marks it contended, so the next unlock wakes a sleeping thread |
+| [`unlock()`](src/rpp/mutex.h#L93) | Releases the lock, and wakes one sleeping thread when the lock was contended |
 
 `rpp::cvar` holds the word wait under `futex_mutex`, the condition variable and the semaphore flags.
 
 | Function | Description |
 |----------|-------------|
-| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L29) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
-| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L32) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
-| [`wake_one(const void* addr)`](src/rpp/mutex.h#L35) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
-| [`wake_all(const void* addr)`](src/rpp/mutex.h#L38) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
+| [`wait(const void* addr, rpp::uint32 expected)`](src/rpp/mutex.h#L30) | Sleeps until the 32-bit word at `addr` no longer equals `expected` |
+| [`wait_for(const void* addr, rpp::uint32 expected, rpp::Duration timeout)`](src/rpp/mutex.h#L33) | Same as `wait()` with a timeout, and sleeps again when the OS wakes it before the deadline |
+| [`wake_one(const void* addr)`](src/rpp/mutex.h#L36) | Wakes one thread which sleeps on `addr`, and never reads `addr` |
+| [`wake_all(const void* addr)`](src/rpp/mutex.h#L39) | Wakes every thread which sleeps on `addr`, and never reads `addr` |
 
 ### Example: Basic Mutex and Spin Lock
 
@@ -2193,23 +2193,23 @@ Counting semaphore and lightweight notification flags.
 
 | Class | Description |
 |-------|-------------|
-| [`semaphore`](src/rpp/semaphore.h#L54) | Counting semaphore with spin-lock optimization |
-| [`semaphore_flag`](src/rpp/semaphore.h#L484) | Flag in one 32-bit word, whose wait sleeps in the kernel and unsets the flag on success |
-| [`semaphore_once_flag`](src/rpp/semaphore.h#L548) | Flag in one 32-bit word which stays set, and whose `notify()` wakes every waiter |
+| [`semaphore`](src/rpp/semaphore.h#L55) | Counting semaphore with spin-lock optimization |
+| [`semaphore_flag`](src/rpp/semaphore.h#L485) | Flag in one 32-bit word, whose wait sleeps in the kernel and unsets the flag on success |
+| [`semaphore_once_flag`](src/rpp/semaphore.h#L549) | Flag in one 32-bit word which stays set, and whose `notify()` wakes every waiter |
 
 ### semaphore Methods
 
 | Method | Description |
 |--------|-------------|
-| [`notify()`](src/rpp/semaphore.h#L130) | Increment and wake one waiter |
-| [`notify_all()`](src/rpp/semaphore.h#L167) | Wake all waiters |
-| [`notify_once()`](src/rpp/semaphore.h#L202) | Notify only if not already signaled |
-| [`try_wait()`](src/rpp/semaphore.h#L242) | Non-blocking wait attempt |
-| [`wait()`](src/rpp/semaphore.h#L262) | Blocking wait |
-| [`wait(Duration timeout)`](src/rpp/semaphore.h#L297) | Wait with timeout |
-| [`await(Duration timeout)`](src/rpp/semaphore.h#L397) | C++20 coroutine `co_await` — dispatches wait to background thread |
-| [`count()`](src/rpp/semaphore.h#L88) | Current count |
-| [`reset()`](src/rpp/semaphore.h#L102) | Reset to zero |
+| [`notify()`](src/rpp/semaphore.h#L131) | Increment and wake one waiter |
+| [`notify_all()`](src/rpp/semaphore.h#L168) | Wake all waiters |
+| [`notify_once()`](src/rpp/semaphore.h#L203) | Notify only if not already signaled |
+| [`try_wait()`](src/rpp/semaphore.h#L243) | Non-blocking wait attempt |
+| [`wait()`](src/rpp/semaphore.h#L263) | Blocking wait |
+| [`wait(Duration timeout)`](src/rpp/semaphore.h#L298) | Wait with timeout |
+| [`await(Duration timeout)`](src/rpp/semaphore.h#L398) | C++20 coroutine `co_await` — dispatches wait to background thread |
+| [`count()`](src/rpp/semaphore.h#L89) | Current count |
+| [`reset()`](src/rpp/semaphore.h#L103) | Reset to zero |
 
 ### Example: Coroutine co_await
 
@@ -2307,15 +2307,15 @@ next unlock.
 
 | Class | Description |
 |-------|-------------|
-| [`condition_variable`](src/rpp/condition_variable.h#L57) | Condition variable with 1ms timeout granularity on every platform |
-| [`cv_status`](src/rpp/condition_variable.h#L23) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
+| [`condition_variable`](src/rpp/condition_variable.h#L58) | Condition variable with 1ms timeout granularity on every platform |
+| [`cv_status`](src/rpp/condition_variable.h#L24) | Result of a timed wait without a predicate: `no_timeout` or `timeout` |
 
 | Method | Description |
 |--------|-------------|
-| [`notify_one()`](src/rpp/condition_variable.h#L120) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
-| [`notify_all()`](src/rpp/condition_variable.h#L127) | Wakes all waiting threads |
-| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L154) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
-| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L167) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
+| [`notify_one()`](src/rpp/condition_variable.h#L121) | Wakes one waiting thread, and makes no syscall when every waiting thread already has a wake |
+| [`notify_all()`](src/rpp/condition_variable.h#L128) | Wakes all waiting threads |
+| [`wait_for(Lock& lock, const rpp::Duration& rel_time)`](src/rpp/condition_variable.h#L155) | Waits until a notify or the timeout, and returns `cv_status::timeout` after the timeout |
+| [`wait_until(Lock& lock, const rpp::TimePoint& abs_time)`](src/rpp/condition_variable.h#L168) | Waits until a notify or a monotonic deadline, and reads a deadline past 15 s as a clock mismatch |
 
 `rpp::cvar`, the word wait under the condition variable, lives in [rpp/mutex.h](#rppmutexh).
 
@@ -2986,6 +2986,7 @@ LogInfo("time of day: %s", tod.to_string());
 | Type | Description |
 |------|-------------|
 | [`atomic<T>`](src/rpp/atomic.h#L171) | `std::atomic<T>` where it is always lock-free, else `seqlock_atomic<T>` for an 8-byte `T` |
+| [`atomic_int16`](src/rpp/atomic.h#L175) / [`atomic_uint16`](src/rpp/atomic.h#L176) / [`atomic_int32`](src/rpp/atomic.h#L177) / [`atomic_uint32`](src/rpp/atomic.h#L178) / [`atomic_int64`](src/rpp/atomic.h#L179) / [`atomic_uint64`](src/rpp/atomic.h#L180) | `rpp::atomic` of each rpp integer alias. A futex word is an `atomic_uint32`, because newlib makes `std::atomic_uint32_t` hold an `unsigned long` |
 | [`seqlock_atomic<T>`](src/rpp/atomic.h#L60) | The `std::atomic` interface for an 8-byte `T` in 8 bytes, built on 32-bit atomics. An integral `T` gets `fetch_add()`, `fetch_sub()`, `++`, `--`, `+=` and `-=`, but no bitwise operations |
 
 The objects share a pool of 64 stripes in the namespace `rpp::atomics`, and each object hashes its address into one. A stripe holds a 32-bit version. A writer takes the stripe, copies the old value of the object into it, and then writes the object. During the write, a reader of the object takes the copy. So a reader never waits for a writer, even for one which the scheduler stopped in the middle of a write. Writers to the objects of one stripe wait for each other.
