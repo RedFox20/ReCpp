@@ -13,6 +13,7 @@
     #define _CRT_DISABLE_PERFCRIT_LOCKS 1 // we're running single-threaded I/O only
     #include <Windows.h>
     #include <direct.h> // mkdir, getcwd
+    #include <io.h> // _wchmod
     #define USE_WINAPI_IO 1 // WINAPI IO is much faster on windows because msvcrt has lots of overhead
     #define stat64 _stat64
     #define fseeki64 _fseeki64
@@ -176,6 +177,13 @@ namespace rpp
             return _wstat64(conv.wstr, out) == 0;
         return false;
     }
+    template<StringViewType T>
+    static bool set_st_mode(T filename, int mode) noexcept
+    {
+        if (wchar_conv conv{ filename })
+            return _wchmod(conv.wstr, mode & (_S_IREAD | _S_IWRITE)) == 0;
+        return false; // conversion failed
+    }
 #else // Linux
 
     using os_stat64 = struct ::stat64;
@@ -195,10 +203,10 @@ namespace rpp
         return false;
     }
     template<StringViewType T>
-    static bool set_st_mode(T filename, mode_t mode) noexcept
+    static bool set_st_mode(T filename, int mode) noexcept
     {
         multibyte_conv conv{ filename };
-        if (conv.cstr) return chmod(conv.cstr, mode) == 0;
+        if (conv.cstr) return chmod(conv.cstr, mode_t(mode)) == 0;
         return false; // conversion failed
 	}
 #endif

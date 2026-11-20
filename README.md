@@ -1254,77 +1254,84 @@ Cross-platform path manipulation, directory listing, and filesystem utilities.
 | Function | Description |
 |----------|-------------|
 | [`file_exists(path)`](src/rpp/paths.h#L29) | True if the file exists |
-| [`folder_exists(path)`](src/rpp/paths.h#L45) | True if the folder exists |
+| [`folder_exists(path)`](src/rpp/paths.h#L54) | True if the folder exists |
 | [`is_symlink(path)`](src/rpp/paths.h#L37) | True if the path is a symlink |
-| [`file_size(path)`](src/rpp/paths.h#L100) | Short file size (32-bit) |
-| [`file_sizel(path)`](src/rpp/paths.h#L108) | Long file size (64-bit) |
-| [`file_created(path)`](src/rpp/paths.h#L116) | File creation date |
-| [`file_accessed(path)`](src/rpp/paths.h#L124) | Last file access date |
-| [`file_modified(path)`](src/rpp/paths.h#L132) | Last file modification date |
-| [`file_or_folder_exists(fileOrFolder)`](src/rpp/paths.h#L53) | True if a file or folder exists at the given path |
-| [`file_info(filename, filesize, created, accessed, modified)`](src/rpp/paths.h#L77) | Gets file info: size, creation, access and modification dates |
+| [`file_size(path)`](src/rpp/paths.h#L109) | Short file size (32-bit) |
+| [`file_sizel(path)`](src/rpp/paths.h#L117) | Long file size (64-bit) |
+| [`file_created(path)`](src/rpp/paths.h#L125) | File creation date |
+| [`file_accessed(path)`](src/rpp/paths.h#L133) | Last file access date |
+| [`file_modified(path)`](src/rpp/paths.h#L141) | Last file modification date |
+| [`file_or_folder_exists(fileOrFolder)`](src/rpp/paths.h#L62) | True if a file or folder exists at the given path |
+| [`file_info(filename, filesize, created, accessed, modified)`](src/rpp/paths.h#L86) | Gets file info: size, creation, access and modification dates |
+| [`is_device(path)`](src/rpp/paths.h#L46) | True if the path is a block device, character device, named pipe or socket |
+| [`file_mode(path)`](src/rpp/paths.h#L150) | Permission bits of a file or folder, or -1 if it does not exist |
+| [`set_file_mode(path, mode)`](src/rpp/paths.h#L159) | Set the permission bits of a file or folder, like chmod(2) |
+| [`free_disk_space(path)`](src/rpp/paths.h#L168) | Bytes free for a user on the file system of the path, or -1 on failure |
 
 ### File Operations
 
 | Function | Description |
 |----------|-------------|
-| [`delete_file(path)`](src/rpp/paths.h#L141) | Delete a single file |
-| [`rename_file(oldPath, newPath)`](src/rpp/paths.h#L151) | Rename a file, overwriting the destination, and fall back to copy and delete across filesystems |
-| [`copy_file(sourceFile, destinationFile)`](src/rpp/paths.h#L166) | Copy file, overwriting destination |
-| [`copy_file_if_needed(sourceFile, destinationFile)`](src/rpp/paths.h#L184) | Copy only if destination doesn't exist |
-| [`copy_file_into_folder(sourceFile, destinationFolder)`](src/rpp/paths.h#L193) | Copy file into a folder |
-| [`create_symlink(target, link)`](src/rpp/paths.h#L63) | Create a symbolic link |
-| [`copy_file_mode(sourceFile, destinationFile)`](src/rpp/paths.h#L175) | Copies file access permissions from source to destination |
+| [`delete_file(path)`](src/rpp/paths.h#L177) | Delete a single file |
+| [`rename_file(oldPath, newPath)`](src/rpp/paths.h#L187) | Rename a file, overwriting the destination, and fall back to copy and delete across filesystems |
+| [`copy_file(sourceFile, destinationFile)`](src/rpp/paths.h#L202) | Copy file, overwriting destination |
+| [`copy_file_if_needed(sourceFile, destinationFile)`](src/rpp/paths.h#L220) | Copy only if destination doesn't exist |
+| [`copy_file_into_folder(sourceFile, destinationFolder)`](src/rpp/paths.h#L229) | Copy file into a folder |
+| [`create_symlink(target, link)`](src/rpp/paths.h#L72) | Create a symbolic link |
+| [`copy_file_mode(sourceFile, destinationFile)`](src/rpp/paths.h#L211) | Copies file access permissions from source to destination |
 
 ### Folder Operations
 
 | Function | Description |
 |----------|-------------|
-| [`create_folder(foldername)`](src/rpp/paths.h#L203) | Create folder recursively |
-| [`delete_folder(foldername, mode)`](src/rpp/paths.h#L221) | Delete folder (recursive or non-recursive) |
+| [`create_folder(foldername)`](src/rpp/paths.h#L239) | Create folder recursively |
+| [`delete_folder(foldername, mode)`](src/rpp/paths.h#L257) | Delete folder (recursive or non-recursive) |
 
 ### Path Manipulation
 
 | Function | Description |
 |----------|-------------|
-| [`full_path(path)`](src/rpp/paths.h#L230) | Resolve relative path to absolute |
-| [`merge_dirups(path)`](src/rpp/paths.h#L239) | Merge all `../` inside a path |
-| [`file_name(path)`](src/rpp/paths.h#L254) | Extract filename without extension |
-| [`file_nameext(path)`](src/rpp/paths.h#L266) | Extract filename with extension |
-| [`file_ext(path)`](src/rpp/paths.h#L280) | Extract file extension |
-| [`file_replace_ext(path, ext)`](src/rpp/paths.h#L293) | Replace file extension |
-| [`file_name_append(path, add)`](src/rpp/paths.h#L305) | Append to filename (before extension) |
-| [`file_name_replace(path, newFileName)`](src/rpp/paths.h#L317) | Replace only the filename |
-| [`file_nameext_replace(path, newFileNameAndExt)`](src/rpp/paths.h#L329) | Replace filename and extension |
-| [`folder_name(path)`](src/rpp/paths.h#L342) | Extract folder name from path |
-| [`folder_path(path)`](src/rpp/paths.h#L356) | Extract full folder path from file path |
-| [`normalize(path, sep)`](src/rpp/paths.h#L368) | Normalize slashes in-place |
-| [`normalized(path, sep)`](src/rpp/paths.h#L379) | Return normalized copy |
-| [`path_combine(path1, path2, ...)`](src/rpp/paths.h#L391) | Safely combine path segments (up to 4) |
+| [`is_absolute(path)`](src/rpp/paths.h#L266) | True if the path is absolute by the rules of the platform, with no system call |
+| [`full_path(path)`](src/rpp/paths.h#L275) | Resolve relative path to absolute |
+| [`weakly_canonical(path)`](src/rpp/paths.h#L284) | Real path, or the real path of the longest existing folder plus the rest with `.` and `..` folded |
+| [`create_temp_folder(prefix)`](src/rpp/paths.h#L290) | Create a new unique folder in the temp folder, or return "" |
+| [`merge_dirups(path)`](src/rpp/paths.h#L298) | Merge all `../` inside a path |
+| [`file_name(path)`](src/rpp/paths.h#L313) | Extract filename without extension |
+| [`file_nameext(path)`](src/rpp/paths.h#L325) | Extract filename with extension |
+| [`file_ext(path)`](src/rpp/paths.h#L339) | Extract file extension |
+| [`file_replace_ext(path, ext)`](src/rpp/paths.h#L352) | Replace file extension |
+| [`file_name_append(path, add)`](src/rpp/paths.h#L364) | Append to filename (before extension) |
+| [`file_name_replace(path, newFileName)`](src/rpp/paths.h#L376) | Replace only the filename |
+| [`file_nameext_replace(path, newFileNameAndExt)`](src/rpp/paths.h#L388) | Replace filename and extension |
+| [`folder_name(path)`](src/rpp/paths.h#L401) | Extract folder name from path |
+| [`folder_path(path)`](src/rpp/paths.h#L415) | Extract full folder path from file path |
+| [`normalize(path, sep)`](src/rpp/paths.h#L429) | Normalize slashes in-place |
+| [`normalized(path, sep)`](src/rpp/paths.h#L438) | Return normalized copy |
+| [`path_combine(path1, path2, ...)`](src/rpp/paths.h#L456) | Safely combine path segments (up to 4) |
 
 ### Directory Listing
 
 | Function | Description |
 |----------|-------------|
-| [`list_dirs(out, dir, flags)`](src/rpp/paths.h#L640) | List all folders inside a directory |
-| [`list_files(out,dir, suffix, flags)`](src/rpp/paths.h#L694) | List files with optional extension filter |
-| [`dir_iterator`](src/rpp/paths.h#L572) | Range-based UTF-8 directory iterator |
-| [`udir_iterator`](src/rpp/paths.h#L577) | Range-based UTF-16 directory iterator |
-| [`dir_iter_base`](src/rpp/paths.h#L411) | Common base class for directory iteration |
-| [`directory_iter`](src/rpp/paths.h#L460) | Basic non-recursive directory iterator |
-| [`list_alldir(outDirs, outFiles, dir, flags)`](src/rpp/paths.h#L738) | Lists all directories and files in a directory |
+| [`list_dirs(out, dir, flags)`](src/rpp/paths.h#L701) | List all folders inside a directory |
+| [`list_files(out,dir, suffix, flags)`](src/rpp/paths.h#L755) | List files with optional extension filter |
+| [`dir_iterator`](src/rpp/paths.h#L629) | Range-based UTF-8 directory iterator |
+| [`udir_iterator`](src/rpp/paths.h#L634) | Range-based UTF-16 directory iterator |
+| [`dir_iter_base`](src/rpp/paths.h#L468) | Common base class for directory iteration |
+| [`directory_iter`](src/rpp/paths.h#L517) | Basic non-recursive directory iterator |
+| [`list_alldir(outDirs, outFiles, dir, flags)`](src/rpp/paths.h#L797) | Lists all directories and files in a directory |
 
 ### System Directories
 
 | Function | Description |
 |----------|-------------|
-| [`working_dir()`](src/rpp/paths.h#L751) | Current working directory (with trailing slash) |
-| [`module_dir(moduleObject)`](src/rpp/paths.h#L781) | Directory of the current linked module |
-| [`temp_dir()`](src/rpp/paths.h#L808) | System temporary directory |
-| [`home_dir()`](src/rpp/paths.h#L819) | User home directory |
-| [`module_path(moduleObject)`](src/rpp/paths.h#L789) | Full path to enclosing binary including filename |
-| [`change_dir(new_wd)`](src/rpp/paths.h#L796) | Changes the application working directory |
-| [`home_diru()`](src/rpp/paths.h#L821) | User home directory as Unicode ustring |
+| [`working_dir()`](src/rpp/paths.h#L810) | Current working directory (with trailing slash) |
+| [`module_dir(moduleObject)`](src/rpp/paths.h#L838) | Directory of the current linked module |
+| [`temp_dir()`](src/rpp/paths.h#L867) | System temporary directory |
+| [`home_dir()`](src/rpp/paths.h#L876) | User home directory |
+| [`module_path(moduleObject)`](src/rpp/paths.h#L846) | Full path to enclosing binary including filename |
+| [`change_dir(new_wd)`](src/rpp/paths.h#L855) | Changes the application working directory |
+| [`home_diru()`](src/rpp/paths.h#L878) | User home directory as Unicode ustring |
 
 ### Example using paths.h for path manipulation and directory listing:
 

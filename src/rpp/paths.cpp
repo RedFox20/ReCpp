@@ -2,6 +2,10 @@
 #include "file_io.h"
 #include "delegate.h"
 #include "paths.inl"
+#if !_MSC_VER
+    #include <sys/statvfs.h> // statvfs
+    #include <cstdlib> // mkdtemp
+#endif
 
 namespace rpp /* ReCpp */
 {
@@ -17,6 +21,42 @@ namespace rpp /* ReCpp */
     bool is_symlink(ustrview filename) noexcept { return (read_file_flags(filename) & FF_SYMLINK) != 0; }
     bool folder_exists(ustrview folder) noexcept { return (read_file_flags(folder) & FF_FOLDER) != 0; }
     bool file_or_folder_exists(ustrview path) noexcept { return (read_file_flags(path) & FF_FILE_OR_FOLDER) != 0; }
+#endif
+
+    // its own stat, so file_exists() and the other read_file_flags() queries pay nothing for it
+    template<StringViewType T>
+    static bool is_device(T path) noexcept
+    {
+    #if _MSC_VER
+        wchar_conv conv { path };
+        if (!conv)
+            return false;
+        const wchar_t* name = conv.wstr;
+        auto is_slash = [](wchar_t c) { return c == L'/' || c == L'\\'; };
+        const bool unc = is_slash(name[0]) && is_slash(name[1]);
+        const wchar_t* host_end = unc ? (const wchar_t*)ustrview{(const char16_t*)name + 2}.findany(u"/\\") : nullptr;
+        const bool in_pipe_folder = host_end && _wcsnicmp(host_end + 1, L"pipe", 4) == 0 && is_slash(host_end[5]); // "//host/pipe/name"
+        if (in_pipe_folder) // CreateFileW() would connect to the pipe as a client, and use up its free instance
+            return WaitNamedPipeW(name, 1) || GetLastError() == ERROR_SEM_TIMEOUT; // the timeout means a busy pipe
+        // a character device has no FILE_ATTRIBUTE_DEVICE, only GetFileType() of an open handle sees it
+        const DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+        HANDLE file = CreateFileW(name, FILE_READ_ATTRIBUTES, share, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        if (file == INVALID_HANDLE_VALUE)
+            return false;
+        const DWORD type = GetFileType(file);
+        CloseHandle(file);
+        return type == FILE_TYPE_CHAR || type == FILE_TYPE_PIPE;
+    #else
+        os_stat64 s;
+        if (!sys_stat64(path, &s)) // stat() follows a link, so a dangling link is not a device
+            return false;
+        return S_ISBLK(s.st_mode) || S_ISCHR(s.st_mode) || S_ISFIFO(s.st_mode) || S_ISSOCK(s.st_mode);
+    #endif
+    }
+
+    bool is_device(strview path) noexcept { return is_device<strview>(path); }
+#if RPP_ENABLE_UNICODE
+    bool is_device(ustrview path) noexcept { return is_device<ustrview>(path); }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -188,6 +228,29 @@ namespace rpp /* ReCpp */
     time_t file_modified(ustrview filename) noexcept { return time_of(filename, 2); }
 #endif
 
+    template<StringViewType T>
+    static int64 free_disk_space(T path) noexcept
+    {
+    #if _MSC_VER
+        ULARGE_INTEGER avail;
+        wchar_conv conv { path };
+        if (conv && GetDiskFreeSpaceExW(conv.wstr, &avail, nullptr, nullptr))
+            return int64(avail.QuadPart);
+        return -1;
+    #else
+        struct statvfs s;
+        multibyte_conv conv { path };
+        if (conv && statvfs(conv.cstr, &s) == 0)
+            return int64(s.f_bavail) * int64(s.f_frsize);
+        return -1;
+    #endif
+    }
+
+    int64 free_disk_space(strview path) noexcept { return free_disk_space<strview>(path); }
+#if RPP_ENABLE_UNICODE
+    int64 free_disk_space(ustrview path) noexcept { return free_disk_space<ustrview>(path); }
+#endif
+
     ////////////////////////////////////////////////////////////////////////////////
 
     template<StringViewType T>
@@ -339,7 +402,7 @@ namespace rpp /* ReCpp */
         return attr != DWORD(-1) && win32_set_file_attr(destinationFile, attr);
     #else
         os_stat64 s;
-        return sys_stat64(sourceFile, &s) && set_st_mode(destinationFile, s.st_mode);
+        return sys_stat64(sourceFile, &s) && set_st_mode(destinationFile, int(s.st_mode));
     #endif
     }
 
@@ -352,6 +415,20 @@ namespace rpp /* ReCpp */
     {
         return copy_file_mode<ustrview>(sourceFile, destinationFile);
     }
+#endif
+
+    template<StringViewType T>
+    static int file_mode(T path) noexcept
+    {
+        os_stat64 s;
+        return sys_stat64(path, &s) ? int(s.st_mode & 07777) : -1;
+    }
+
+    int file_mode(strview path) noexcept { return file_mode<strview>(path); }
+    bool set_file_mode(strview path, int mode) noexcept { return set_st_mode(path, mode); }
+#if RPP_ENABLE_UNICODE
+    int file_mode(ustrview path) noexcept { return file_mode<ustrview>(path); }
+    bool set_file_mode(ustrview path, int mode) noexcept { return set_st_mode(path, mode); }
 #endif
 
     bool copy_file_if_needed(strview sourceFile, strview destinationFile) noexcept
@@ -512,8 +589,26 @@ namespace rpp /* ReCpp */
     #endif
     }
 
+#if _MSC_VER
+    // FALSE only for a reparse point which holds its own data, such as a cloud placeholder.
+    // TRUE for an unknown tag, so the recursion never enters a junction
     template<StringViewType T>
-    static bool delete_folder(T foldername, delete_mode mode) noexcept
+    static bool win32_is_link(T path) noexcept
+    {
+        wchar_conv conv { path };
+        if (!conv)
+            return true;
+        WIN32_FIND_DATAW data;
+        HANDLE find = FindFirstFileW(conv.wstr, &data); // dwReserved0 holds the reparse tag
+        if (find == INVALID_HANDLE_VALUE)
+            return true;
+        FindClose(find);
+        return IsReparseTagNameSurrogate(data.dwReserved0); // a symlink or a junction
+    }
+#endif
+
+    template<StringViewType T>
+    static bool delete_folder(T foldername, delete_mode mode, bool listed_folder) noexcept
     {
         using tstring = typename T::string_t;
         using tchar = typename T::char_t;
@@ -526,6 +621,30 @@ namespace rpp /* ReCpp */
         if (mode == delete_mode::non_recursive)
             return sys_rmdir(foldername); // easy path, just gently try to delete...
 
+        T name = foldername; // lstat() of "link/" reads the target, so read "link"
+    #if _WIN32
+        name.trim_end(constants<T>::slashes_a);
+        constexpr bool listing_shows_links = true; // a link to a folder is a folder to Windows
+    #else
+        name.trim_end(tchar('/')); // a POSIX file name can hold '\'
+        constexpr bool listing_shows_links = false; // a POSIX listing gives a link as a file
+    #endif
+        file_flags flags = FF_FOLDER;
+        if (!listed_folder || listing_shows_links)
+            flags = read_file_flags(name);
+    #if _MSC_VER
+        if ((flags & FF_SYMLINK) && !win32_is_link(name))
+            flags = file_flags(flags & ~FF_SYMLINK);
+    #endif
+        if (flags & FF_SYMLINK) // remove only the link, like std::filesystem::remove_all()
+        {
+        #if _MSC_VER
+            if (flags & FF_FOLDER)
+                return sys_rmdir(name);
+        #endif
+            return sys_delete(name);
+        }
+
         std::vector<tstring> folders;
         std::vector<tstring> files;
         bool deletedChildren = true;
@@ -533,7 +652,10 @@ namespace rpp /* ReCpp */
         if (list_alldir(folders, files, foldername))
         {
             for (const tstring& folder : folders)
-                deletedChildren |= delete_folder(path_combine(foldername, folder), delete_mode::recursive);
+            {
+                const tstring child = path_combine(foldername, folder);
+                deletedChildren |= delete_folder(T{child}, delete_mode::recursive, /*listed_folder*/true);
+            }
 
             for (const tstring& file : files)
                 deletedChildren |= delete_file(path_combine(foldername, file));
@@ -546,16 +668,38 @@ namespace rpp /* ReCpp */
     }
     bool delete_folder(strview foldername, delete_mode mode) noexcept
     {
-        return delete_folder<strview>(foldername, mode);
+        return delete_folder<strview>(foldername, mode, /*listed_folder*/false);
     }
 #if RPP_ENABLE_UNICODE
     bool delete_folder(ustrview foldername, delete_mode mode) noexcept
     {
-        return delete_folder<ustrview>(foldername, mode);
+        return delete_folder<ustrview>(foldername, mode, /*listed_folder*/false);
     }
 #endif
 
     ////////////////////////////////////////////////////////////////////////////////
+
+    template<StringViewType T>
+    static bool is_absolute(T path) noexcept
+    {
+        using tchar = typename T::char_t;
+    #if _WIN32
+        auto is_slash = [](tchar c) { return c == tchar('/') || c == tchar('\\'); };
+        const bool drive = path.len >= 2 && unsigned((path[0] | 0x20) - 'a') < 26u && path[1] == tchar(':');
+        if (drive) // "C:x" is relative to the current folder of drive C
+            return path.len >= 3 && is_slash(path[2]);
+        if (path.len >= 4 && is_slash(path[0]) && path[1] == tchar('?') && path[2] == tchar('?') && is_slash(path[3]))
+            return true; // the NT prefix "\??\"
+        return path.len >= 3 && is_slash(path[0]) && is_slash(path[1]) && !is_slash(path[2]); // "\\server" or "\\?\"
+    #else
+        return path.len > 0 && path[0] == tchar('/');
+    #endif
+    }
+
+    bool is_absolute(strview path) noexcept { return is_absolute<strview>(path); }
+#if RPP_ENABLE_UNICODE
+    bool is_absolute(ustrview path) noexcept { return is_absolute<ustrview>(path); }
+#endif
 
     string full_path(strview path) noexcept
     {
@@ -601,6 +745,98 @@ namespace rpp /* ReCpp */
     #endif
     }
 #endif
+
+    // path with its links resolved, or "" if it does not exist
+    static string real_path(strview path) noexcept
+    {
+    #if _WIN32
+        wchar_conv conv { path };
+        if (!conv)
+            return {};
+        const DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+        HANDLE file = CreateFileW(conv.wstr, 0, share, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        if (file == INVALID_HANDLE_VALUE)
+            return {};
+        conv_buffer out;
+        const DWORD len = GetFinalPathNameByHandleW(file, out.path_w, out.MAX_U, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+        CloseHandle(file);
+        if (len < 4 || len >= DWORD(out.MAX_U))
+            return {};
+        normalize(out.path_u, u'/');
+        return to_string(out.path_u + 4, int(len - 4)); // drops the "\\?\" prefix
+    #else
+        return full_path(path);
+    #endif
+    }
+
+    string weakly_canonical(strview path) noexcept
+    {
+    #if _WIN32
+        const strview separators = "/\\";
+    #else
+        const strview separators = "/"; // a POSIX file name can hold '\'
+    #endif
+        strview head = path;
+        string result = real_path(head);
+        while (result.empty() && head)
+        {
+            head.trim_end(separators);
+            const char* last = head.rfindany(separators.str, separators.len);
+            head = last ? strview{head.str, last + 1} : strview{}; // a root keeps its separator: "/" or "C:/"
+            result = real_path(head);
+        }
+        if (result.empty())
+            return path.to_string();
+        const size_t root_len = result.find('/') + 1;
+        strview rest = path.substr(head.len);
+        while (rest)
+        {
+            const strview name = rest.next(separators.str, separators.len);
+            if (name == "..")
+            {
+                const size_t slash = result.rfind('/');
+                result.resize(slash > root_len ? slash : root_len);
+            }
+            else if (!name.empty() && name != ".")
+            {
+                if (result.back() != '/')
+                    result += '/';
+                result.append(name.str, size_t(name.len));
+            }
+        }
+        return result;
+    }
+
+    string create_temp_folder(strview prefix) noexcept
+    {
+        if (prefix.contains_any("/\\", 2)) // the new folder stays in the temp folder
+            return {};
+        string base = temp_dir();
+        if (!base.ends_with('/')) // not path_combine(), which drops the root "/"
+            base += '/';
+        base.append(prefix.str, size_t(prefix.len));
+    #if _WIN32
+        for (int attempt = 0; attempt < 100; ++attempt)
+        {
+            LARGE_INTEGER ticks;
+            QueryPerformanceCounter(&ticks);
+            const string folder = base + rpp::to_string(int64(ticks.QuadPart));
+            wchar_conv conv { strview{folder} };
+            if (!conv)
+                return {};
+            if (CreateDirectoryW(conv.wstr, nullptr))
+                return folder;
+            if (GetLastError() != ERROR_ALREADY_EXISTS)
+                return {};
+        }
+        return {};
+    #else
+        string folder = base + "XXXXXX";
+        if (!mkdtemp(folder.data()))
+            return {};
+        return folder;
+    #endif
+    }
 
     ////////////////////////////////////////////////////////////////////////////////
 
@@ -1116,14 +1352,21 @@ namespace rpp /* ReCpp */
     bool dir_iter_base::is_device()  const noexcept { return s->hFind && *s->ffd.cFileName && (s->ffd.dwFileAttributes & FILE_ATTRIBUTE_DEVICE) != 0; }
 #else
     dir_iter_base::operator bool() const noexcept { return s->d && s->e; }
-    // the d_type of an entry as st_mode bits, or a stat() of it when the file system leaves d_type unknown
+#if RPP_TESTS // a test seam, not in a header: TRUE makes each entry take the DT_UNKNOWN path below
+    RPPAPI bool dir_iter_ignores_d_type = false;
+#else
+    static constexpr bool dir_iter_ignores_d_type = false;
+#endif
+
+    // the d_type of an entry as st_mode bits, or an lstat() of it when the file system leaves d_type unknown
     static FINLINE mode_t entry_mode(const dirent* e, const string& dirname) noexcept
     {
         if (!e) return 0;
-        if (e->d_type) return mode_t(e->d_type) << 12; // every POSIX libc defines DT_x as S_IFx >> 12
-        // the CV25 Yocto filesystem gives DT_UNKNOWN, and no filesystem in CI or the tests does
+        if (e->d_type && !dir_iter_ignores_d_type) return mode_t(e->d_type) << 12; // every POSIX libc defines DT_x as S_IFx >> 12
+        // the CV25 Yocto filesystem gives DT_UNKNOWN, and no filesystem in CI does
+        // lstat() and not stat(), so a link stays a link like DT_LNK, and delete_folder() never follows it
         struct stat st;
-        return ::stat(path_combine(dirname, e->d_name).c_str(), &st) == 0 ? st.st_mode : 0;
+        return ::lstat(path_combine(dirname, e->d_name).c_str(), &st) == 0 ? st.st_mode : 0;
     }
     bool dir_iter_base::is_dir()     const noexcept { return S_ISDIR(entry_mode(s->e, s->dirname)); }
     bool dir_iter_base::is_file()    const noexcept { return S_ISREG(entry_mode(s->e, s->dirname)); }
