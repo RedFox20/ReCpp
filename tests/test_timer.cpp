@@ -147,36 +147,41 @@ TestImpl(test_timer)
     TestCase(sleep_waits_for_a_monotonic_deadline_through_a_signal)
     {
         static std::atomic_bool handled;
-        handled = false;
         struct sigaction on_signal {};
         struct sigaction old_signal {};
         on_signal.sa_handler = [](int) { handled = true; };
         sigaction(SIGUSR1, &on_signal, &old_signal);
 
         const rpp::Duration sleep = rpp::millis(10);
-        std::atomic<pid_t> sleeper_tid { 0 };
-        std::atomic_bool done { false };
         rpp::Duration slept;
-        std::thread sleeper { [&] {
-            sleeper_tid = gettid();
-            const rpp::TimePoint start = rpp::TimePoint::monotonic_now();
-            rpp::sleep_ns(sleep.nsec);
-            slept = rpp::TimePoint::monotonic_now() - start;
-            done = true;
-        }};
-        while (sleeper_tid == 0) rpp::yield();
-        const std::string path = "/proc/self/task/" + std::to_string(sleeper_tid) + "/syscall";
-        unsigned long long clock = ~0ull;
-        unsigned long long flags = ~0ull;
         bool blocked = false;
-        while (!blocked && !done) blocked = read_blocked_syscall(path, clock, flags); // The end of the sleep ends this wait.
-        pthread_kill(sleeper.native_handle(), SIGUSR1);
-        sleeper.join();
+        // a reader which runs late under load or qemu-user signals after the sleep, so it tries again
+        for (int attempt = 0; attempt < 3 && !(blocked && handled); ++attempt)
+        {
+            handled = false;
+            blocked = false;
+            std::atomic<pid_t> sleeper_tid { 0 };
+            std::atomic_bool done { false };
+            std::thread sleeper { [&] {
+                sleeper_tid = gettid();
+                const rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+                rpp::sleep_ns(sleep.nsec);
+                slept = rpp::TimePoint::monotonic_now() - start;
+                done = true;
+            }};
+            while (sleeper_tid == 0) rpp::yield();
+            const std::string path = "/proc/self/task/" + std::to_string(sleeper_tid) + "/syscall";
+            unsigned long long clock = ~0ull;
+            unsigned long long flags = ~0ull;
+            // qemu-user shows the syscall of its host thread, which can also block in a futex
+            while (!blocked && !done)
+                blocked = read_blocked_syscall(path, clock, flags) && clock == CLOCK_MONOTONIC && flags == TIMER_ABSTIME;
+            pthread_kill(sleeper.native_handle(), SIGUSR1);
+            sleeper.join();
+        }
         sigaction(SIGUSR1, &old_signal, nullptr);
 
         AssertTrue(blocked);
-        AssertEqual(clock, static_cast<unsigned long long>(CLOCK_MONOTONIC));
-        AssertEqual(flags, static_cast<unsigned long long>(TIMER_ABSTIME));
         AssertTrue(handled);
         AssertGreaterOrEqual(slept.nsec, sleep.nsec);
     }
