@@ -829,10 +829,14 @@ namespace rpp
         DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
         const uint32_t start_cycles = DWT->CYCCNT;
         const uint32_t wait_cycles = static_cast<uint32_t>(microseconds * cpu_freq_mhz);
-        while ((DWT->CYCCNT - start_cycles) < wait_cycles)
+        if (DWT->CYCCNT != start_cycles) // QEMU and a core with no cycle counter read a stopped counter
         {
+            while ((DWT->CYCCNT - start_cycles) < wait_cycles)
+            {
+            }
+            return;
         }
-#  else
+#  endif
         uint32_t loops = microseconds * (cpu_freq_mhz / 2);
 
         // an iteration takes no fewer cycles than the divisor above, so the spin never ends early
@@ -844,7 +848,6 @@ namespace rpp
             :
             : "cc"
         );
-#  endif
 #else
         // NOTE: high_resolution_clock might not be available on some target systems
         //       which would require a fallback to rolling our own.

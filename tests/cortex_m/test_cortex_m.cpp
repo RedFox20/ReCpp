@@ -1,8 +1,9 @@
-// Each case contends with a second FreeRTOS task, because newlib on arm-none-eabi has no std::thread.
+// A lock case contends with a second FreeRTOS task, because newlib on arm-none-eabi has no std::thread.
 // The helper task releases each wait, and it never asserts or logs, because every task shares one TLS block
 #include <rpp/mutex.h>
 #include <rpp/semaphore.h>
 #include <rpp/tests.h>
+#include <rpp/timepoint.h> // rpp::TimePoint
 #include <FreeRTOS.h>
 #include <task.h>
 using namespace rpp;
@@ -71,5 +72,14 @@ TestImpl(test_cortex_m)
             AssertEqual(rpp::semaphore::notified, s.items.wait(rpp::seconds(1)));
         AssertEqual(rpp::semaphore::notified, s.done.wait(rpp::seconds(1)));
         AssertThat(s.items.try_wait(), false);
+    }
+
+    // QEMU reads the DWT cycle counter as 0, so the spin takes the loop. A stopped counter or a wrapped count hangs
+    TestCase(spin_sleep_ends_without_a_cycle_counter)
+    {
+        const rpp::TimePoint start = rpp::TimePoint::monotonic_now();
+        spin_sleep_for_us(0);
+        spin_sleep_for_us(1000);
+        AssertLess((rpp::TimePoint::monotonic_now() - start).nsec, rpp::seconds(1).nsec);
     }
 };
