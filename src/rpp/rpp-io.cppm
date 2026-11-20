@@ -22,6 +22,7 @@ export namespace rpp {
     using rpp::buffer_keyval_parser;
     using rpp::file_exists;
     using rpp::is_symlink;
+    using rpp::is_device;
     using rpp::folder_exists;
     using rpp::file_or_folder_exists;
     using rpp::create_symlink;
@@ -31,6 +32,9 @@ export namespace rpp {
     using rpp::file_created;
     using rpp::file_accessed;
     using rpp::file_modified;
+    using rpp::file_mode;
+    using rpp::set_file_mode;
+    using rpp::free_disk_space;
     using rpp::delete_file;
     using rpp::rename_file;
     using rpp::move_file;
@@ -41,7 +45,10 @@ export namespace rpp {
     using rpp::create_folder;
     using rpp::delete_mode;
     using rpp::delete_folder;
+    using rpp::is_absolute;
     using rpp::full_path;
+    using rpp::weakly_canonical;
+    using rpp::create_temp_folder;
     using rpp::merge_dirups;
     using rpp::file_name;
     using rpp::file_nameext;

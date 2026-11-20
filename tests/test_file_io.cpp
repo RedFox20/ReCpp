@@ -22,6 +22,7 @@
         #define NOMINMAX 1
     #endif
     #include <windows.h> // CreateNamedPipeA
+    #include <winioctl.h> // FSCTL_SET_REPARSE_POINT
 #else
     #include <unistd.h> // pipe, dup2
     #include <csignal> // sigaction
@@ -33,6 +34,9 @@
     #include <TargetConditionals.h> // TARGET_OS_IPHONE
 #endif
 using namespace rpp;
+#if !_WIN32
+namespace rpp { extern bool dir_iter_ignores_d_type; } // the test seam of paths.cpp
+#endif
 
 TestImpl(test_file_io)
 {
@@ -130,6 +134,240 @@ TestImpl(test_file_io)
         AssertFalse(file_exists(TestDir));
     }
 #endif
+
+#if !RPP_ANDROID && !OCLEA && !__EMSCRIPTEN__ // the targets of the symlink case above, plus Windows
+    TestCase(delete_folder_never_follows_a_link)
+    {
+        const std::string outside = path_combine(TestDir, "outside");
+        const std::string inner = path_combine(TestDir, "inner");
+        const std::string link = path_combine(TestDir, "link");
+        Assert(create_folder(outside));
+        Assert(create_folder(inner));
+        create_test_file(path_combine(outside, "keep.txt"));
+    #if _MSC_VER // a Windows symlink needs Developer Mode or admin rights
+        if (!create_symlink(outside, link))
+            return;
+    #else
+        AssertTrue(create_symlink(outside, link));
+    #endif
+        AssertTrue(create_symlink(outside, path_combine(inner, "link")));
+        AssertTrue(delete_folder(link, delete_mode::recursive));
+        AssertFalse(is_symlink(link));
+        AssertTrue(file_exists(path_combine(outside, "keep.txt")));
+        AssertTrue(delete_folder(inner, delete_mode::recursive));
+        AssertFalse(folder_exists(inner));
+        AssertTrue(file_exists(path_combine(outside, "keep.txt")));
+        for (const std::string& spelling : { link + "/", link + "//" }) // lstat() of "link/" reads the target
+        {
+            AssertTrue(create_symlink(outside, link));
+            AssertTrue(delete_folder(spelling, delete_mode::recursive));
+            AssertFalse(is_symlink(link));
+            AssertTrue(file_exists(path_combine(outside, "keep.txt")));
+        }
+    }
+
+#if _MSC_VER // a cloud placeholder has a reparse tag which is no name surrogate, so it is no link
+    TestCase(delete_folder_keeps_a_reparse_file_which_is_no_link)
+    {
+        Assert(create_folder(TestDir));
+        const std::string file = path_combine(TestDir, "placeholder.txt");
+        create_test_file(file);
+        HANDLE handle = CreateFileA(file.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        Assert(handle != INVALID_HANDLE_VALUE);
+        REPARSE_GUID_DATA_BUFFER reparse {};
+        reparse.ReparseTag = 0x123; // a third party tag
+        reparse.ReparseGuid = { 0x7c5ad1a2, 0x3c4b, 0x4e5f, { 1, 2, 3, 4, 5, 6, 7, 8 } };
+        DWORD bytes = 0;
+        const bool tagged = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, &reparse,
+                                            REPARSE_GUID_DATA_BUFFER_HEADER_SIZE, nullptr, 0, &bytes, nullptr) != FALSE;
+        CloseHandle(handle);
+        AssertTrue(tagged);
+        AssertTrue(is_symlink(file));
+        AssertFalse(delete_folder(file, delete_mode::recursive));
+        AssertTrue(DeleteFileA(file.c_str()) != FALSE); // the file is still there
+    }
+#endif
+
+    TestCase(weakly_canonical_resolves_the_links_of_the_existing_head)
+    {
+        const std::string real = path_combine(TestDir, "real");
+        const std::string link = path_combine(TestDir, "link");
+        Assert(create_folder(real));
+    #if _WIN32 // a Windows symlink needs Developer Mode or admin rights
+        if (!create_symlink(real, link))
+            return;
+    #else
+        AssertTrue(create_symlink(real, link));
+    #endif
+        AssertThat(weakly_canonical(link), weakly_canonical(real));
+        AssertThat(weakly_canonical(link + "/missing/x"), weakly_canonical(real) + "/missing/x");
+    }
+#endif
+
+    TestCase(weakly_canonical_folds_the_missing_rest)
+    {
+        Assert(create_folder(TestDir));
+        const std::string canonical = weakly_canonical(TestDir);
+        const std::string root = canonical.substr(0, canonical.find('/') + 1);
+        AssertTrue(is_absolute(canonical));
+        AssertThat(weakly_canonical(TestDir + "/missing/./x/"), canonical + "/missing/x");
+        AssertThat(weakly_canonical(TestDir + "/missing/../x"), canonical + "/x");
+        AssertThat(weakly_canonical(TestDir + "/missing/../../x"), path_combine(folder_path(canonical), "x"));
+        AssertThat(weakly_canonical(root + "_rpp_missing/../.."), root);
+    }
+
+    TestCase(weakly_canonical_splits_the_path_at_the_separators_of_the_platform)
+    {
+        Assert(create_folder(TestDir));
+        const std::string canonical = weakly_canonical(TestDir);
+    #if _WIN32
+        AssertThat(weakly_canonical(TestDir + "\\missing\\x"), canonical + "/missing/x");
+    #else // a POSIX file name can hold '\', so "a\" is not the head of "a\..\x"
+        AssertThat(mkdir((TestDir + "/a\\").c_str(), 0700), 0);
+        AssertThat(weakly_canonical(TestDir + "/a\\..\\x"), canonical + "/a\\..\\x");
+        AssertThat(rmdir((TestDir + "/a\\").c_str()), 0);
+    #endif
+    }
+
+    TestCase(weakly_canonical_gives_a_path_with_no_existing_part_unchanged)
+    {
+        AssertThat(weakly_canonical("_rpp_missing/x"), std::string{"_rpp_missing/x"}); // Win32 folds ".." before the open
+    }
+
+    TestCase(create_temp_folder_makes_a_new_folder_for_the_owner)
+    {
+        const std::string first = create_temp_folder("_rpp_test_tmp_");
+        const std::string second = create_temp_folder("_rpp_test_tmp_");
+        AssertTrue(folder_exists(first));
+        AssertTrue(folder_exists(second));
+        AssertNotEqual(first, second);
+        AssertTrue(first.starts_with(path_combine(temp_dir(), "_rpp_test_tmp_")));
+    #if !_WIN32 // a Windows folder gets the access rights of the temp folder
+        AssertThat(file_mode(first), 0700);
+    #endif
+        AssertTrue(delete_folder(first));
+        AssertTrue(delete_folder(second));
+    }
+
+    TestCase(create_temp_folder_refuses_a_prefix_with_a_separator)
+    {
+        AssertThat(create_temp_folder("_rpp_missing/x"), std::string{});
+        AssertThat(create_temp_folder("_rpp_missing\\x"), std::string{});
+    }
+
+#if __linux__ && !RPP_ANDROID // temp_dir() reads TMP
+    TestCase(create_temp_folder_stays_in_a_root_temp_folder)
+    {
+        const std::string saved = temp_dir();
+        setenv("TMP", "/", 1);
+        const std::string folder = create_temp_folder("_rpp_test_tmp_");
+        setenv("TMP", saved.c_str(), 1);
+        if (!folder.empty())
+            delete_folder(folder);
+        AssertTrue(folder.empty() || folder.starts_with("/_rpp_test_tmp_")); // only root can write in "/"
+    }
+#endif
+
+    TestCase(is_device_sees_a_fifo_and_a_link_to_it)
+    {
+        create_test_file(TestFile);
+        Assert(create_folder(TestDir));
+        AssertFalse(is_device(TestFile));
+        AssertFalse(is_device(TestDir));
+        AssertFalse(is_device(path_combine(TestDir, "missing")));
+    #if _MSC_VER // the FIFO twin: a named pipe, and the NUL character device
+        const char* pipe_name = "\\\\.\\pipe\\rpp_is_device_test";
+        HANDLE pipe = CreateNamedPipeA(pipe_name, PIPE_ACCESS_DUPLEX, PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, nullptr);
+        AssertNotEqual(pipe, INVALID_HANDLE_VALUE);
+        const bool pipe_is_device = is_device(pipe_name);
+        HANDLE client = CreateFileA(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+        const bool busy_pipe_is_device = is_device(pipe_name);
+        if (client != INVALID_HANDLE_VALUE)
+            CloseHandle(client);
+        CloseHandle(pipe);
+        AssertTrue(pipe_is_device);
+        AssertNotEqual(client, INVALID_HANDLE_VALUE); // is_device() did not take the only pipe instance
+        AssertTrue(busy_pipe_is_device);
+        AssertFalse(is_device("\\\\.\\pipe\\rpp_is_device_missing"));
+        AssertTrue(is_device("NUL"));
+    #elif !__EMSCRIPTEN__ // the Emscripten file system has no FIFO
+        const std::string fifo = path_combine(TestDir, "fifo");
+        AssertThat(mkfifo(fifo.c_str(), 0600), 0);
+        AssertTrue(is_device(fifo));
+        #if !RPP_ANDROID && !OCLEA // the same targets as the symlink cases above
+            const std::string link = path_combine(TestDir, "link");
+            const std::string dangling = path_combine(TestDir, "dangling");
+            AssertTrue(create_symlink(fifo, link));
+            AssertTrue(create_symlink("missing", dangling));
+            AssertTrue(is_device(link));
+            AssertFalse(is_device(dangling));
+        #endif
+    #endif
+    }
+
+    TestCase(set_file_mode_and_file_mode_round_trip)
+    {
+        create_test_file(TestFile);
+        Assert(create_folder(TestDir));
+        const std::string missing = path_combine(TestDir, "missing");
+        AssertThat(file_mode(missing), -1);
+        AssertFalse(set_file_mode(missing, 0644));
+    #if _MSC_VER // Windows keeps only the owner write bit, as the read-only attribute
+        AssertTrue(set_file_mode(TestFile, 0444));
+        AssertThat(file_mode(TestFile) & 0200, 0);
+        AssertTrue(set_file_mode(TestFile, 0644));
+        AssertThat(file_mode(TestFile) & 0200, 0200);
+    #else
+        AssertTrue(set_file_mode(TestFile, 0700));
+        AssertThat(file_mode(TestFile), 0700);
+        AssertTrue(set_file_mode(TestFile, 0644));
+        AssertThat(file_mode(TestFile), 0644);
+        AssertTrue(set_file_mode(TestDir, 0644));
+        AssertThat(file_mode(TestDir), 0644);
+        AssertTrue(set_file_mode(TestDir, 0700));
+        AssertThat(file_mode(TestDir), 0700);
+    #endif
+    }
+
+    TestCase(free_disk_space_counts_the_temp_dir_and_fails_for_a_missing_path)
+    {
+        AssertGreater(free_disk_space(temp_dir()), int64(0));
+    #if !__EMSCRIPTEN__ // Emscripten statvfs() gives fixed counts, also for a missing path
+        AssertThat(free_disk_space(path_combine(TestDir, "missing")), int64(-1));
+    #endif
+    }
+
+    TestCase(is_absolute_follows_the_rules_of_the_platform)
+    {
+        AssertFalse(is_absolute(""));
+        AssertFalse(is_absolute("x"));
+        AssertFalse(is_absolute("./x"));
+        AssertFalse(is_absolute("../x"));
+        AssertTrue(is_absolute(temp_dir()));
+    #if _WIN32
+        AssertTrue(is_absolute("C:/x"));
+        AssertTrue(is_absolute("c:\\x"));
+        AssertTrue(is_absolute("\\\\server\\x"));
+        AssertTrue(is_absolute("//server/x"));
+        AssertTrue(is_absolute("\\\\?\\C:\\x"));
+        AssertTrue(is_absolute("\\??\\C:\\x")); // the NT prefix, as in std::filesystem of MSVC
+        AssertFalse(is_absolute("/x"));
+        AssertFalse(is_absolute("\\x"));
+        AssertFalse(is_absolute("C:x"));
+        AssertFalse(is_absolute("C:"));
+        AssertFalse(is_absolute("///x"));
+    #else
+        AssertTrue(is_absolute("/"));
+        AssertTrue(is_absolute("/x"));
+        AssertTrue(is_absolute("//server/x"));
+        AssertFalse(is_absolute("C:/x"));
+        AssertFalse(is_absolute("\\x"));
+    #endif
+    #if RPP_ENABLE_UNICODE
+        AssertTrue(is_absolute(temp_diru()));
+        AssertFalse(is_absolute(ustrview{u"x"}));
+    #endif
+    }
 
     TestCase(seek_before_the_start_fails)
     {
@@ -334,16 +572,21 @@ TestImpl(test_file_io)
         Assert(create_folder(path_combine(TestDir, "dir")));
         AssertThat(symlink("file", path_combine(TestDir, "link").c_str()), 0);
         AssertThat(mkfifo(path_combine(TestDir, "fifo").c_str(), 0600), 0);
-        int entries = 0;
-        for (auto e : dir_iterator{TestDir})
+        for (bool unknown_type : {false, true}) // true takes the lstat() path of a file system which gives DT_UNKNOWN
         {
-            AssertThat(e.is_file(), e.name == "file");
-            AssertThat(e.is_dir(), e.name == "dir");
-            AssertThat(e.is_symlink(), e.name == "link");
-            AssertThat(e.is_device(), e.name == "fifo");
-            ++entries;
+            dir_iter_ignores_d_type = unknown_type;
+            int entries = 0;
+            for (auto e : dir_iterator{TestDir})
+            {
+                AssertThat(e.is_file(), e.name == "file");
+                AssertThat(e.is_dir(), e.name == "dir");
+                AssertThat(e.is_symlink(), e.name == "link");
+                AssertThat(e.is_device(), e.name == "fifo");
+                ++entries;
+            }
+            dir_iter_ignores_d_type = false;
+            AssertThat(entries, 4);
         }
-        AssertThat(entries, 4);
     }
 #endif
 

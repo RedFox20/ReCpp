@@ -40,6 +40,15 @@ namespace rpp /* ReCpp */
 #endif
 
     /**
+     * @return TRUE if the path is a block device, character device, named pipe or socket. Windows sees no block device.
+     * It follows a link, like file_exists(). Same meaning as dir_iter_base::is_device()
+     */
+    RPPAPI bool is_device(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI bool is_device(ustrview path) noexcept;
+#endif
+
+    /**
      * @return TRUE if the folder exists, arg ex: "root/dir" or "root/dir/"
      */
     RPPAPI bool folder_exists(strview folder) noexcept;
@@ -135,6 +144,33 @@ namespace rpp /* ReCpp */
 #endif
 
     /**
+     * @return The permission bits (st_mode & 07777) of a file or folder, or -1 if it does not exist.
+     * It follows a link. Windows gives only the read, write and execute bits.
+     */
+    RPPAPI int file_mode(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI int file_mode(ustrview path) noexcept;
+#endif
+
+    /**
+     * @brief Sets the permission bits of a file or folder, like chmod(2). It follows a link.
+     * @note Windows sets only the read-only attribute from the owner write bit, on the link itself
+     */
+    RPPAPI bool set_file_mode(strview path, int mode) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI bool set_file_mode(ustrview path, int mode) noexcept;
+#endif
+
+    /**
+     * @return The bytes free for a user without admin rights on the file system of a folder, or -1 on failure.
+     * Windows needs a folder, and a share root needs its last separator: "//server/share/". POSIX also accepts a file.
+     */
+    RPPAPI int64 free_disk_space(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI int64 free_disk_space(ustrview path) noexcept;
+#endif
+
+    /**
      * @brief Deletes a single file, ex: "root/dir/file.ext"
      * @return TRUE if the file was actually deleted (can fail due to file locks or access rights)
      */
@@ -224,6 +260,15 @@ namespace rpp /* ReCpp */
 #endif
 
     /**
+     * @return TRUE if the path is absolute, like std::filesystem::path::is_absolute(). It does no system call.
+     * POSIX: "/x". Windows: "C:/x", "C:\x", "\\server\x", "//server/x" or "\??\C:\x", but not "/x" or "C:x"
+     */
+    RPPAPI bool is_absolute(strview path) noexcept;
+#if RPP_ENABLE_UNICODE
+    RPPAPI bool is_absolute(ustrview path) noexcept;
+#endif
+
+    /**
      * @brief Resolves a relative path to a full path name using filesystem path resolution
      * @result "path" ==> "C:\Projects\Test\path"
      */
@@ -231,6 +276,18 @@ namespace rpp /* ReCpp */
 #if RPP_ENABLE_UNICODE
     RPPAPI ustring full_path(ustrview path) noexcept;
 #endif
+
+    /**
+     * @return The real path of path, or of its longest existing folder plus the rest with "." and ".." folded.
+     * Only a root ends with '/'. Windows also splits at '\' and gives '/'. A path with no existing part stays as is
+     */
+    RPPAPI string weakly_canonical(strview path) noexcept;
+
+    /**
+     * @return A new unique folder temp_dir()/<prefix><random>, or "" on failure or for a prefix with a separator.
+     * On POSIX, only the owner can open it
+     */
+    RPPAPI string create_temp_folder(strview prefix) noexcept;
 
     /**
      * @brief Merges all ../ inside of a path
