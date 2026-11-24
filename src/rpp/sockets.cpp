@@ -2091,7 +2091,9 @@ namespace rpp
 
     socket socket::accept(int timeoutMillis) noexcept
     {
-        if (!good())
+        // close() on another thread resets the handle and the type, so check both in one lock
+        rpp::unique_lock lock = rpp::spin_lock(Mtx);
+        if (os_handle_unsafe() == INVALID)
         {
             LogError("Cannot use socket::accept() on closed sockets");
             return socket::from_err_code(ESOCK(EBADF));
@@ -2101,13 +2103,14 @@ namespace rpp
             LogError("Cannot use socket::accept() on non-TCP sockets, use recvfrom instead");
             return socket::from_err_code(ESOCK(EPROTOTYPE));
         }
+        lock.unlock(); // the poll must wait without the lock, or close() cannot end it
 
         if (!this->poll(timeoutMillis, PF_Read)) // poll will handle any errors
             return socket::from_err_code(get_errno());
 
         saddr saddr;
         socklen_t len = sizeof(saddr);
-        rpp::unique_lock lock = rpp::spin_lock(Mtx);
+        lock = rpp::spin_lock(Mtx);
         int handle = (int)::accept(os_handle_unsafe(), &saddr.sa, &len); // NOLINT(readability-redundant-casting)
         if (handle == -1)
         {
