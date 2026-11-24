@@ -8,6 +8,12 @@ names the fix. Git holds the story, and a longer entry is noise every agent read
 
 ## Open
 
+### B38. `accept()` polls fd -1 until its timeout after a `close()` on another thread
+A `close()` between the handle check of `accept()` and `os_handle()` in `poll()` gives `poll()` the handle -1.
+`::poll()` skips a negative fd, so the call waits for the whole timeout, and `accept(-1)` never returns.
+`tsan_reports_no_race_on_accept_and_a_close_on_another_thread` hits it in 53 of 800 rounds. A fix: `poll()` returns
+false with `EBADF` when `os_handle()` is `INVALID`.
+
 ### B37. gcc-15 TSAN reports a race on each coroutine frame which another thread resumes
 Under g++ 15.2 TSAN, 21 cases in `test_async`, `test_coroutines`, `test_concurrent_queue`, `test_event_loop` and
 `test_semaphore` report 31 races. Each report is a 2-byte read of the coroutine frame on the thread which resumes it.
@@ -712,6 +718,10 @@ forward declaration, and `--check` accepts any candidate. The `task.h` `task<T>`
 `write_cont` rows reproduce it. A fix ranks a declaration above a call first.
 
 ## Closed
+
+### C44. `socket::accept()` read the socket type after it released the lock
+A `close()` on another thread could write the type between the handle check and the poll, and TSAN saw no order for it.
+`accept()` now checks the handle and the type in one lock, which `tsan_reports_no_race_on_accept_and_a_close_on_another_thread` pins.
 
 ### C43. `udp_load_balancer` missed its throughput floor under full-suite load (was B29)
 A starved sender loses its balancer budget for good, so one loaded run fell under the floor.

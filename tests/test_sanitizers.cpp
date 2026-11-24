@@ -26,13 +26,16 @@ const char* __tsan_default_suppressions() { // NOLINT(bugprone-reserved-identifi
 
 #if RPP_TSAN_BUILD && __linux__
 #include <rpp/mutex.h>
+#include <rpp/sockets.h>
 #include <rpp/thread_pool.h>
+#include <rpp/threads.h>
 #include <atomic> // std::atomic_int
 #include <initializer_list> // std::initializer_list
 #include <memory> // std::make_unique
 #include <mutex> // std::lock_guard
 #include <sched.h> // sched_setaffinity
 #include <stdexcept> // std::logic_error
+#include <thread> // std::thread
 #include <typeinfo> // typeid
 #include <sanitizer/tsan_interface.h>
 
@@ -134,6 +137,38 @@ TestImpl(test_sanitizers)
         expect_race = false;
         sched_setaffinity(0, sizeof(all), &all);
         AssertThat(caught, 10);
+        AssertThat(race_reports.load(), 0);
+    #else
+        AssertTrue(true); // only a TSAN build reports the race
+    #endif
+    }
+
+    // accept() checks the socket type in the lock which close() takes on another thread, see BUGS.md C44
+    TestCase(tsan_reports_no_race_on_accept_and_a_close_on_another_thread)
+    {
+    #if RPP_TSAN_BUILD && __linux__
+        race_reports = 0;
+        expect_race = true;
+        for (int round = 0; round < 20; ++round) // TSAN reports only some of the rounds which hit the race
+        {
+            rpp::socket server = rpp::socket::listen_to({rpp::AF_IPv4, 0}, rpp::IPP_TCP); // the OS picks a free port
+            std::atomic_bool started = false;
+            std::atomic_bool accepted = false;
+            std::thread acceptor { [&]
+            {
+                started = true;
+                server.accept(5); // close() ends the poll, and a close() before the poll waits for the timeout, see BUGS.md B38
+                accepted = true;
+            }};
+            while (!started) // a spin, because a semaphore wakes this thread after accept() took the mutex
+                rpp::yield();
+            // a failed probe means accept() holds the socket mutex for its first check
+            while (!accepted && server.mutex().try_lock())
+                server.mutex().unlock();
+            server.close(); // so close() takes the mutex after that check, and often before the poll
+            acceptor.join();
+        }
+        expect_race = false;
         AssertThat(race_reports.load(), 0);
     #else
         AssertTrue(true); // only a TSAN build reports the race
